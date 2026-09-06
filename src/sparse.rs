@@ -6,6 +6,9 @@ use crate::{algebra::{Monoid, Semiring, Wire}, context::Context, mapping::Distri
 #[path = "sparse_sum.rs"]
 mod summation;
 
+#[path = "sparse_gemm.rs"]
+mod gemm;
+
 #[derive(Clone)]
 pub struct SparseTensor<'c, 'r, A: Monoid> {
     context: &'c Context<'r>,

@@ -431,3 +431,21 @@ kernel's scalar-input alpha*value exception and dense beta scaling convention.
 This path routes keys using existing distributed writes rather than claiming
 completion of upstream's optimized folding/replication sparse sum planner.
 Custom unary/accumulator functions and compressed-symmetry sums remain pending.
+
+## Explicit-grid distributed sparse matrix contractions (2026-09-07)
+
+sparse_gemm.rs aligns A(m,k), B(k,n) and C(m,n) to a physical 2D grid and
+an LCM contraction phase, using virtual k blocks when process row/column
+counts differ. Each step broadcasts variable sparse entry counts followed by
+serialized panel entries along the A row/B column fibers. Sparse panels are
+converted to owned CSR, then invoke the existing CSR sparse or dense kernels.
+The sparse-by-dense path broadcasts fixed-size dense B panels. Beta applies
+on the first step only; empty panels still participate. Inputs remain unchanged
+and output redistributes back to its original physical/virtual layout.
+
+Sparse output never uses a dense m*n intermediate. Sparse-by-sparse dense
+output uses the intended gen_csrmultd loop; unlike the pinned generic source,
+the returned addition value is assigned instead of discarded. No C++ sparse
+buffer ABI is retained. This closes explicit-grid NS matrix paths only, not
+automatic sparse plan selection, arbitrary-order sparse folds, output-moving
+2D levels, compressed symmetry or node-aware sparse scheduling.

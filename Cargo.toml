@@ -202,3 +202,8 @@ harness = false
 name = "distributed_sparse_sum"
 path = "tests/distributed_sparse_sum.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_gemm"
+path = "tests/distributed_sparse_gemm.rs"
+harness = false

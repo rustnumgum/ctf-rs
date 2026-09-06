@@ -610,3 +610,21 @@ Combined source/test integration was reviewed before execution. The first
 tolerances; the affected run and first 2/4-rank runs passed. DIGIT / PASS,
 exact comparisons only, no repeated passing tests or precision diagnostics.
 Full sparse contraction and optimized sparse sum execution remain open.
+
+## Distributed sparse matrix contractions (2026-09-07)
+
+distributed_sparse_gemm passed once each with 1/2/4 MPI ranks in WSL's Linux
+work copy, including parity contexts. Shapes (m,k,n)=(5,7,3),(1,1,1),(3,1,5)
+cover sparse*sparse -> sparse/dense and sparse*dense -> dense, alpha=2/beta=3,
+nonuniform/empty panels, rectangular and square process grids, and restoration
+of virtual-2 output layouts. Entirely empty A still applies beta correctly.
+All arithmetic fixtures compare exact i64 values. A custom min-plus semiring
+checks nonnumeric-zero identity and distributed panel/kernel composition.
+
+Source protocol and delegated kernel/tests were reviewed before execution.
+The initial compile found byte payloads passed to the typed Wire broadcast;
+this was corrected to the existing raw-byte MPI FFI entry point before any
+numerical test executed. All runs passed, DIGIT / PASS; no reruns or precision
+diagnostics. This does not close arbitrary-order sparse contraction, automatic
+planning, moving sparse output panels, node-aware sparse execution or the
+remaining native Windows/full CPU acceptance.
