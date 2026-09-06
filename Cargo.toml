@@ -252,3 +252,8 @@ harness = false
 name = "distributed_symmetric_repack"
 path = "tests/distributed_symmetric_repack.rs"
 harness = false
+
+[[test]]
+name = "distributed_packed_sum"
+path = "tests/distributed_packed_sum.rs"
+harness = false

@@ -728,3 +728,15 @@ The acceptance PowerShell script passed syntax parsing. Native execution is
 not accepted: Microsoft MPI runtime installation was canceled (0x800704c7),
 msmpi.dll was absent, and local_linalg exited before any test output. See
 native-windows.md for exact setup and remaining runtime acceptance.
+
+## Physical packed summation execution (2026-09-07)
+
+distributed_packed_sum passed once at each of 1/2/4 WSL MPI ranks, world and
+parity contexts. Exact i64 checks exercise canonical packed-to-NS overlap,
+repeated output diagonals with untouched off-diagonal beta, trace reduction,
+inclusive AS physical diagonal slots, explicit input broadcast/output reduction,
+virtual-block reduction with beta once, and empty local extents. No failures or
+retries. DIGIT / PASS for the raw packed execution layers, tolerance zero.
+The same new target compiled and linked once on Windows GNU; native runtime
+acceptance still awaits Microsoft MPI runtime installation. No installer retry
+or repetition of passed WSL checks was performed.

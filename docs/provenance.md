@@ -567,3 +567,21 @@ rejects simultaneously adding and removing them. Source automatic mapping and
 optimized aligned summation communication remain pending; current key routing
 does not gather or allocate a full global tensor. Genuine symmetry-aware sums
 and contractions remain separate unfinished work.
+
+## Packed sequential and replicated summation (2026-09-07)
+
+src/symmetric_sum.rs ports the scalar sym_seq_sum_ref canonical-bound traversal
+and packed offsets from summation/sym_seq_sum.cxx. All non-NS physical links
+use inclusive local bounds and SY-sized offsets, including AS/SH: a diagonal
+local quotient is not necessarily a diagonal global coordinate. This raw kernel
+does not perform signed semantic reads or clear globally invalid padding.
+Input multiplies alpha on the right, then is added before existing output;
+beta multiplies output on the left. Repeated output labels restrict the beta
+operation to the indexed diagonal, following SCAL_B (232-261).
+
+src/symmetric_sum_comm.rs ports explicit tsum_virt visits and tsum_replicate's
+input broadcasts, root-only old output, and ordered output-fiber reductions.
+Beta applies once per visited virtual output block. Layouts, aligned phases,
+communicator fibers, and additive commutativity are explicit caller inputs.
+It does not claim automatic symmetric mapping, broken-symmetry permutation
+expansion, global padding cleanup, or a complete high-level symmetric sum API.
