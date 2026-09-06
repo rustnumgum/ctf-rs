@@ -193,3 +193,13 @@ After these passes a fixed-width serialization assertion was added before the
 FFI call to enforce the Wire buffer-size contract; no numerical rerun was needed.
 The existing tensor reduction API is unchanged; generic contraction/summation
 communication integration remains unfinished.
+
+## 2026-09-06: generic aligned Tensor summation
+
+`cargo test --test algebra_sum --test tensor_sum` with MPI runners at 1,2,4:
+all PASS once after a compile-time temporary-borrow fix. New exact checks cover
+integer and Boolean semiring Tensor reductions. The existing f64 Tensor sum
+checks were rerun because this refactor changes their executed communication
+path to the native MPI user operation. Other passing suites were not rerun.
+`sum_from_aligned` now accepts any Semiring with Wire elements; it remains an
+explicitly aligned, unique-label interface, not complete general summation.

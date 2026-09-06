@@ -4,6 +4,21 @@
 use crate::algebra::Semiring;
 use crate::{algebra::Arithmetic,context::Context};
 
+/// General semiring version of tsum_replicate. MPI's user operation preserves
+/// the declared monoid order; no root-side array gather is used.
+pub fn replicated<A: Semiring>(algebra: &A,input_comms: &[&Context<'_>],output_comms: &[&Context<'_>],
+    shape_a: &[usize],virtual_a: &[usize],indices_a: &str,a: &mut [A::Element],
+    shape_b: &[usize],virtual_b: &[usize],indices_b: &str,b: &mut [A::Element],
+    alpha: &A::Element,beta: &A::Element,commutative: bool) where A::Element: crate::algebra::Wire {
+    for comm in input_comms {comm.broadcast(0,a);}
+    let root = output_comms.iter().all(|comm|comm.rank()==0);
+    if !root {b.fill(algebra.zero());}
+    let one=algebra.one();
+    virtualized(algebra,shape_a,virtual_a,indices_a,a,shape_b,virtual_b,indices_b,b,
+        alpha,if root {beta} else {&one});
+    for comm in output_comms {comm.all_reduce_monoid(algebra,b,commutative);}
+}
+
 /// Native-double tsum_replicate layer: broadcast input blocks, retain the old
 /// output only on reduction roots, execute the virtual layer, then all-reduce
 /// output blocks in communicator order. Communicators are supplied explicitly.

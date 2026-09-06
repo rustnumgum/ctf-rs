@@ -37,11 +37,14 @@ impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
         across_columns.close(); across_rows.close();
         cc.redistribute(self.distribution.clone()); self.data = cc.data;
     }
+}
+
+impl<A: Semiring> Tensor<'_, '_, A> where A::Element: Wire {
     /// Collective sum for unique labels with explicitly aligned distributions.
     /// Shared labels have identical maps; each topology axis maps to the same
     /// label in both operands, or to only one operand. Automatic remapping is
     /// deliberately not hidden in this entry point.
-    pub fn sum_from_aligned(&mut self, indices_b: &str, input: &Self, indices_a: &str, alpha: f64, beta: f64) {
+    pub fn sum_from_aligned(&mut self, indices_b: &str, input: &Self, indices_a: &str, alpha: A::Element, beta: A::Element) {
         use crate::mapping::Mapping;
         assert!(std::ptr::eq(self.context,input.context));
         assert_eq!(self.distribution.topology,input.distribution.topology);
@@ -81,11 +84,11 @@ impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
         let virtual_a: Vec<_> = input.distribution.mappings.iter().map(|m|m.phase()/m.physical_phase()).collect();
         let virtual_b: Vec<_> = self.distribution.mappings.iter().map(|m|m.phase()/m.physical_phase()).collect();
         let mut a = input.data.clone();
-        crate::summation::replicated_f64(&input_comms.iter().collect::<Vec<_>>(),&output_comms.iter().collect::<Vec<_>>(),
+        crate::summation::replicated(&self.algebra,&input_comms.iter().collect::<Vec<_>>(),&output_comms.iter().collect::<Vec<_>>(),
             &input.distribution.block_shape(),&virtual_a,indices_a,&mut a,
-            &self.distribution.block_shape(),&virtual_b,indices_b,&mut self.data,alpha,beta);
+            &self.distribution.block_shape(),&virtual_b,indices_b,&mut self.data,&alpha,&beta,false);
         for (offset,value) in self.data.iter_mut().enumerate() {
-            if self.distribution.global_key(self.context.rank(),offset).is_none() { *value = 0.; }
+            if self.distribution.global_key(self.context.rank(),offset).is_none() { *value = self.algebra.zero(); }
         }
         for comm in input_comms { comm.close(); }
         for comm in output_comms { comm.close(); }

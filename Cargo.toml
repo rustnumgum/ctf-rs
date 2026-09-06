@@ -55,3 +55,8 @@ required-features = ["native-linalg"]
 name = "custom_reduce"
 path = "tests/custom_reduce.rs"
 harness = false
+
+[[test]]
+name = "algebra_sum"
+path = "tests/algebra_sum.rs"
+harness = false
