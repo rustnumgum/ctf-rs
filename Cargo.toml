@@ -207,3 +207,13 @@ harness = false
 name = "distributed_sparse_gemm"
 path = "tests/distributed_sparse_gemm.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_fold"
+path = "tests/distributed_sparse_fold.rs"
+harness = false
+
+[[test]]
+name = "upstream_sparse_mp3"
+path = "tests/upstream_sparse_mp3.rs"
+harness = false

@@ -9,6 +9,9 @@ mod summation;
 #[path = "sparse_gemm.rs"]
 mod gemm;
 
+#[path = "sparse_fold.rs"]
+mod folding;
+
 #[derive(Clone)]
 pub struct SparseTensor<'c, 'r, A: Monoid> {
     context: &'c Context<'r>,
@@ -220,6 +223,17 @@ impl<A: Semiring> SparseTensor<'_, '_, A> where A::Element: Wire {
 }
 
 impl<'c, 'r, A: Monoid + Clone> SparseTensor<'c, 'r, A> where A::Element: Wire {
+    /// Collective column-major reshape of stored keys, following the source's
+    /// sparse reshape read-local-pairs/write path. No dense storage is allocated.
+    pub fn reshape(&self, target: Distribution) -> Self {
+        assert_eq!(self.distribution.global_len(), target.global_len());
+        assert_eq!(target.topology.size(), self.context.size());
+        let pairs: Vec<_> = self.local_pairs().into_iter()
+            .filter(|(key, _)| self.distribution.owner(*key) == self.context.rank()).collect();
+        let mut result = Self::new(self.context, target, self.algebra.clone());
+        result.write_add(&pairs);
+        result
+    }
     /// Reindex stored entries without changing physical ownership.
     pub fn permute_axes(&self, axes: &[usize]) -> Self {
         assert_eq!(axes.len(), self.distribution.shape.len());

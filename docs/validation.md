@@ -628,3 +628,27 @@ numerical test executed. All runs passed, DIGIT / PASS; no reruns or precision
 diagnostics. This does not close arbitrary-order sparse contraction, automatic
 planning, moving sparse output panels, node-aware sparse execution or the
 remaining native Windows/full CPU acceptance.
+
+## High-order sparse folding and MP3 (2026-09-07)
+
+distributed_sparse_fold and upstream_sparse_mp3 passed once each with 1/2/4
+MPI ranks on the Linux work copy, including parity contexts. Exact i64 folding
+tests merge two contraction labels, retain batch labels, permute all operands,
+restore virtual-2 output layouts, and cover outer products/scalar dot products.
+Sparse and mixed inputs dispatch through distributed matrix panels. A two-entry
+1,000,000 x 1,000,000 tensor reshapes to a trillion-element vector without
+dense allocation. Input pairs/distributions stay unchanged.
+
+The upstream MP3 dense-T equation chain compares dense and sparse-integral
+execution with the original abs((dense-sparse)/dense)<1e-6 criterion. Energy
+is approximately -2.74094e-3; maximum observed relative difference across the
+requested configurations was 7.9112e-16. DIGIT / PASS; no repeated passing
+tests, additional precision, or unrequested benchmark iterations.
+Combined delegated implementation/test review removed constructor-only wrappers
+before the first run. Sparse-T custom functions, general non-foldable sparse
+indices and full native Windows/CPU coverage remain open.
+
+A read-only native readiness probe found stable-x86_64-pc-windows-gnu installed
+under C:/Users/xylxp/.cargo/bin but not on this shell's PATH. No mpiexec was
+found on PATH or the usual Microsoft MPI directories. No native numerical
+build/test was attempted in this batch; this is not Windows acceptance.

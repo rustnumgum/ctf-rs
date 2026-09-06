@@ -449,3 +449,28 @@ the returned addition value is assigned instead of discarded. No C++ sparse
 buffer ABI is retained. This closes explicit-grid NS matrix paths only, not
 automatic sparse plan selection, arbitrary-order sparse folds, output-moving
 2D levels, compressed symmetry or node-aware sparse scheduling.
+
+## High-order sparse folding and reshape (2026-09-07)
+
+sparse_fold.rs groups unique NS labels by their occurrence in A/B/C: AB is k,
+AC is m, BC is n, and ABC is an independent batch. Canonical sparse matrices
+use A[m,k,batch], B[k,n,batch], C[m,n,batch], dispatching each batch through
+the distributed sparse matrix panel kernels before inverse axis permutation
+and restoration of the requested output distribution. Stored-key reshape
+follows the source sparse reshape path, without dense temporary storage.
+
+This is a fully foldable unique-index path, not a reference Cartesian-product
+fallback. Repeated labels, one-operand-only labels and compressed symmetry are
+still explicitly unsupported by this folding entry point. Automatic candidate
+selection and source-specific sparse packing optimizations remain separate
+unfinished responsibilities.
+
+tests/upstream_sparse_mp3.rs ports examples/sparse_mp3.cxx's MP3 equations with
+dense T, testing dense integrals against sparse integrals through the new fold
+path. Orbital-denominator sums and all five MP3 contribution terms are retained.
+The nv=3/no=2 fixture uses deterministic global-key values in the source's
+intervals and threshold 0.8 rather than rank-seeded drand48. The test sparsifies
+all five integral tensors (the source calls Vabcd.sparsify twice and leaves
+Vijab dense); this changes storage, not the equations or values. The original
+relative-energy criterion is retained. The custom-function sparse-T branch
+is not claimed implemented or tested here.
