@@ -263,3 +263,23 @@ storage; the source's optimized dense diagonal extraction via mapped summation
 is not yet an exact communication-level port. This fidelity work, general
 cost-based planning, sparse/packed symmetry and distributed decompositions remain
 explicitly unfinished. Passing numerical identities do not close those gaps.
+
+## 2026-09-07: owned sparse matrix formats and local kernels
+
+WSL Ubuntu-26.04, source `/home/xylxp/ctf-rs-work`, target cache
+`/home/xylxp/.cache/ctf-rs-target`: `cargo test --test sparse_formats` PASS,
+5 tests. Initial compilation exposed missing explicit PartialEq method bounds;
+those were fixed before the single numerical acceptance run. No numerical
+diagnostic runs or repeats of passing dense suites.
+
+Exact i64/bool acceptance covers one-based IA/JA/row encodings, conversion with
+unsorted input and explicit zeros, duplicate COO preservation, cyclic partition
+and assemble with 1/2/4/9 parts, empty matrices/parts, CCSR logical row count 2^40,
+CSR and CCSR sparse union, CSR*dense, CSR*CSR, CCSR*dense, alpha/beta and prior
+output, cancellation retaining structural zeros, last-column padding, and a
+Boolean semiring product. Partition counts are local strips, NOT MPI rank runs.
+
+DIGIT / PASS: class R, reference pinned source layout/kernel rules and exact
+analytic integer/Boolean results, tolerance 0, 5/5 checks. This closes only these
+local paths; distributed sparse execution, upstream sparse test migration and
+Windows native acceptance remain open.

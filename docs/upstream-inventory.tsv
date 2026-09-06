@@ -1,10 +1,10 @@
 source	rust_destination	status
 src/Makefile	Cargo/build tooling	replaced
-src/sparse_formats/ccsr.cxx	src/sparse_formats	pending
+src/sparse_formats/ccsr.cxx	src/sparse_formats.rs	partial: row encoding, partition/assemble, addition; local exact tests pass
 src/sparse_formats/ccsr.h	src/sparse_formats	pending
 src/sparse_formats/coo.cxx	src/sparse_formats	pending
 src/sparse_formats/coo.h	src/sparse_formats	pending
-src/sparse_formats/csr.cxx	src/sparse_formats	pending
+src/sparse_formats/csr.cxx	src/sparse_formats.rs	partial: partition/assemble, addition; local exact tests pass
 src/sparse_formats/csr.h	src/sparse_formats	pending
 src/sparse_formats/Makefile	Cargo/build tooling	replaced
 src/sparse_formats/sparse_matrix.cxx	src/sparse_formats	pending
@@ -81,9 +81,9 @@ src/interface/scalar.h	src/interface	pending
 src/interface/schedule.cxx	src/interface	pending
 src/interface/schedule.h	src/interface	pending
 src/interface/semiring.cxx	src/interface	pending
-src/interface/semiring.h	src/interface	pending
+src/interface/semiring.h	src/algebra.rs; src/sparse_formats.rs	partial: algebra, gen_csrmm, gen_csrmultcsr, gen_ccsrmm; remaining kernels pending
 src/interface/set.cxx	src/interface	pending
-src/interface/set.h	src/interface	pending
+src/interface/set.h	src/sparse_formats.rs	partial: seq_coo_to_csr, seq_coo_to_ccsr, seq_csr_to_coo; remaining set responsibilities pending
 src/interface/sparse_tensor.cxx	src/interface	pending
 src/interface/sparse_tensor.h	src/interface	pending
 src/interface/tensor.cxx	src/interface	pending

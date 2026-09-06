@@ -52,3 +52,28 @@ Do not stamp independently written files with the upstream author's copyright.
 Keep attribution with actual adaptations and add per-source provenance as the
 port grows. The source/test inventory is a scope ledger, not a claim that all
 listed source files have been ported.
+
+## Sparse matrix formats (2026-09-07)
+
+`src/sparse_formats.rs` adapts `interface/set.h` COO conversion ordering and
+prefix sums, `sparse_formats/{csr,ccsr}.cxx` cyclic partitions/assembly and
+symbolic union/scatter addition, and `interface/semiring.h` gen_csrmm,
+gen_csrmultcsr and gen_ccsrmm. One-based logical indices and structural zeros
+are retained. C++ aligned byte-buffer headers are replaced by owned Rust vectors.
+CCSR addition shares the CSR row-union kernel for overlapping compressed rows;
+it never expands the full logical row dimension.
+
+Source memory mistakes are not ABI requirements: empty CCSR uses just IA=[1]
+(the source seq_coo_to_ccsr writes IA[1] even with zero represented rows);
+gen_csrmultcsr allocates exactly the symbolic nnz instead of initializing beyond
+its allocation; CCSR beta scaling targets values, not the packed metadata header.
+Zero-column CCSR outputs retain the Rust operation's declared shape instead of
+the source empty-path hard-coded column count 1. Source's one-final-zero-column
+padding omission is retained for nonempty column dimensions. COO duplicate ties
+have no specified upstream sort order; conversion retains duplicates, while
+sparse addition requires unique coordinates as its input contract.
+
+The generic source gen_csrmultd discards fadd's returned value. That kernel has
+not been ported or silently repaired; sparse-sparse-to-dense and the specialized
+native kernels remain pending. The new exact local tests are analytic layout
+and algebra checks, not a claim to have migrated the upstream sparse CPU suite.

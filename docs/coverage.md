@@ -12,7 +12,7 @@ Statuses below describe implementation, not acceptance passes.
 | 2 | scaling/*; summation/*; redistribution/{slice,nosym_transp} | scaling; summation; redistribution | diag_sym, diag_ctr, scalar, permutations and slices | dense offset slice, axis transpose and indexed endomorphisms implemented; remaining paths pending |
 | 2 | contraction/{contraction,ctr_tsr,ctr_comm,ctr_2d_general,sym_seq_ctr}; shared/blas_symbs | contraction; ffi/linalg | gemm_4D, weigh_4D, ccsdt_t3_to_t2, sy_times_ns; node-aware execution | pending |
 | 3 | contraction/{contraction_signature,contraction_plan,contraction_selector}; shared/{model,init_models,memcontrol,int_timer} | contraction; shared | cache reuse, candidate selection, distribution switching, low-memory path, timings/peak memory | pending |
-| 4 | sparse_formats/*; contraction/sp*; summation/spr*; tensor sparse paths | sparse_formats; contraction; summation | speye, sptensor_sum, sparse_mp3, custom sparse endomorphisms | pending |
+| 4 | sparse_formats/*; contraction/sp*; summation/spr*; tensor sparse paths | sparse_formats; contraction; summation | speye, sptensor_sum, sparse_mp3, custom sparse endomorphisms | local COO/CSR/CCSR conversion, cyclic strips, addition and CSR/CCSR matrix kernels implemented; distributed tensor paths and upstream sparse tests pending |
 | 4 | symmetry/*; symmetric sequential kernels | symmetry | NS/SY/AS/SH compressed layouts, mixed symmetry and repeated indices | pending |
 | 4 | interface/{functions,fun_term}; transforms in tensor | algebra; tensor | univar_function, bivar_function, bivar_transform, endomorphism* | pending |
 | 5 | interface/matrix; shared/lapack_symbs | matrix; ffi/linalg; ffi/scalapack | qr, svd, eigh, Cholesky, SPD/triangular solves, randomized SVD | pending |

@@ -16,4 +16,5 @@ for ranks in 1 2 4; do
     cargo test "${args[@]}"
 done
 cargo test --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
-  --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction -- --nocapture
+  --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction \
+  --test sparse_formats -- --nocapture
