@@ -93,12 +93,46 @@ macro_rules! arithmetic {
 }
 arithmetic!(f32, f64, i32, i64);
 
+/// Rust-owned complex scalar. Communication uses Wire, not the memory layout.
+#[repr(C)]
+#[derive(Clone,Copy,Debug,Default,PartialEq)]
+pub struct Complex<T> {pub re:T,pub im:T}
+impl<T> Complex<T> {pub fn new(re:T,im:T)->Self {Self {re,im}}}
+macro_rules! complex_arithmetic {
+    ($($t:ty),*) => {$(
+        impl Monoid for Arithmetic<Complex<$t>> {
+            type Element=Complex<$t>;
+            fn zero(&self)->Self::Element {Complex::new(0.,0.)}
+            fn add(&self,a:&Self::Element,b:&Self::Element)->Self::Element {Complex::new(a.re+b.re,a.im+b.im)}
+        }
+        impl Semiring for Arithmetic<Complex<$t>> {
+            fn one(&self)->Self::Element {Complex::new(1.,0.)}
+            fn multiply(&self,a:&Self::Element,b:&Self::Element)->Self::Element {
+                Complex::new(a.re*b.re-a.im*b.im,a.re*b.im+a.im*b.re)
+            }
+        }
+        impl Group for Arithmetic<Complex<$t>> {
+            fn negate(&self,a:&Self::Element)->Self::Element {Complex::new(-a.re,-a.im)}
+        }
+        impl Complex<$t> {
+            pub fn conjugate(self)->Self {Self::new(self.re,-self.im)}
+            pub fn norm_squared(self)->$t {self.re*self.re+self.im*self.im}
+        }
+    )*}
+}
+complex_arithmetic!(f32,f64);
+
 /// Explicit serialization, rather than transmitting Rust object representations.
 /// Each encoded element occupies exactly WIDTH bytes on every rank.
 pub trait Wire: Sized {
     const WIDTH: usize;
     fn encode(&self, output: &mut Vec<u8>);
     fn decode(input: &[u8]) -> Self;
+}
+impl<T:Wire> Wire for Complex<T> {
+    const WIDTH:usize=2*T::WIDTH;
+    fn encode(&self,output:&mut Vec<u8>) {self.re.encode(output);self.im.encode(output);}
+    fn decode(input:&[u8])->Self {Self::new(T::decode(&input[..T::WIDTH]),T::decode(&input[T::WIDTH..]))}
 }
 macro_rules! wire_number {
     ($($t:ty),*) => {$(

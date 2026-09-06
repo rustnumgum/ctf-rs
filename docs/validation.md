@@ -203,3 +203,11 @@ checks were rerun because this refactor changes their executed communication
 path to the native MPI user operation. Other passing suites were not rerun.
 `sum_from_aligned` now accepts any Semiring with Wire elements; it remains an
 explicitly aligned, unique-label interface, not complete general summation.
+
+## 2026-09-06: complex scalar algebra
+
+`cargo test --test complex_scalar` under MPI at 1,2,4: PASS once each after a
+test-only temporary-borrow compile fix. Exact small-integer complex values cover
+f32/f64 arithmetic, conjugation, norm squared, local indexed contraction, native
+MPI user reduction, distributed key I/O and scaling. Complex native BLAS/LAPACK/
+ScaLAPACK bindings are not supplied by this scalar-algebra addition.

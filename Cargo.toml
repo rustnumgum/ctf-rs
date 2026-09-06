@@ -60,3 +60,8 @@ harness = false
 name = "algebra_sum"
 path = "tests/algebra_sum.rs"
 harness = false
+
+[[test]]
+name = "complex_scalar"
+path = "tests/complex_scalar.rs"
+harness = false
