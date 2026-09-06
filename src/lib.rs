@@ -11,6 +11,7 @@ pub mod map_tensor;
 pub mod topology_candidates;
 pub mod node_aware;
 pub mod tensor;
+mod diagonal;
 pub mod summation;
 pub mod contraction;
 pub mod ctr_2d;

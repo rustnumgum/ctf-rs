@@ -6,12 +6,14 @@ export OPENBLAS_NUM_THREADS=1
 
 # Run in Linux, not as an interpolated PowerShell command string.
 # Each required rank configuration runs once; failed commands stop the set.
+mpi_tests=(foundation dense_views replicated_sum tensor_sum custom_reduce algebra_sum
+  complex_scalar sum_remap replicated_contraction ctr_2d tensor_gemm
+  algebra_contraction tensor_contract contract_remap dense_semantics upstream_dense subcomm_dense)
+args=()
+for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
-    cargo test --test foundation
+    cargo test "${args[@]}"
 done
-for ranks in 1 2 4; do
-  CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
-    cargo test --test dense_views
-done
-cargo test --test local_linalg -- --nocapture
+cargo test --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
+  --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction -- --nocapture

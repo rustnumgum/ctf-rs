@@ -80,3 +80,29 @@ harness = false
 name = "tensor_contract"
 path = "tests/tensor_contract.rs"
 harness = false
+
+[[test]]
+name = "contract_remap"
+path = "tests/contract_remap.rs"
+harness = false
+
+[[test]]
+name = "dense_semantics"
+path = "tests/dense_semantics.rs"
+harness = false
+
+[[test]]
+name = "upstream_dense"
+path = "tests/upstream_dense.rs"
+harness = false
+
+[[test]]
+name = "subcomm_dense"
+path = "tests/subcomm_dense.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[example]]
+name = "mpi_gemm_bench"
+path = "examples/mpi_gemm_bench.rs"
+required-features = ["native-linalg"]

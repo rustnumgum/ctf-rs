@@ -40,6 +40,12 @@ for Cargo's target directory. The script currently covers only the foundation
 and local-linalg subset; do not treat it as the complete acceptance suite.
 Recorded results and remaining gates are in `docs/validation.md`.
 
+To avoid Windows-drive source I/O, run `bash scripts/sync-wsl.sh` from the
+Windows-backed repository in WSL. Build/test in `/home/xylxp/ctf-rs-work` after
+syncing; keep edits and Git commits in `D:\projects\ctf-rs`. The sync does not
+copy `.git`, remove files, or change the delivery repository. Passing acceptance
+sets need not be repeated merely because the work copy location changed.
+
 ## Commit cadence
 
 Commit each completed implementation/validation batch with its scope and evidence.

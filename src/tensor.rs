@@ -40,6 +40,115 @@ impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
 }
 
 impl<A: Semiring> Tensor<'_, '_, A> where A::Element: Wire {
+    /// Distributed unary sum; f is applied to each alpha-scaled input before
+    /// any reduction, preserving custom-function ordering for nonlinear f.
+    pub fn sum_function_from(&mut self,indices_b:&str,input:&Self,indices_a:&str,topology:crate::mapping::Topology,
+        alpha:A::Element,beta:A::Element,function:impl Fn(&A::Element)->A::Element)->Result<(),crate::map_tensor::Rejected> where A:Clone {
+        let mut transformed=Self {context:input.context,algebra:input.algebra.clone(),distribution:input.distribution.clone(),data:input.data.clone()};
+        for (offset,value) in transformed.data.iter_mut().enumerate() {
+            if transformed.distribution.global_key(transformed.context.rank(),offset).is_some() {*value=function(&input.algebra.multiply(value,&alpha));}
+        }
+        self.sum_from(indices_b,&transformed,indices_a,topology,self.algebra.one(),beta)
+    }
+    /// Dense slice insertion following extract/remap/rank-shift/scatter. Beta is
+    /// applied only inside the destination slice, including empty local shards.
+    pub fn assign_slice(&mut self,ranges:&[std::ops::Range<usize>],source:&Self,source_ranges:&[std::ops::Range<usize>],
+        alpha:&A::Element,beta:&A::Element) where A:Clone {
+        assert!(std::ptr::eq(self.context,source.context));assert_eq!(ranges.len(),self.distribution.shape.len());
+        for (r,&n) in ranges.iter().zip(&self.distribution.shape) {assert!(r.start<=r.end&&r.end<=n);}
+        let shape:Vec<_>=ranges.iter().map(|r|r.end-r.start).collect();
+        let offsets:Vec<_>=ranges.iter().map(|r|r.start).collect();
+        let mut part=source.slice(source_ranges);assert_eq!(part.distribution.shape,shape);
+        let mut distribution=self.distribution.clone();distribution.shape=shape;part.redistribute(distribution);
+        let send=self.distribution.shifted_rank(self.context.rank(),&offsets,true);
+        let recv=self.distribution.shifted_rank(self.context.rank(),&offsets,false);
+        if send!=self.context.rank()&&!part.data.is_empty() {
+            let mut bytes=Vec::with_capacity(part.data.len()*A::Element::WIDTH);for value in &part.data {value.encode(&mut bytes);}
+            let mut received=vec![0u8;bytes.len()];self.context.inner.send_receive(&bytes,send,recv,&mut received);
+            for (value,bytes) in part.data.iter_mut().zip(received.chunks_exact(A::Element::WIDTH)) {*value=A::Element::decode(bytes);}
+        }
+        for (offset,value) in part.data.iter().enumerate() {
+            if let Some(key)=part.distribution.global_key(recv,offset) {
+                let coordinates:Vec<_>=part.distribution.decode_key(key).iter().zip(&offsets).map(|(&c,&o)|c+o).collect();
+                let key=self.distribution.encode_key(&coordinates);let index=self.distribution.local_offset(self.context.rank(),key);
+                let previous=if *beta==self.algebra.zero() {self.algebra.zero()} else {self.algebra.multiply(&self.data[index],beta)};
+                self.data[index]=self.algebra.add(&self.algebra.multiply(value,alpha),&previous);
+            }
+        }
+    }
+    /// Distributed indexed sum, including repeated input/output labels.
+    pub fn sum_from(&mut self,indices_b:&str,input:&Self,indices_a:&str,topology:crate::mapping::Topology,
+        alpha:A::Element,beta:A::Element)->Result<(),crate::map_tensor::Rejected> where A:Clone {
+        let pa=crate::diagonal::Projection::new(&input.distribution.shape,indices_a);
+        let pb=crate::diagonal::Projection::new(&self.distribution.shape,indices_b);
+        if !pa.repeated()&&!pb.repeated() {return self.sum_from_on_grid(indices_b,input,indices_a,topology,alpha,beta);}
+        let (a,ia)=input.extract_diagonal(indices_a);let (mut b,ib)=self.extract_diagonal(indices_b);
+        b.sum_from_on_grid(&ib,&a,&ia,topology,alpha,beta)?;
+        self.replace_diagonal(indices_b,&b);Ok(())
+    }
+    /// Distributed reference contraction including repeated labels. The explicit
+    /// grid execution remains distinct from cost-based/BLAS-folded planning.
+    pub fn contract_from(&mut self,indices_c:&str,a:&Self,indices_a:&str,b:&Self,indices_b:&str,
+        topology:crate::mapping::Topology,alpha:A::Element,beta:A::Element)->Result<(),crate::map_tensor::Rejected> where A:Clone {
+        let pa=crate::diagonal::Projection::new(&a.distribution.shape,indices_a);
+        let pb=crate::diagonal::Projection::new(&b.distribution.shape,indices_b);
+        let pc=crate::diagonal::Projection::new(&self.distribution.shape,indices_c);
+        if !pa.repeated()&&!pb.repeated()&&!pc.repeated() {return self.contract_from_on_grid(indices_c,a,indices_a,b,indices_b,topology,alpha,beta);}
+        let (aa,ia)=a.extract_diagonal(indices_a);let (bb,ib)=b.extract_diagonal(indices_b);let (mut cc,ic)=self.extract_diagonal(indices_c);
+        cc.contract_from_on_grid(&ic,&aa,&ia,&bb,&ib,topology,alpha,beta)?;
+        self.replace_diagonal(indices_c,&cc);Ok(())
+    }
+    /// Collective affine key write. Duplicate incoming keys are summed before
+    /// alpha/beta are applied once; keys absent from the request are unchanged.
+    pub fn write_scaled(&mut self,pairs:&[(usize,A::Element)],alpha:&A::Element,beta:&A::Element) {
+        let mut buckets=vec![Vec::new();self.context.size()];
+        for (key,value) in pairs {for (rank,bucket) in buckets.iter_mut().enumerate() {
+            if self.distribution.owns(rank,*key) {(*key as u64).encode(bucket);value.encode(bucket);}
+        }}
+        let mut incoming=std::collections::BTreeMap::new();
+        for bytes in self.context.inner.exchange(&buckets) {for pair in bytes.chunks_exact(8+A::Element::WIDTH) {
+            let key=u64::decode(&pair[..8]) as usize;let value=A::Element::decode(&pair[8..]);
+            incoming.entry(key).and_modify(|old|*old=self.algebra.add(old,&value)).or_insert(value);
+        }}
+        for (key,value) in incoming {
+            let offset=self.distribution.local_offset(self.context.rank(),key);
+            let previous=if *beta==self.algebra.zero() {self.algebra.zero()} else {self.algebra.multiply(&self.data[offset],beta)};
+            self.data[offset]=self.algebra.add(&self.algebra.multiply(&value,alpha),&previous);
+        }
+    }
+    /// Map unique-label operands to a supplied topology, execute the generic
+    /// aligned contraction and restore C's distribution. This is explicit-grid
+    /// execution; candidate cost selection and BLAS folding are not implied.
+    pub fn contract_from_on_grid(&mut self,indices_c:&str,a:&Self,indices_a:&str,b:&Self,indices_b:&str,
+        topology:crate::mapping::Topology,alpha:A::Element,beta:A::Element)->Result<(),crate::map_tensor::Rejected>
+    where A:Clone {
+        use crate::mapping::Mapping;
+        assert!(std::ptr::eq(self.context,a.context)&&std::ptr::eq(self.context,b.context));assert_eq!(topology.size(),self.context.size());
+        let mut labels=Vec::new();let mut shape=Vec::new();
+        for (indices,d) in [(indices_a,&a.distribution),(indices_b,&b.distribution),(indices_c,&self.distribution)] {
+            assert!(indices.is_ascii());assert_eq!(indices.len(),d.shape.len());
+            for (i,label) in indices.bytes().enumerate() {
+                assert!(!indices.as_bytes()[..i].contains(&label),"unique labels required by this entry point");
+                if let Some(j)=labels.iter().position(|&l|l==label) {assert_eq!(shape[j],d.shape[i]);}
+                else {labels.push(label);shape.push(d.shape[i]);}
+            }
+        }
+        let mut maps=vec![Mapping::Unmapped;labels.len()];
+        if !labels.is_empty() {
+            crate::map_tensor::assign(&shape,&topology,&(0..topology.dimensions.len()).collect::<Vec<_>>(),
+                &vec![false;labels.len()*labels.len()],&mut vec![false;labels.len()],&mut maps,true)?;
+        }
+        let mapped=|indices:&str,shape:&[usize]|Distribution::new(shape.to_vec(),topology.clone(),
+            indices.bytes().map(|label|maps[labels.iter().position(|&l|l==label).unwrap()].clone()).collect());
+        let mut aa=Self {context:a.context,algebra:a.algebra.clone(),distribution:a.distribution.clone(),data:a.data.clone()};
+        let mut bb=Self {context:b.context,algebra:b.algebra.clone(),distribution:b.distribution.clone(),data:b.data.clone()};
+        let mut cc=Self {context:self.context,algebra:self.algebra.clone(),distribution:self.distribution.clone(),data:self.data.clone()};
+        aa.redistribute(mapped(indices_a,&aa.distribution.shape));bb.redistribute(mapped(indices_b,&bb.distribution.shape));
+        cc.redistribute(mapped(indices_c,&cc.distribution.shape));
+        cc.contract_from_aligned(indices_c,&aa,indices_a,&bb,indices_b,alpha,beta);
+        cc.redistribute(self.distribution.clone());self.data=cc.data;
+        Ok(())
+    }
     /// Collective unique-label contraction on already aligned distributions.
     /// Shared labels must have identical maps; mismatched physical labels need
     /// the 2D/planning layer instead. Native user reductions support custom rings.
@@ -226,6 +335,31 @@ impl<'c, 'r, A: Monoid> Tensor<'c, 'r, A> {
 }
 
 impl<'c, 'r, A: Monoid + Clone> Tensor<'c, 'r, A> where A::Element: Wire {
+    /// Extract one coordinate per repeated label. Only canonical local entries
+    /// are sent; no global tensor or diagonal is gathered on a single process.
+    pub fn extract_diagonal(&self,labels:&str)->(Self,String) {
+        let projection=crate::diagonal::Projection::new(&self.distribution.shape,labels);
+        if !projection.repeated() {return (Self {context:self.context,algebra:self.algebra.clone(),distribution:self.distribution.clone(),data:self.data.clone()},projection.labels);}
+        let mut result=Self::new(self.context,Distribution::cyclic(projection.shape.clone(),self.context.size()),self.algebra.clone());
+        let mut pairs=Vec::new();
+        for (key,value) in self.local_pairs() {
+            if self.distribution.owner(key)!=self.context.rank() {continue;}
+            if let Some(coordinates)=projection.project(&self.distribution.decode_key(key)) {pairs.push((result.distribution.encode_key(&coordinates),value));}
+        }
+        result.write_add(&pairs);(result,projection.labels)
+    }
+    /// Replace selected diagonal entries, preserving all off-diagonal data.
+    pub fn replace_diagonal(&mut self,labels:&str,input:&Self) {
+        assert!(std::ptr::eq(self.context,input.context));
+        let projection=crate::diagonal::Projection::new(&self.distribution.shape,labels);
+        assert_eq!(projection.shape,input.distribution.shape);
+        let mut pairs=Vec::new();
+        for (key,value) in input.local_pairs() {
+            if input.distribution.owner(key)!=self.context.rank() {continue;}
+            let coordinates=projection.expand(&input.distribution.decode_key(key));pairs.push((self.distribution.encode_key(&coordinates),value));
+        }
+        let zero=self.algebra.zero();self.transform_indexed(labels,|value|*value=zero.clone());self.write_add(&pairs);
+    }
     /// Collective dense slice, retaining physical/virtual mappings. Extract the
     /// local sub-block, then shift its owner by offsets modulo physical phases,
     /// as in upstream redistribution/slice.cxx. No global tensor is gathered.

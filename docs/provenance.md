@@ -40,6 +40,12 @@ Do not stamp independently written files with the upstream author's copyright.
 * `src/ctr_2d.rs`: panel packing/broadcast, output reduction/scatter and layer
   propagation adapted from `ctr_2d_general::run` and `find_bsizes` in
   `src/contraction/ctr_2d_general.cxx`.
+* `src/diagonal.rs`: repeated-coordinate key projection/insertion follows the
+  index deletion/insertion rules in `tensor::extract_diag`. Current dense data
+  transfer uses canonical-key redistribution, not the optimized upstream dense
+  mapped-summation path; do not claim exact communication parity for this path.
+* `tests/upstream_dense.rs`: numerical identities from `test/diag_ctr.cxx` and
+  `test/reduce_bcast.cxx`, retaining original residual metrics and tolerances.
 * `src/linalg.rs`, `src/ffi/linalg.rs`: new local-kernel interface and bindings to
   standard BLAS/LAPACK operations. No C++ CTF wrapper is linked or copied here.
 

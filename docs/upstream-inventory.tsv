@@ -173,7 +173,7 @@ test/bivar_transform.cxx	tests/upstream/test/bivar_transform.rs	pending
 test/ccsdt_map_test.cxx	tests/upstream/test/ccsdt_map_test.rs	pending
 test/ccsdt_t3_to_t2.cxx	tests/upstream/test/ccsdt_t3_to_t2.rs	pending
 test/dft.cxx	tests/upstream/test/dft.rs	pending
-test/diag_ctr.cxx	tests/upstream/test/diag_ctr.rs	pending
+test/diag_ctr.cxx	tests/upstream_dense.rs	identity ported; WSL 1/2/4 pass
 test/diag_sym.cxx	tests/upstream/test/diag_sym.rs	pending
 test/endomorphism_cust_sp.cxx	tests/upstream/test/endomorphism_cust_sp.rs	pending
 test/endomorphism_cust.cxx	tests/upstream/test/endomorphism_cust.rs	pending
@@ -184,7 +184,7 @@ test/multi_tsr_sym.cxx	tests/upstream/test/multi_tsr_sym.rs	pending
 test/permute_multiworld.cxx	tests/upstream/test/permute_multiworld.rs	pending
 test/readall_test.cxx	tests/upstream/test/readall_test.rs	pending
 test/readwrite_test.cxx	tests/upstream/test/readwrite_test.rs	pending
-test/reduce_bcast.cxx	tests/upstream/test/reduce_bcast.rs	pending
+test/reduce_bcast.cxx	tests/upstream_dense.rs	both identities ported; WSL 1/2/4 pass
 test/repack.cxx	tests/upstream/test/repack.rs	pending
 test/scalar.cxx	tests/upstream/test/scalar.rs	pending
 test/speye.cxx	tests/upstream/test/speye.rs	pending

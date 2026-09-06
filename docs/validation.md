@@ -238,3 +238,28 @@ layers, and restores valid output replicas from canonical owners. Tests cover
 combined physical and virtual k reduction and preserving input tensors.
 General repeated-index contraction, automatic remapping/folding and planning are
 not established by this explicitly aligned entry point.
+
+## 2026-09-06: dense indexed API integration
+
+Previously completed `contract_remap` PASS at 1/2/4 ranks is retained without
+rerunning it: high-order two-index reduction with differing input distributions.
+New `dense_semantics` PASS once at 1/2/4 ranks: diagonal extraction/replacement,
+repeated-label sums and contractions, output off-diagonal preservation, nonlinear
+unary sum ordering, empty diagonal reductions, offset slice insertion, and
+duplicate-key affine writes. All those checks use exact integers.
+
+`upstream_dense` migrates the numerical identities of upstream `diag_ctr.cxx`
+and both `reduce_bcast.cxx` variants. PASS at 1/2/4 ranks, original bounds 1e-10
+(absolute trace difference) and 1e-6 (Frobenius residual). Observed residuals
+were zero. No stricter check or precision explanation was pursued.
+`subcomm_dense` PASS at 1/2/4 world ranks: split-context repeated-label sum,
+generic contraction and MPI+BLAS, including two simultaneously active groups.
+
+Each newly required configuration ran once, no numerical diagnostic computations.
+Representative timing/RSS measurements are separately recorded in `performance.md`.
+
+Diagonal projection currently uses canonical-key redistribution and rank-local
+storage; the source's optimized dense diagonal extraction via mapped summation
+is not yet an exact communication-level port. This fidelity work, general
+cost-based planning, sparse/packed symmetry and distributed decompositions remain
+explicitly unfinished. Passing numerical identities do not close those gaps.
