@@ -103,3 +103,18 @@ Covered transpose with alpha/beta, reduction plus broadcast, repeated input and
 output indices, zero-length reduction, and custom-function application after
 input scaling. The kernel processes local column-major blocks; distributed
 tsum replication/reduction and compressed-symmetry integration remain pending.
+
+## 2026-09-06: virtual and replicated summation layers
+
+`cargo test --test virtual_sum`: 3 exact tests PASS once. Covered beta-on-first-
+output-block-visit, virtual broadcast/permutation and virtual diagonals.
+`cargo test --test replicated_sum` under MPI runners with 1,2,4 ranks: each PASS
+once. Covered input block broadcast, native f64 block Allreduce, retaining beta
+only on reduction roots, nested virtual reduction and zero-count output blocks.
+Values in these MPI checks are exactly representable small integers; equality
+is exact, with no floating-point tolerance study or diagnostic reruns.
+
+The communication sequence is ported from `tsum_replicate::run`, while virtual
+traversal follows `tsum_virt::run`. No global tensor gather is used. This is the
+native-double layer; custom reduction operators, automatic mapping, complete
+Tensor-level summation and packed symmetry are still outstanding.

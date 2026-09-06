@@ -24,3 +24,8 @@ harness = false
 name = "dense_views"
 path = "tests/dense_views.rs"
 harness = false
+
+[[test]]
+name = "replicated_sum"
+path = "tests/replicated_sum.rs"
+harness = false

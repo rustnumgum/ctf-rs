@@ -52,6 +52,18 @@ impl Comm {
         if self.owned { unsafe { check(sys::MPI_Comm_free(&mut self.raw)); } }
     }
     pub(crate) fn barrier(&self) { unsafe { check(sys::MPI_Barrier(self.raw)); } }
+    pub(crate) fn sum_f64(&self, values: &mut [f64]) {
+        let input = values.to_vec();
+        if values.is_empty() {
+            // Distinct valid addresses for zero-count MPI calls.
+            let input = 0.0f64; let mut output = 0.0f64;
+            unsafe { check(sys::MPI_Allreduce((&input as *const f64).cast(), (&mut output as *mut f64).cast(),
+                0,sys::RSMPI_DOUBLE,sys::RSMPI_SUM,self.raw)); }
+        } else {
+            unsafe { check(sys::MPI_Allreduce(input.as_ptr().cast(),values.as_mut_ptr().cast(),
+                values.len().try_into().unwrap(),sys::RSMPI_DOUBLE,sys::RSMPI_SUM,self.raw)); }
+        }
+    }
     pub(crate) fn send_receive(&self, send: &[u8], destination: usize, source: usize, recv: &mut [u8]) {
         assert!(destination < self.size() && source < self.size());
         unsafe { check(sys::MPI_Sendrecv(send.as_ptr().cast(), send.len().try_into().unwrap(), sys::RSMPI_UINT8_T,

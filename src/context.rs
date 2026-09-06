@@ -18,6 +18,8 @@ impl Context<'_> {
     pub fn rank(&self) -> usize { self.inner.rank() }
     pub fn size(&self) -> usize { self.inner.size() }
     pub fn barrier(&self) { self.inner.barrier(); }
+    /// Native MPI sum of one local f64 block. Collective; no global tensor gather.
+    pub fn sum_f64(&self, values: &mut [f64]) { self.inner.sum_f64(values); }
     pub fn split(&self, color: Option<i32>, key: i32) -> Option<Context<'_>> {
         self.inner.split(color, key).map(|inner| Context { inner, _runtime: self._runtime })
     }

@@ -28,6 +28,8 @@ Do not stamp independently written files with the upstream author's copyright.
 * `src/summation.rs`: local NS sequential summation control flow and alpha/beta
   ordering adapted from `src/summation/sym_seq_sum.cxx`; Rust index offset tables
   replace byte offsets and explicit C++ buffer management.
+  Its virtual-block and replicated-block layers follow `tsum_virt::run` and
+  `tsum_replicate::run` in `src/summation/sum_tsr.cxx`.
 * `src/linalg.rs`, `src/ffi/linalg.rs`: new local-kernel interface and bindings to
   standard BLAS/LAPACK operations. No C++ CTF wrapper is linked or copied here.
 

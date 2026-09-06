@@ -2,6 +2,22 @@
 // Adapted dense NS branch of summation/sym_seq_sum.cxx; packed symmetry and
 // distributed tsum layers are separate responsibilities.
 use crate::algebra::Semiring;
+use crate::{algebra::Arithmetic,context::Context};
+
+/// Native-double tsum_replicate layer: broadcast input blocks, retain the old
+/// output only on reduction roots, execute the virtual layer, then all-reduce
+/// output blocks in communicator order. Communicators are supplied explicitly.
+pub fn replicated_f64(input_comms: &[&Context<'_>], output_comms: &[&Context<'_>],
+    shape_a: &[usize], virtual_a: &[usize], indices_a: &str, a: &mut [f64],
+    shape_b: &[usize], virtual_b: &[usize], indices_b: &str, b: &mut [f64],
+    alpha: f64, beta: f64) {
+    for comm in input_comms { comm.broadcast(0,a); }
+    let root = output_comms.iter().all(|comm|comm.rank() == 0);
+    if !root { b.fill(0.); }
+    virtualized(&Arithmetic::<f64>::new(),shape_a,virtual_a,indices_a,a,
+        shape_b,virtual_b,indices_b,b,&alpha,&if root {beta} else {1.});
+    for comm in output_comms { comm.sum_f64(b); }
+}
 
 struct Indices { dimensions: Vec<usize>, offsets: Vec<Vec<usize>> }
 impl Indices {
@@ -54,6 +70,34 @@ impl Indices {
 pub fn sequential<A: Semiring>(algebra: &A, shape_a: &[usize], indices_a: &str, a: &[A::Element],
     shape_b: &[usize], indices_b: &str, b: &mut [A::Element], alpha: &A::Element, beta: &A::Element) {
     sequential_function(algebra,shape_a,indices_a,a,shape_b,indices_b,b,alpha,beta,Clone::clone);
+}
+
+/// Local virtual-block traversal from tsum_virt::run. Both block dimensions and
+/// virtual phases must agree for shared index labels. Beta is applied only on
+/// the first visit to each output block, including reductions over virtual axes.
+pub fn virtualized<A: Semiring>(algebra: &A,
+    shape_a: &[usize], virtual_a: &[usize], indices_a: &str, a: &[A::Element],
+    shape_b: &[usize], virtual_b: &[usize], indices_b: &str, b: &mut [A::Element],
+    alpha: &A::Element, beta: &A::Element) {
+    assert_eq!(shape_a.len(),virtual_a.len());
+    assert_eq!(shape_b.len(),virtual_b.len());
+    assert!(virtual_a.iter().chain(virtual_b).all(|&n|n > 0));
+    let block_a: usize = shape_a.iter().product();
+    let block_b: usize = shape_b.iter().product();
+    let count_a: usize = virtual_a.iter().product();
+    let count_b: usize = virtual_b.iter().product();
+    assert_eq!(a.len(),block_a*count_a);
+    assert_eq!(b.len(),block_b*count_b);
+    let blocks = Indices::new(&[(virtual_a,indices_a),(virtual_b,indices_b)]);
+    let mut visited = vec![false;count_b];
+    let one = algebra.one();
+    blocks.for_each(|offsets| {
+        let ia = offsets[0]; let ib = offsets[1];
+        sequential(algebra,shape_a,indices_a,&a[ia*block_a..(ia+1)*block_a],
+            shape_b,indices_b,&mut b[ib*block_b..(ib+1)*block_b],alpha,
+            if visited[ib] {&one} else {beta});
+        visited[ib] = true;
+    });
 }
 
 /// Upstream custom-function ordering: transform the alpha-scaled input, then
