@@ -740,3 +740,15 @@ retries. DIGIT / PASS for the raw packed execution layers, tolerance zero.
 The same new target compiled and linked once on Windows GNU; native runtime
 acceptance still awaits Microsoft MPI runtime installation. No installer retry
 or repetition of passed WSL checks was performed.
+
+## Raw packed contraction layers (2026-09-07)
+
+distributed_packed_contraction passed once at each of 1/2/4 WSL MPI ranks,
+including parity contexts. Exact i64 checks cover canonical i<=k<=j products,
+repeated-index products, the source whole-buffer beta behavior, scalar dot
+reductions, physical AS diagonal slots, virtual reduction with beta once,
+root-only MPI Reduce results, clearing broadcast replicas and empty extents.
+No failures or retries; DIGIT / PASS, tolerance zero. New target also compiled
+and linked once on Windows GNU; runtime MPI acceptance is still pending.
+This validates the explicit raw execution layers, not a complete high-level
+distributed symmetric tensor contraction operation.

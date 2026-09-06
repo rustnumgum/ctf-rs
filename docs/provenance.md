@@ -585,3 +585,23 @@ Beta applies once per visited virtual output block. Layouts, aligned phases,
 communicator fibers, and additive commutativity are explicit caller inputs.
 It does not claim automatic symmetric mapping, broken-symmetry permutation
 expansion, global padding cleanup, or a complete high-level symmetric sum API.
+
+## Raw packed contraction execution (2026-09-07)
+
+src/symmetric_contraction.rs ports sym_seq_ctr_ref's inclusive local canonical
+bounds and SY-sized physical offsets for all non-NS kinds. The product order
+is (A*B)*alpha, then scaled product plus C. The all-scalar source branch uses
+C*beta; the nonscalar-index branch prescales the whole C allocation by beta
+on the left. In particular, source lines 444-450 explicitly note that prescaling
+the full buffer is wrong for subset iterators: this low-level port preserves
+that behavior, and a public diagonal operation must extract/reinsert its output
+in the upper layer. No extra beta==one gate was introduced.
+
+src/symmetric_contraction_comm.rs implements explicit virtual traversal and
+ctr_replicate ordering: broadcast A and B, beta-scale old output only on roots,
+execute child blocks with root/nonroot beta one/zero, Reduce output on supplied
+fibers, then clear nonroot broadcast input replicas. This is not Allreduce.
+Shared local shapes and virtual phases are caller-aligned. It does not supply
+automatic mapping, 2D symmetric communication, operation permutation/sign
+expansion, or symmetry multiplicity normalization. These remain upper-layer
+work; no globally gathered substitute or implicit signed full tensor was added.

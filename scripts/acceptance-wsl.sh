@@ -14,6 +14,7 @@ mpi_tests+=(distributed_symmetric_io)
 mpi_tests+=(distributed_symmetric_operations)
 mpi_tests+=(distributed_symmetric_repack)
 mpi_tests+=(distributed_packed_sum)
+mpi_tests+=(distributed_packed_contraction)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \

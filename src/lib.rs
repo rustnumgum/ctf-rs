@@ -36,3 +36,5 @@ pub mod symmetric_distribution;
 pub mod symmetric_tensor;
 pub mod symmetric_sum;
 pub mod symmetric_sum_comm;
+pub mod symmetric_contraction;
+pub mod symmetric_contraction_comm;
