@@ -7,6 +7,50 @@ use crate::{
     symmetric_distribution::SymmetricDistribution,
 };
 
+#[path = "symmetric_operations.rs"]
+mod operations;
+
+impl<'c, 'r, A: Group + crate::algebra::Semiring> SymmetricTensor<'c, 'r, A>
+where A::Element: Wire {
+    /// Collective indexed write: incoming*alpha + old*beta. Beta applies once
+    /// per touched canonical key; untouched entries are unchanged.
+    pub fn write_scaled(&mut self, pairs: &[(usize, A::Element)],
+                        alpha: &A::Element, beta: &A::Element) {
+        let mut buckets = vec![Vec::new(); self.context.size()];
+        for (key, value) in pairs {
+            let Some((canonical, sign)) = self.distribution.canonicalize(*key) else { continue; };
+            let value = if sign == 1 { value.clone() } else { self.algebra.negate(value) };
+            for (rank, bucket) in buckets.iter_mut().enumerate() {
+                if self.distribution.distribution().owns(rank, canonical) {
+                    (canonical as u64).encode(bucket);
+                    value.encode(bucket);
+                }
+            }
+        }
+        let mut incoming = Vec::new();
+        for bytes in self.context.inner.exchange(&buckets) {
+            for pair in bytes.chunks_exact(8 + A::Element::WIDTH) {
+                incoming.push((u64::decode(&pair[..8]) as usize, A::Element::decode(&pair[8..])));
+            }
+        }
+        incoming.sort_by_key(|pair| pair.0);
+        let mut position = 0;
+        while position < incoming.len() {
+            let key = incoming[position].0;
+            let offset = self.distribution.local_offset(self.context.rank(), key);
+            let mut value = self.algebra.add(
+                &self.algebra.multiply(&incoming[position].1, alpha),
+                &self.algebra.multiply(&self.data[offset], beta));
+            position += 1;
+            while position < incoming.len() && incoming[position].0 == key {
+                value = self.algebra.add(&value, &self.algebra.multiply(&incoming[position].1, alpha));
+                position += 1;
+            }
+            self.data[offset] = value;
+        }
+    }
+}
+
 /// Dense packed storage for the canonical entries of a symmetric tensor.
 /// Allocated padding and noncanonical holes remain present in `local_storage`,
 /// but tensor operations visit only canonical valid slots.

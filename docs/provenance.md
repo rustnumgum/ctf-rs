@@ -532,3 +532,19 @@ Communication currently uses key-based exchange rather than all optimized
 upstream cyclic reshuffle/readwrite kernels. Symmetry-changing repack,
 distributed symmetric sums/contractions and automatic symmetry mapping remain
 pending; this storage implementation does not imply their completion.
+
+## Compressed indexed operations and group-preserving repack (2026-09-07)
+
+src/symmetric_operations.rs applies the existing sym_seq_scl right-scalar
+multiplication order to distributed canonical entries, including repeated-label
+diagonal selection and custom transforms. Holes are not operands. Its
+repack_groups follows tensor/untyped_tensor.cxx 223-270's no-more/no-less-symmetry
+branch: preserve the physical layout and raw canonical values, then clear slots
+invalid under the new SY/AS/SH kind. It deliberately does not introduce factorial
+normalization, sign averaging, or NS expansion. Changing NS group boundaries
+belongs to the source summation-based branch and is still pending.
+
+SymmetricTensor::write_scaled canonicalizes keys and AS signs, applies incoming
+value times alpha plus old value times beta, and applies beta once per touched
+canonical key. Untouched entries and AS/SH structural zeros are unchanged.
+Equivalent requested permutations contribute to the same canonical entry.

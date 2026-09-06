@@ -166,7 +166,7 @@ src/scaling/scaling.cxx	src/scaling	pending
 src/scaling/scaling.h	src/scaling	pending
 src/scaling/strp_tsr.cxx	src/scaling	pending
 src/scaling/strp_tsr.h	src/scaling	pending
-src/scaling/sym_seq_scl.cxx	src/symmetry.rs	partial: packed indexed right scaling and transforms; distributed scaling integration pending
+src/scaling/sym_seq_scl.cxx	src/symmetry.rs; src/symmetric_operations.rs	partial: local and distributed packed indexed right scaling and transforms; automatic scaling remapping pending
 src/scaling/sym_seq_scl.h	src/scaling	pending
 test/bivar_function.cxx	tests/upstream/test/bivar_function.rs	pending
 test/bivar_transform.cxx	tests/upstream/test/bivar_transform.rs	pending

@@ -698,3 +698,17 @@ remain zero. Extent-one cases exercise empty canonical local shards.
 No compilation/runtime failures or retries; DIGIT / PASS, tolerance zero.
 These checks establish compressed storage/I/O, not symmetric contraction or
 symmetry-changing repack. Native Windows acceptance remains pending.
+
+## Compressed symmetric operations (2026-09-07)
+
+distributed_symmetric_operations passed once at each of 1/2/4 MPI ranks,
+including parity contexts. Exact i64 acceptance covers repeated-index scaling
+and transforms, SY-to-AS-to-SH-to-SY group-preserving repack, zero diagonals
+after repack, virtual blocks and empty valid local slices, equivalent-key
+scaled writes with alpha=2/beta=3, beta applied once per touched canonical key,
+untouched values, and zero allocation holes. Integration review corrected the
+ordinary scale implementation to use source right multiplication before the
+first run. No runtime failures or retries. DIGIT / PASS; tolerance zero.
+Noncommutative scaling order is source-inspected here, not separately validated
+by this integer fixture. NS-boundary changes and symmetric contractions remain
+unfinished.

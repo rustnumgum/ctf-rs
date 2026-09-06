@@ -242,3 +242,8 @@ harness = false
 name = "distributed_symmetric_io"
 path = "tests/distributed_symmetric_io.rs"
 harness = false
+
+[[test]]
+name = "distributed_symmetric_operations"
+path = "tests/distributed_symmetric_operations.rs"
+harness = false
