@@ -788,3 +788,21 @@ diagonals, and repeated iik-to-ii hollow summation with unchanged off-diagonal
 output. No failures or retries; DIGIT / PASS, tolerance zero. The new target
 also compiled and linked once on Windows GNU; native execution remains pending.
 Cross-group symmetry-breaking diagonal patterns were not tested or claimed.
+
+## f64 SY sums and raw-task alignment correction (2026-09-07)
+
+distributed_sy_sum fixes atol=1e-6 per entry against analytic references,
+requiring finite values. The first 1-rank run passed matrix assertions but
+failed three-axis expansion with an actual 0 where 7 was required. Source
+inspection identified the omitted mandatory sum_tensors index-alignment step;
+no precision/backend sweep or tolerance adjustment was used.
+
+After that code fix, distributed_sy_sum and the affected
+distributed_canonical_sum passed at 1/2/4 WSL MPI ranks, world and parity
+contexts. Only these affected suites were run. Coverage includes SY expansion
+with diagonal counted once, NS-to-SY orbit projection including diagonal
+multiplicity, beta handling, full reduction, transposition, mixed AS
+cancellation, supported repeated diagonals, and a three-axis distinct-index
+fixture. Both targets compiled and linked on Windows GNU. DIGIT / PASS;
+verification closed. This does not establish arbitrary high-order coincidence
+surfaces, other SY scalar types, or native MPI runtime acceptance.

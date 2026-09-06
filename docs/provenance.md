@@ -657,3 +657,23 @@ which is not generally interchangeable with sampling signed semantic reads.
 sum_hollow_from now extracts/reinserts supported repeated-label patterns before
 its unique-index recursion. Unrestricted diagonal symmetry handling is still
 pending, not hidden behind a silent NS fallback.
+
+## f64 SY-aware summation (2026-09-07)
+
+src/symmetric_sy_sum.rs extends the source recursive orchestration to SY for
+Arithmetic<f64>. It preserves input-SY materialization and beta-dependent
+output-SY unfolding, pair-diagonal exclusion in transpose contributions, and
+the active higher-order coincidence-surface scaling in desymmetrize. The
+disabled `if(0)` symmetrize algorithm is not ported: the active branch uses a
+fresh target-symmetry tensor followed by accumulation. No global gather is used.
+Other scalar types and unsupported cross-group repeated-index extraction remain
+pending; the source's higher-order desymmetrize FIXME is not silently redesigned.
+
+A three-axis fixture exposed a missing source step in sum_canonical_from:
+sum_tensors aligns preserved symmetric index relations even with symmetry
+processing disabled (summation.cxx around 1518). That alignment now happens
+before canonical key routing and retains the source positive-sign precondition.
+Consequently transposed SY-to-SY raw tasks cover the full aligned canonical
+domain, rather than only the unaligned diagonal intersection. Earlier notes
+describing that transposed case as diagonal-only are superseded by this source
+correction; identity-map repack semantics remain unchanged.

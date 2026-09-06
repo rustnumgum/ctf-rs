@@ -24,11 +24,10 @@ fn run(c:&Context<'_>){
     let mut broadcast=tensor(c,vec![3,3],vec![AS,NS],false);
     broadcast.sum_canonical_from("ij",&vector,"i",1,0);
     assert_eq!(broadcast.read(&(0..9).collect::<Vec<_>>()),vec![0,-1,-1,1,0,-2,1,2,0]);
-    // Transposed raw canonical domains intersect only on the diagonal: this
-    // deliberately differs from signed/mirrored semantic reads.
+    // sum_tensors aligns preserved symmetric labels before the raw kernel.
     let mut transposed=tensor(c,vec![3,3],vec![SY,NS],true);
     transposed.sum_canonical_from("ij",&a,"ji",1,0);
-    assert_eq!(transposed.read(&[0,3,4,6,7,8]),vec![1,0,5,0,0,9]);
+    assert_eq!(transposed.read(&[0,3,4,6,7,8]),vec![1,4,5,7,8,9]);
     let empty=tensor(c,vec![0,0],vec![SY,NS],false);
     scalar.sum_canonical_from("",&empty,"ij",2,3);assert_eq!(scalar.read(&[0]),vec![180]);
 }

@@ -12,6 +12,11 @@ impl<'c,'r,A:Group+Semiring+Clone> SymmetricTensor<'c,'r,A> where A::Element:Wir
     pub fn sum_canonical_from(&mut self,indices_b:&str,a:&Self,indices_a:&str,
                               alpha:A::Element,beta:A::Element) {
         assert!(std::ptr::eq(self.context,a.context));
+        let mut aligned_output=indices_b.as_bytes().to_vec();
+        let sign=crate::sym_indices::align_pair(indices_a.as_bytes(),a.distribution.links(),
+            &mut aligned_output,self.distribution.links());
+        assert_eq!(sign,1,"raw sum requires upper-layer antisymmetric sign handling");
+        let indices_b=std::str::from_utf8(&aligned_output).unwrap();
         let da=a.distribution.distribution();let db=self.distribution.distribution();
         let input=Projection::new(&da.shape,indices_a);
         let output=Projection::new(&db.shape,indices_b);
