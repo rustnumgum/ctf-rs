@@ -122,32 +122,36 @@ impl<A: Semiring> Tensor<'_, '_, A> where A::Element: Wire {
     pub fn contract_from_on_grid(&mut self,indices_c:&str,a:&Self,indices_a:&str,b:&Self,indices_b:&str,
         topology:crate::mapping::Topology,alpha:A::Element,beta:A::Element)->Result<(),crate::map_tensor::Rejected>
     where A:Clone {
-        use crate::mapping::Mapping;
         assert!(std::ptr::eq(self.context,a.context)&&std::ptr::eq(self.context,b.context));assert_eq!(topology.size(),self.context.size());
-        let mut labels=Vec::new();let mut shape=Vec::new();
-        for (indices,d) in [(indices_a,&a.distribution),(indices_b,&b.distribution),(indices_c,&self.distribution)] {
-            assert!(indices.is_ascii());assert_eq!(indices.len(),d.shape.len());
-            for (i,label) in indices.bytes().enumerate() {
-                assert!(!indices.as_bytes()[..i].contains(&label),"unique labels required by this entry point");
-                if let Some(j)=labels.iter().position(|&l|l==label) {assert_eq!(shape[j],d.shape[i]);}
-                else {labels.push(label);shape.push(d.shape[i]);}
-            }
-        }
-        let mut maps=vec![Mapping::Unmapped;labels.len()];
-        if !labels.is_empty() {
-            crate::map_tensor::assign(&shape,&topology,&(0..topology.dimensions.len()).collect::<Vec<_>>(),
-                &vec![false;labels.len()*labels.len()],&mut vec![false;labels.len()],&mut maps,true)?;
-        }
-        let mapped=|indices:&str,shape:&[usize]|Distribution::new(shape.to_vec(),topology.clone(),
-            indices.bytes().map(|label|maps[labels.iter().position(|&l|l==label).unwrap()].clone()).collect());
+        let plan=crate::planning::GridPlan::prepare([&a.distribution,&b.distribution,&self.distribution],
+            [indices_a,indices_b,indices_c],topology)?;
+        self.contract_with_plan(indices_c,a,indices_a,b,indices_b,&plan,alpha,beta);
+        Ok(())
+    }
+    /// Reuse a context-local explicit-grid mapping plan. Collective when executed;
+    /// cache hits avoid remapping search, not the necessary tensor redistribution.
+    pub fn contract_cached(&mut self,indices_c:&str,a:&Self,indices_a:&str,b:&Self,indices_b:&str,
+        topology:crate::mapping::Topology,cache:&mut crate::planning::PlanCache<'_,'_>,
+        alpha:A::Element,beta:A::Element)->Result<(),crate::map_tensor::Rejected> where A:Clone {
+        assert!(std::ptr::eq(self.context,cache.context()));
+        let plan=cache.prepare([&a.distribution,&b.distribution,&self.distribution],[indices_a,indices_b,indices_c],topology)?;
+        self.contract_with_plan(indices_c,a,indices_a,b,indices_b,plan,alpha,beta);
+        Ok(())
+    }
+    /// Execute a prepared aligned plan against matching shapes/index maps/current
+    /// distributions. Plan reuse never reuses old tensor values or scalar factors.
+    pub fn contract_with_plan(&mut self,indices_c:&str,a:&Self,indices_a:&str,b:&Self,indices_b:&str,
+        plan:&crate::planning::GridPlan,alpha:A::Element,beta:A::Element) where A:Clone {
+        assert!(std::ptr::eq(self.context,a.context)&&std::ptr::eq(self.context,b.context));
+        assert_eq!(plan.signature().topology().size(),self.context.size());
+        assert!(plan.matches([&a.distribution,&b.distribution,&self.distribution],[indices_a,indices_b,indices_c]));
         let mut aa=Self {context:a.context,algebra:a.algebra.clone(),distribution:a.distribution.clone(),data:a.data.clone()};
         let mut bb=Self {context:b.context,algebra:b.algebra.clone(),distribution:b.distribution.clone(),data:b.data.clone()};
         let mut cc=Self {context:self.context,algebra:self.algebra.clone(),distribution:self.distribution.clone(),data:self.data.clone()};
-        aa.redistribute(mapped(indices_a,&aa.distribution.shape));bb.redistribute(mapped(indices_b,&bb.distribution.shape));
-        cc.redistribute(mapped(indices_c,&cc.distribution.shape));
+        let mapped=plan.mapped_distributions();
+        aa.redistribute(mapped[0].clone());bb.redistribute(mapped[1].clone());cc.redistribute(mapped[2].clone());
         cc.contract_from_aligned(indices_c,&aa,indices_a,&bb,indices_b,alpha,beta);
         cc.redistribute(self.distribution.clone());self.data=cc.data;
-        Ok(())
     }
     /// Collective unique-label contraction on already aligned distributions.
     /// Shared labels must have identical maps; mismatched physical labels need

@@ -95,10 +95,10 @@ src/interface/vector.cxx	src/interface	pending
 src/interface/vector.h	src/interface	pending
 src/interface/world.cxx	src/interface	pending
 src/interface/world.h	src/interface	pending
-src/contraction/contraction_plan.h	src/contraction	pending
+src/contraction/contraction_plan.h	src/planning.rs	partial: executable explicit-grid mapping plan; costs, diagnostic steps and packing pending
 src/contraction/contraction_selector.h	src/contraction	pending
-src/contraction/contraction_signature.cxx	src/contraction	pending
-src/contraction/contraction_signature.h	src/contraction	pending
+src/contraction/contraction_signature.cxx	src/planning.rs	partial: dense structural signature and context-scoped cache; sparse/symmetry signatures pending
+src/contraction/contraction_signature.h	src/planning.rs	partial: dense structural signature, full collision-safe equality
 src/contraction/contraction.cxx	src/contraction	pending
 src/contraction/contraction.h	src/contraction	pending
 src/contraction/ctr_2d_general.cxx	src/contraction	pending

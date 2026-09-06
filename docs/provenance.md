@@ -77,3 +77,21 @@ The generic source gen_csrmultd discards fadd's returned value. That kernel has
 not been ported or silently repaired; sparse-sparse-to-dense and the specialized
 native kernels remain pending. The new exact local tests are analytic layout
 and algebra checks, not a claim to have migrated the upstream sparse CPU suite.
+
+## Explicit-grid plan cache (2026-09-07)
+
+`src/planning.rs` separates the previously implemented unique-label grid mapping
+from execution and supplies the signature/map-plan/cache responsibilities of
+`contraction_signature.{h,cxx}`, `contraction_plan.h`, and `World::ctr_sig_map_`.
+The actual mapping algorithm and redistribution/aligned contraction/restore
+sequence are unchanged. This does not port the automatic candidate search or
+claim the explicit-grid mapping heuristic is its replacement.
+
+The cache borrows an explicit Context rather than living in a process-global
+World static. It retains full distribution/map-chain fields and compares full
+keys rather than upstream's hash-only equality. Equivalent index renamings
+normalize by first appearance; scalars/values are excluded. Requested topology
+is additionally keyed because this API exposes an explicit grid choice. This
+is not an upstream hash/serialization ABI. Dense NS/unique-label plans only:
+symmetry/sparse planning, candidate metadata, model costs, diagnostic steps and
+plan packing remain unimplemented, not populated with placeholder estimates.

@@ -283,3 +283,23 @@ DIGIT / PASS: class R, reference pinned source layout/kernel rules and exact
 analytic integer/Boolean results, tolerance 0, 5/5 checks. This closes only these
 local paths; distributed sparse execution, upstream sparse test migration and
 Windows native acceptance remain open.
+
+## 2026-09-07: executable grid plan cache
+
+WSL Linux source copy and Linux target cache: `plan_cache` and affected
+`contract_remap` PASS at 1/2/4 MPI ranks, once per configuration, exact i64
+criteria. No numerical diagnostics or tighter checks were needed.
+
+`plan_cache` exercises a miss then a hit with equivalent renamed labels and
+changed input values/alpha/beta; different requested topology and input mapping
+produce misses. It checks actual contraction values, restored output layout,
+standalone prepared-plan execution, explicit clear, scalar operands, zero-length
+reduction, and repeats the operations in split subcommunicators. Empty local
+shards arise with the 1x1 output at multiple ranks. `contract_remap` rechecks the
+existing higher-order two-contracted-label path affected by extracting mapping
+preparation into GridPlan. Other unchanged passing tests were not rerun.
+
+DIGIT / PASS: class R, exact layout/cache expectations and integer contraction
+identities, tolerance 0. This is explicit-grid mapping-plan reuse, not acceptance
+of automatic candidate selection, cost prediction, low-memory execution or
+full cc4s plan-cache parity.

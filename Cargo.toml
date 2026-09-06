@@ -106,3 +106,8 @@ required-features = ["native-linalg"]
 name = "mpi_gemm_bench"
 path = "examples/mpi_gemm_bench.rs"
 required-features = ["native-linalg"]
+
+[[test]]
+name = "plan_cache"
+path = "tests/plan_cache.rs"
+harness = false
