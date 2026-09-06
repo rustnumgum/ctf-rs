@@ -23,6 +23,47 @@ fn validate(indices:&[u8],sym:&[Symmetry]) {
 fn same_group(sym:&[Symmetry],a:usize,b:usize)->bool {
     sym[a.min(b)..a.max(b)].iter().all(|&s|s!=NS)
 }
+/// Three-operand align_symmetric_indices. Groups must have the same operand
+/// incidence and lie in a shared symmetry group in every participating operand.
+pub fn align_triple(a:&[u8],sym_a:&[Symmetry],b:&mut [u8],sym_b:&[Symmetry],c:&mut [u8],sym_c:&[Symmetry])->i32 {
+    validate(a,sym_a);validate(b,sym_b);validate(c,sym_c);
+    #[derive(Clone)]
+    struct Locator {order:usize,label:u8,positions:[Option<usize>;3]}
+    let mut indices=Vec::new();
+    for (i,&label) in a.iter().enumerate() {
+        let ib=b.iter().position(|&x|x==label);let ic=c.iter().position(|&x|x==label);
+        if ib.is_some()||ic.is_some() {indices.push(Locator{order:0,label,positions:[Some(i),ib,ic]});}
+    }
+    for (i,&label) in b.iter().enumerate() {
+        if !a.contains(&label) {
+            if let Some(ic)=c.iter().position(|&x|x==label) {indices.push(Locator{order:0,label,positions:[None,Some(i),Some(ic)]});}
+        }
+    }
+    let symbols=[sym_a,sym_b,sym_c];let mut factor=1;
+    while !indices.is_empty() {
+        let mut group=vec![indices.remove(0)];let mut i=0;
+        while i<indices.len() {
+            let compatible=(0..3).all(|operand|match (group[0].positions[operand],indices[i].positions[operand]) {
+                (None,None)=>true,(Some(x),Some(y))=>same_group(symbols[operand],x,y),_=>false,
+            });
+            if compatible {let mut entry=indices.remove(i);entry.order=group.len();group.push(entry);} else {i+=1;}
+        }
+        if group.len()<2 {continue;}
+        let reference:Vec<_>=group.iter().map(|entry|entry.order).collect();
+        let has_a=group[0].positions[0].is_some();
+        for operand in if has_a {1..3} else {2..3} {
+            if group[0].positions[operand].is_none() {continue;}
+            group.sort_by_key(|entry|entry.positions[operand]);
+            let order:Vec<_>=group.iter().map(|entry|entry.order).collect();
+            for i in 0..group.len() {
+                let destination=group[group[i].order].positions[operand].unwrap();
+                if operand==1 {b[destination]=group[i].label;} else {c[destination]=group[i].label;}
+            }
+            if symbols[operand][group[0].positions[operand].unwrap()]==AS {factor*=relative_sign(&reference,&order);}
+        }
+    }
+    factor
+}
 /// Two-operand align_symmetric_indices. A stays fixed; reorder common symmetry
 /// groups in B and return the associated antisymmetric sign.
 pub fn align_pair(a:&[u8],sym_a:&[Symmetry],b:&mut [u8],sym_b:&[Symmetry])->i32 {

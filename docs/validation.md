@@ -392,3 +392,18 @@ source signed arithmetic result. Only the failed multiplicity test was rerun
 after that correction; the passing sign test was not repeated. DIGIT / PASS,
 class R, tolerance 0. Three-operand alignment and distributed symmetry execution
 remain unfinished.
+
+## 2026-09-07: combined alignment/permutation/packed-operation batch
+
+WSL sym_triple 2/2 PASS once: sixteen three-party permutation/sign combinations,
+AB-only/BC-only/AC-only groups, partner NS boundaries and scalars. Then new
+sym_operations 2/2 PASS once: broken versus preserved symmetry permutations,
+factorial discovery, contraction permutation path, circular generator parity,
+packed iteration offset bijection for mixed SY/AS/SH groups, empty/scalar domains,
+repeated-label scaling/endomorphisms and no writes to AS structural diagonals.
+
+DIGIT / PASS, class R, exact integer/index/sign expectations. No failed numerical
+runs or extra diagnostics; previous passing suites were not rerun. These remain
+local checks, not full upstream distributed symmetry acceptance. This batch
+combines the related APIs and tests in one stage commit rather than stopping
+after the initial triple-alignment helper.

@@ -144,10 +144,10 @@ src/redistribution/slice.h	src/redistribution	pending
 src/redistribution/sparse_rw.cxx	src/redistribution	pending
 src/redistribution/sparse_rw.h	src/redistribution	pending
 src/symmetry/Makefile	Cargo/build tooling	replaced
-src/symmetry/sym_indices.cxx	src/symmetry	pending
-src/symmetry/sym_indices.h	src/symmetry	pending
-src/symmetry/symmetrization.cxx	src/symmetry	pending
-src/symmetry/symmetrization.h	src/symmetry	pending
+src/symmetry/sym_indices.cxx	src/sym_indices.rs	pair/triple alignment, relative signs and both multiplicity factors; exact local checks pass
+src/symmetry/sym_indices.h	src/sym_indices.rs	Rust direct helper APIs; integration into distributed symmetry pending
+src/symmetry/symmetrization.cxx	src/sym_permutations.rs	partial: order/add/get permutations and circular generator; tensor symmetrize/desymmetrize pending
+src/symmetry/symmetrization.h	src/sym_permutations.rs	partial: permutation APIs
 src/summation/Makefile	Cargo/build tooling	replaced
 src/summation/spr_seq_sum.cxx	src/summation	pending
 src/summation/spr_seq_sum.h	src/summation	pending
@@ -166,7 +166,7 @@ src/scaling/scaling.cxx	src/scaling	pending
 src/scaling/scaling.h	src/scaling	pending
 src/scaling/strp_tsr.cxx	src/scaling	pending
 src/scaling/strp_tsr.h	src/scaling	pending
-src/scaling/sym_seq_scl.cxx	src/scaling	pending
+src/scaling/sym_seq_scl.cxx	src/symmetry.rs	partial: packed indexed right scaling and transforms; distributed scaling integration pending
 src/scaling/sym_seq_scl.h	src/scaling	pending
 test/bivar_function.cxx	tests/upstream/test/bivar_function.rs	pending
 test/bivar_transform.cxx	tests/upstream/test/bivar_transform.rs	pending

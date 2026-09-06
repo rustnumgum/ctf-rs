@@ -11,6 +11,15 @@ pub enum Symmetry { NS,SY,AS,SH }
 #[derive(Clone,Debug)]
 pub struct Layout {shape:Vec<usize>,links:Vec<Symmetry>}
 impl Layout {
+    /// Iterate canonical coordinates in packed column-major order, with O(order)
+    /// state. This Rust iterator does not allocate the expanded tensor domain.
+    pub fn coordinates(&self)->Coordinates<'_> {
+        let mut current=vec![0;self.shape.len()];
+        for (start,end,kind) in self.groups() {
+            if matches!(kind,Symmetry::AS|Symmetry::SH) {for i in start..end {current[i]=i-start;}}
+        }
+        Coordinates{layout:self,current,remaining:self.len()}
+    }
     pub fn new(shape:Vec<usize>,links:Vec<Symmetry>)->Self {
         assert_eq!(shape.len(),links.len());
         if let Some(last)=links.last() {assert_eq!(*last,Symmetry::NS);}
@@ -65,6 +74,30 @@ impl Layout {
         Some((offset,sign))
     }
 }
+pub struct Coordinates<'a> {layout:&'a Layout,current:Vec<usize>,remaining:usize}
+impl Iterator for Coordinates<'_> {
+    type Item=Vec<usize>;
+    fn next(&mut self)->Option<Self::Item> {
+        if self.remaining==0 {return None;}
+        let result=self.current.clone();self.remaining-=1;
+        if self.remaining>0 {
+            let mut start=0;
+            for i in 0..self.current.len() {
+                let limit=if self.layout.links[i]==Symmetry::NS {self.layout.shape[i]} else {
+                    self.current[i+1]+usize::from(self.layout.links[i]==Symmetry::SY)
+                };
+                self.current[i]+=1;
+                if self.current[i]<limit {break;}
+                let strict=i>start && matches!(self.layout.links[i-1],Symmetry::AS|Symmetry::SH);
+                self.current[i]=if strict {i-start} else {0};
+                if self.layout.links[i]==Symmetry::NS {start=i+1;}
+            }
+        }
+        Some(result)
+    }
+    fn size_hint(&self)->(usize,Option<usize>) {(self.remaining,Some(self.remaining))}
+}
+impl ExactSizeIterator for Coordinates<'_> {}
 fn group_size(n:usize,order:usize,symmetric:bool)->usize {
     if !symmetric && n<order {return 0;}
     let mut product=1u128;
@@ -78,6 +111,18 @@ fn group_size(n:usize,order:usize,symmetric:bool)->usize {
 /// Owned packed local data. No hidden unpack-to-dense storage or communications.
 pub struct Packed<A:Monoid> {layout:Layout,algebra:A,values:Vec<A::Element>}
 impl<A:Group> Packed<A> {
+    /// Apply an endomorphism once per selected packed entry. Repeated labels
+    /// select diagonals; AS/SH structural zeros never become stored entries.
+    pub fn transform_indexed(&mut self,indices:&str,mut function:impl FnMut(&mut A::Element)) {
+        assert!(indices.is_ascii());assert_eq!(indices.len(),self.layout.shape.len());
+        for (i,label) in indices.bytes().enumerate() {
+            for j in 0..i {if indices.as_bytes()[j]==label {assert_eq!(self.layout.shape[i],self.layout.shape[j]);}}
+        }
+        for (coordinates,value) in self.layout.coordinates().zip(&mut self.values) {
+            let selected=(0..indices.len()).all(|i|(0..i).all(|j|indices.as_bytes()[i]!=indices.as_bytes()[j]||coordinates[i]==coordinates[j]));
+            if selected {function(value);}
+        }
+    }
     pub fn new(layout:Layout,algebra:A)->Self {
         let values=vec![algebra.zero();layout.len()];Self{layout,algebra,values}
     }
@@ -94,6 +139,23 @@ impl<A:Group> Packed<A> {
         if let Some((offset,sign))=self.layout.locate(coordinates) {
             let value=if sign==1 {value.clone()} else {self.algebra.negate(value)};
             self.values[offset]=self.algebra.add(&self.values[offset],&value);
+        }
+    }
+}
+impl<A:Group+crate::algebra::Semiring> Packed<A> {
+    /// sym_seq_scl ordering: multiply the value by alpha on the right, then
+    /// invoke the optional custom endomorphism.
+    pub fn scale_indexed(&mut self,indices:&str,alpha:&A::Element) {
+        // Borrow fields separately so closures never need an alias of self.
+        let algebra=&self.algebra;
+        assert!(indices.is_ascii());assert_eq!(indices.len(),self.layout.shape.len());
+        for (i,label) in indices.bytes().enumerate() {for j in 0..i {
+            if indices.as_bytes()[j]==label {assert_eq!(self.layout.shape[i],self.layout.shape[j]);}
+        }}
+        for (coordinates,value) in self.layout.coordinates().zip(&mut self.values) {
+            if (0..indices.len()).all(|i|(0..i).all(|j|indices.as_bytes()[i]!=indices.as_bytes()[j]||coordinates[i]==coordinates[j])) {
+                *value=algebra.multiply(value,alpha);
+            }
         }
     }
 }

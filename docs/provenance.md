@@ -183,3 +183,20 @@ align_symmetric_indices and both overcounting_factor overloads from
 symmetry/sym_indices.{h,cxx}. Source author attribution is retained. Three-operand
 alignment and integration into symmetry contraction are still pending; factors
 require the source's aligned-index assumptions.
+
+## Combined symmetry operations batch (2026-09-07)
+
+The three-operand align_symmetric_indices overload is now implemented in
+sym_indices.rs, retaining operand-incidence grouping and per-operand sort/sign
+order. `src/sym_permutations.rs` ports both order_perm/add_sym_perm/get_sym_perms
+paths using a fixed two/three-operand array. It retains the expanding discovery
+list and source index-map equality (duplicate signs are not accumulated).
+Inverse index lookup takes the last occurrence, as inv_idx does. Circular
+generator order/parity follows cmp_sym_perms.
+
+`Layout::coordinates` is a Rust packed-domain iterator with O(order) state;
+Packed indexed scaling keeps sym_seq_scl's right multiplication order and indexed
+endomorphisms touch only represented coordinates. These use the true compressed
+layout, not a port of the source SY-padded intermediate iterator ABI. The tensor
+symmetrize/desymmetrize routines, permutation execution, and distributed packed
+mapping still need implementation. No dense tensor expansion is used here.
