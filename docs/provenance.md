@@ -113,3 +113,17 @@ process-global registration. Coefficient file I/O, initial coefficient tables,
 planner call-site integration and automated model instrumentation are still
 pending. Construction takes explicit coefficients and history size; no new
 machine calibration or guessed performance constants were introduced.
+
+## Static CPU cost formulas (2026-09-07)
+
+`src/initial_models.rs` copies all 32 non-offload coefficient arrays from
+shared/init_models.cxx. `src/cost.rs` adapts CommData broadcast/reduce/allreduce/
+alltoall/alltoallv features, seq_tsr_ctr CPU custom/inner model dispatch, and
+nosym_transp contiguous-prefix model selection. Coefficients remain upstream
+seeds, not estimates calibrated on this host. The model bank exposes explicit
+load/write and mutable model access for training, without global registration.
+Coefficient records keep source names and four-fractional-digit scientific
+precision; malformed/missing CPU records return errors instead of source's
+silent zero/substitution behavior. Unknown names, including offload records, are
+ignored. Bulk writer emits the CPU bank; it does not edit unrelated file records.
+These formulas are not yet wired to full contraction-tree candidate selection.

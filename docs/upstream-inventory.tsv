@@ -31,8 +31,8 @@ src/tensor/untyped_tensor.h	src/tensor	pending
 src/shared/blas_symbs.cxx	src/shared	pending
 src/shared/blas_symbs.h	src/shared	pending
 src/shared/fompi_wrapper.h	src/shared	pending
-src/shared/init_models.cxx	src/shared	pending
-src/shared/init_models.h	src/shared	pending
+src/shared/init_models.cxx	src/initial_models.rs	32 CPU coefficient arrays ported; offload excluded; exact roundtrip pass
+src/shared/init_models.h	src/initial_models.rs	Rust static CPU model table replaces declarations
 src/shared/int_timer.cxx	src/shared	pending
 src/shared/int_timer.h	src/shared	pending
 src/shared/iter_tsr.h	src/shared	pending

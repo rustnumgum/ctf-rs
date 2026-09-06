@@ -324,3 +324,18 @@ Numerical verification closed for these paths. Subsequent-update regularization
 with nonzero prior average, model persistence, initial coefficient tables and
 planner integration remain outside this batch's verified coverage. This is not
 a validated wall-time predictor or completed automatic planner.
+
+## 2026-09-07: static model bank and CPU cost formulas
+
+WSL `cost_models`: 3/3 tests PASS once. Strict equality checks cover all 32 CPU
+seed arrays through write/load roundtrip, broadcast/reduction/all-to-all feature
+construction and builtin/custom dispatch, zero message/one-rank semantics,
+all four CPU local contraction model choices, and transpose prefix boundaries
+4/64/65 plus no-op permutations. Integer-valued replacement coefficients make
+feature/dispatch checks exact; no observed wall-time accuracy is claimed.
+
+DIGIT / PASS, class R, exact coefficient and source-formula checks; no numerical
+diagnostics or repeats. Existing distributed training tests were not rerun since
+their update algorithm was unchanged. Automatic candidate generation/selection,
+communication-tree memory costs, model instrumentation and Windows acceptance
+remain open.

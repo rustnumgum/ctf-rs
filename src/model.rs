@@ -30,6 +30,9 @@ impl LinearModel {
     }
     pub fn name(&self)->&str {&self.name}
     pub fn coefficients(&self)->&[f64] {&self.coefficients}
+    pub fn set_coefficients(&mut self,values:&[f64]) {
+        assert_eq!(values.len(),self.coefficients.len());self.coefficients.copy_from_slice(values);
+    }
     pub fn diagnostics(&self)->&Diagnostics {&self.diagnostics}
     pub fn retained_observations(&self)->&[(f64,Vec<f64>)] {&self.history}
     /// Pinned source's deactivate predicate contains threshold<threshold, hence
