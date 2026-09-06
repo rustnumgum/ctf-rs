@@ -270,3 +270,17 @@ initial QR as upstream; generated guesses use explicit rank-seeded drand48 value
 in [-1,1), rather than the source's implicit global random state. Source's zero
 retained-rank behavior (no slice, full factors returned) is preserved and stated
 in the API. This is not an adaptive iteration or oversampling redesign.
+
+## Symmetric eigensolver and square subworlds (2026-09-07)
+
+Tensor::eigh follows matrix.cxx's largest-square-rank subset strategy and
+lapack_symbs.cxx peigs<double>'s PDSYEVX(V,A,U), zero ABSTOL/ORFAC and queried
+WORK/IWORK. Canonical matrix keys route to the square grid via parent all-to-all;
+eigenvectors and eigenvalues are routed back to parent output distributions.
+The square grid comes from the explicit child MPI context, also when called
+inside a user subcommunicator. Native handles and scratch storage stay in FFI.
+For two parent ranks the source strategy uses one computing rank; for four it
+uses all four. This is not a claim of two-rank parallel eigensolver execution.
+The matrix transfer is key-based subworld routing rather than the remaining
+optimized add_to_subworld implementation; no matrix gather replaces the four-rank
+ScaLAPACK computation.

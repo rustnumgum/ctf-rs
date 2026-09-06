@@ -158,3 +158,9 @@ name = "distributed_svd_paths"
 path = "tests/distributed_svd_paths.rs"
 harness = false
 required-features = ["native-scalapack"]
+
+[[test]]
+name = "distributed_eigh"
+path = "tests/distributed_eigh.rs"
+harness = false
+required-features = ["native-scalapack"]

@@ -35,6 +35,37 @@ unsafe extern "C" {
         desc: *const i32,
         info: *mut i32,
     );
+    fn pdsyevx_(
+        job_z: *const c_char,
+        range: *const c_char,
+        uplo: *const c_char,
+        n: *const i32,
+        a: *mut f64,
+        ia: *const i32,
+        ja: *const i32,
+        desc_a: *const i32,
+        vl: *const f64,
+        vu: *const f64,
+        il: *const i32,
+        iu: *const i32,
+        abstol: *const f64,
+        m: *mut i32,
+        nz: *mut i32,
+        w: *mut f64,
+        orfac: *const f64,
+        z: *mut f64,
+        iz: *const i32,
+        jz: *const i32,
+        desc_z: *const i32,
+        work: *mut f64,
+        lwork: *const i32,
+        iwork: *mut i32,
+        liwork: *const i32,
+        ifail: *mut i32,
+        iclustr: *mut i32,
+        gap: *mut f64,
+        info: *mut i32,
+    );
     fn pdgeqrf_(
         m: *const i32,
         n: *const i32,
@@ -238,6 +269,113 @@ impl Grid {
             );
         }
         result(info)
+    }
+
+    pub(crate) fn eigh(
+        &self,
+        n: usize,
+        a: &[f64],
+        desc: &[i32; 9],
+        vectors: &mut [f64],
+    ) -> Result<Vec<f64>, i32> {
+        self.validate_matrix(desc, a.len());
+        self.validate_matrix(desc, vectors.len());
+        let n = int(n);
+        assert!(n <= desc[2] && n <= desc[3]);
+
+        let job_z = b'V' as c_char;
+        let range = b'A' as c_char;
+        let uplo = b'U' as c_char;
+        let one = 1;
+        let zero_i = 0;
+        let zero = 0.0;
+        let query = -1;
+        let (mut m, mut nz) = (0, 0);
+        let mut work_query = [0.0];
+        let mut iwork_query = [0];
+        let mut info = 0;
+        unsafe {
+            pdsyevx_(
+                &job_z,
+                &range,
+                &uplo,
+                &n,
+                std::ptr::null_mut(),
+                &one,
+                &one,
+                desc.as_ptr(),
+                &zero,
+                &zero,
+                &zero_i,
+                &zero_i,
+                &zero,
+                &mut m,
+                &mut nz,
+                std::ptr::null_mut(),
+                &zero,
+                std::ptr::null_mut(),
+                &one,
+                &one,
+                desc.as_ptr(),
+                work_query.as_mut_ptr(),
+                &query,
+                iwork_query.as_mut_ptr(),
+                &query,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                &mut info,
+            );
+        }
+        result(info)?;
+
+        let lwork = int(work_query[0] as usize);
+        let liwork = iwork_query[0];
+        let mut work = vec![0.0; lwork as usize];
+        let mut iwork = vec![0; usize::try_from(liwork).unwrap()];
+        let mut ifail = vec![0; n as usize];
+        let processes = self.rows.checked_mul(self.cols).unwrap();
+        let mut iclustr = vec![0; 2usize.checked_mul(processes).unwrap()];
+        let mut gap = vec![0.0; processes];
+        let mut matrix = a.to_vec();
+        let mut eigenvalues = vec![0.0; n as usize];
+        unsafe {
+            pdsyevx_(
+                &job_z,
+                &range,
+                &uplo,
+                &n,
+                matrix.as_mut_ptr(),
+                &one,
+                &one,
+                desc.as_ptr(),
+                &zero,
+                &zero,
+                &zero_i,
+                &zero_i,
+                &zero,
+                &mut m,
+                &mut nz,
+                eigenvalues.as_mut_ptr(),
+                &zero,
+                vectors.as_mut_ptr(),
+                &one,
+                &one,
+                desc.as_ptr(),
+                work.as_mut_ptr(),
+                &lwork,
+                iwork.as_mut_ptr(),
+                &liwork,
+                ifail.as_mut_ptr(),
+                iclustr.as_mut_ptr(),
+                gap.as_mut_ptr(),
+                &mut info,
+            );
+        }
+        result(info)?;
+        assert_eq!(m, n);
+        assert_eq!(nz, n);
+        Ok(eigenvalues)
     }
 
     pub(crate) fn qr(

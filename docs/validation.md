@@ -476,3 +476,19 @@ a stochastic accuracy study or evidence for arbitrary fixed-rank approximation.
 Pre-existing broad local edits were preserved and excluded from this stage
 commit. Acceptance ran against the current working copy, not a clean-tree full
 regression. Full CPU coverage and Windows native acceptance remain incomplete.
+
+## 2026-09-07: square-subworld symmetric eigensolver
+
+distributed_eigh PASS once at WSL 1/2/4 parent ranks and split subcontexts,
+covering n=5 dense symmetric and degenerate spectra, plus n=1 with empty local
+fragments. The actual eigensolver grid uses 1/1/4 computing ranks respectively,
+as the pinned nonsquare-process strategy requires. Full parent distributions
+are reconstructed after the native solve. No vector-component comparisons.
+
+Original scalapack_tests/eigh.cxx orthogonality/reconstruction bounds n*n*1e-6
+retained. Maximum printed reconstruction norm ~3.58e-14; all criteria pass.
+DIGIT / PASS, class R; no numerical diagnostics or repeated passing checks.
+Combined FFI/subworld integration review was performed once. An agent's accidental
+cargo check was interrupted during compilation; it ran no numerical tests.
+Prior broad dirty edits remain preserved outside this commit. Remaining scalar
+types, SPD solve and full CPU/native Windows acceptance are not closed.

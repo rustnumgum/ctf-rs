@@ -3,7 +3,7 @@
 //! Distributed native matrix operations, following interface/matrix.cxx's
 //! read_mat -> ScaLAPACK -> tensor/get_tri sequence. No global tensor gather.
 use crate::{
-    algebra::Arithmetic,
+    algebra::{Arithmetic, Wire},
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -17,54 +17,191 @@ fn distribution(shape: &[usize], grid: [usize; 2]) -> Distribution {
     Distribution::new(shape.to_vec(), topology, vec![row, column])
 }
 impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
+    /// Symmetric eigensolve using the source's largest-square-grid subworld
+    /// strategy. Reads the upper triangle; returns (eigenvectors, eigenvalues).
+    /// For non-square process counts, only the first floor(sqrt(np))^2 ranks
+    /// compute, then factors are distributed back to the original context.
+    pub fn eigh(&self) -> Result<(Self, Self), i32> {
+        assert_eq!(self.distribution().shape.len(), 2);
+        let n = self.distribution().shape[0];
+        assert_eq!(self.distribution().shape[1], n);
+        let context = self.context();
+        let mut side = 1;
+        while (side + 1) * (side + 1) <= context.size() {
+            side += 1;
+        }
+        let active = side * side;
+        let mapped = distribution(&[n, n], [side, side]);
+        // add_to_subworld: only canonical source owners send, directly to the
+        // rank that owns each entry in the child grid. No root tensor assembly.
+        let mut buckets = vec![Vec::new(); context.size()];
+        for (key, value) in self.local_pairs() {
+            if self.distribution().owner(key) != context.rank() {
+                continue;
+            }
+            let destination = mapped.owner(key);
+            (key as u64).encode(&mut buckets[destination]);
+            value.encode(&mut buckets[destination]);
+        }
+        let incoming = context.inner.exchange(&buckets);
+        let child = context.split(
+            if context.rank() < active {
+                Some(1)
+            } else {
+                None
+            },
+            context.rank() as i32,
+        );
+        let mut vector_pairs = Vec::new();
+        let mut value_pairs = Vec::new();
+        let mut info = 0;
+        if let Some(child) = child {
+            let mut input = vec![0.; mapped.local_len().max(1)];
+            for bytes in incoming {
+                for pair in bytes.chunks_exact(16) {
+                    let key = u64::decode(&pair[..8]) as usize;
+                    input[mapped.local_offset(child.rank(), key)] = f64::decode(&pair[8..]);
+                }
+            }
+            let grid = child.inner.scalapack_grid(side, side);
+            let result = (|| {
+                let desc = grid.descriptor(n, n, 1, 1, n.div_ceil(side).max(1))?;
+                let mut vectors = vec![0.; input.len()];
+                let values = grid.eigh(n, &input, &desc, &mut vectors)?;
+                for (offset, &value) in vectors.iter().enumerate() {
+                    if let Some(key) = mapped.global_key(child.rank(), offset) {
+                        vector_pairs.push((key, value));
+                    }
+                }
+                if child.rank() == 0 {
+                    value_pairs.extend(values.into_iter().enumerate());
+                }
+                Ok::<(), i32>(())
+            })();
+            grid.close();
+            if let Err(error) = result {
+                info = error;
+            }
+            child.close();
+        }
+        let statuses = context.inner.all_gather_i32(info);
+        if let Some(error) = statuses.into_iter().find(|&value| value != 0) {
+            return Err(error);
+        }
+        // add_from_subworld: all parent ranks participate, including ranks that
+        // did not enter ScaLAPACK; writes restore each output's distribution.
+        let mut vectors = Self::new(context, self.distribution().clone(), Arithmetic::new());
+        vectors.write_add(&vector_pairs);
+        let mut values = Self::new(
+            context,
+            Distribution::cyclic(vec![n], context.size()),
+            Arithmetic::new(),
+        );
+        values.write_add(&value_pairs);
+        Ok((vectors, values))
+    }
     /// Source rank/threshold postprocessing: keep singular values >= threshold.
     /// A computed zero rank returns the full factors in this pinned version.
-    pub fn svd_truncated(&self, grid:[usize;2], rank:Option<usize>, threshold:f64)->Result<(Self,Self,Self),i32> {
-        let (u,s,vt)=self.svd(grid)?;let k=s.distribution().shape[0];
-        let mut retained=rank.unwrap_or(k);
-        if threshold>0. {
-            let values=s.read(&(0..k).collect::<Vec<_>>());
-            let cutoff=values.partition_point(|value|value.abs()>=threshold);
-            retained=if retained>0 {retained.min(cutoff)} else {cutoff};
+    pub fn svd_truncated(
+        &self,
+        grid: [usize; 2],
+        rank: Option<usize>,
+        threshold: f64,
+    ) -> Result<(Self, Self, Self), i32> {
+        let (u, s, vt) = self.svd(grid)?;
+        let k = s.distribution().shape[0];
+        let mut retained = rank.unwrap_or(k);
+        if threshold > 0. {
+            let values = s.read(&(0..k).collect::<Vec<_>>());
+            let cutoff = values.partition_point(|value| value.abs() >= threshold);
+            retained = if retained > 0 {
+                retained.min(cutoff)
+            } else {
+                cutoff
+            };
         }
-        if retained>0 && retained<k {
-            let m=u.distribution().shape[0];let n=vt.distribution().shape[1];
-            Ok((u.slice(&[0..m,0..retained]),s.slice(&[0..retained]),vt.slice(&[0..retained,0..n])))
-        } else {Ok((u,s,vt))}
+        if retained > 0 && retained < k {
+            let m = u.distribution().shape[0];
+            let n = vt.distribution().shape[1];
+            Ok((
+                u.slice(&[0..m, 0..retained]),
+                s.slice(&[0..retained]),
+                vt.slice(&[0..retained, 0..n]),
+            ))
+        } else {
+            Ok((u, s, vt))
+        }
     }
     /// Source svd_rand: initialize/QR (unless a guess is supplied), apply A*A^T
     /// and QR, retain requested columns, SVD U^T*A, and rotate the left factor.
     /// All matrix intermediates remain distributed; seed is explicitly supplied.
-    pub fn svd_randomized(&self,grid:[usize;2],rank:usize,iterations:usize,oversampling:usize,
-        seed:u64,guess:Option<&Self>)->Result<(Self,Self,Self),i32> {
-        assert_eq!(self.distribution().shape.len(),2);
-        let (m,n)=(self.distribution().shape[0],self.distribution().shape[1]);
-        assert!(rank>0 && rank<=m.min(n));let width=(rank+oversampling).min(m.min(n));
-        let mut subspace=if let Some(guess)=guess {
-            assert!(std::ptr::eq(self.context(),guess.context()));assert!(rank+oversampling<=m.min(n));
-            assert_eq!(guess.distribution().shape,vec![m,width]);guess.clone()
+    pub fn svd_randomized(
+        &self,
+        grid: [usize; 2],
+        rank: usize,
+        iterations: usize,
+        oversampling: usize,
+        seed: u64,
+        guess: Option<&Self>,
+    ) -> Result<(Self, Self, Self), i32> {
+        assert_eq!(self.distribution().shape.len(), 2);
+        let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
+        assert!(rank > 0 && rank <= m.min(n));
+        let width = (rank + oversampling).min(m.min(n));
+        let mut subspace = if let Some(guess) = guess {
+            assert!(std::ptr::eq(self.context(), guess.context()));
+            assert!(rank + oversampling <= m.min(n));
+            assert_eq!(guess.distribution().shape, vec![m, width]);
+            guess.clone()
         } else {
-            let mut values=Self::new(self.context(),distribution(&[m,width],grid),Arithmetic::new());
-            let mut state=((seed.wrapping_add(self.context().rank() as u64))<<16)|0x330e;
-            values.transform(|_,value| {
-                state=(state.wrapping_mul(0x5deece66d).wrapping_add(11))&((1<<48)-1);
-                *value=2.*state as f64/(1u64<<48) as f64-1.;
-            });values.qr(grid)?.0
+            let mut values = Self::new(
+                self.context(),
+                distribution(&[m, width], grid),
+                Arithmetic::new(),
+            );
+            let mut state = ((seed.wrapping_add(self.context().rank() as u64)) << 16) | 0x330e;
+            values.transform(|_, value| {
+                state = (state.wrapping_mul(0x5deece66d).wrapping_add(11)) & ((1 << 48) - 1);
+                *value = 2. * state as f64 / (1u64 << 48) as f64 - 1.;
+            });
+            values.qr(grid)?.0
         };
         for _ in 0..iterations {
-            let transpose=self.permute_axes(&[1,0]);
-            let mut gram=Self::new(self.context(),distribution(&[m,m],grid),Arithmetic::new());
-            gram.gemm_2d::<crate::linalg::Native>(self,&transpose,grid,1.,0.);
-            let mut next=Self::new(self.context(),distribution(&[m,width],grid),Arithmetic::new());
-            next.gemm_2d::<crate::linalg::Native>(&gram,&subspace,grid,1.,0.);subspace=next.qr(grid)?.0;
+            let transpose = self.permute_axes(&[1, 0]);
+            let mut gram = Self::new(
+                self.context(),
+                distribution(&[m, m], grid),
+                Arithmetic::new(),
+            );
+            gram.gemm_2d::<crate::linalg::Native>(self, &transpose, grid, 1., 0.);
+            let mut next = Self::new(
+                self.context(),
+                distribution(&[m, width], grid),
+                Arithmetic::new(),
+            );
+            next.gemm_2d::<crate::linalg::Native>(&gram, &subspace, grid, 1., 0.);
+            subspace = next.qr(grid)?.0;
         }
-        let u=if width>rank {subspace.slice(&[0..m,0..rank])} else {subspace};
-        let transpose=u.permute_axes(&[1,0]);
-        let mut projected=Self::new(self.context(),distribution(&[rank,n],grid),Arithmetic::new());
-        projected.gemm_2d::<crate::linalg::Native>(&transpose,self,grid,1.,0.);
-        let (rotation,s,vt)=projected.svd(grid)?;
-        let mut left=Self::new(self.context(),distribution(&[m,rank],grid),Arithmetic::new());
-        left.gemm_2d::<crate::linalg::Native>(&u,&rotation,grid,1.,0.);Ok((left,s,vt))
+        let u = if width > rank {
+            subspace.slice(&[0..m, 0..rank])
+        } else {
+            subspace
+        };
+        let transpose = u.permute_axes(&[1, 0]);
+        let mut projected = Self::new(
+            self.context(),
+            distribution(&[rank, n], grid),
+            Arithmetic::new(),
+        );
+        projected.gemm_2d::<crate::linalg::Native>(&transpose, self, grid, 1., 0.);
+        let (rotation, s, vt) = projected.svd(grid)?;
+        let mut left = Self::new(
+            self.context(),
+            distribution(&[m, rank], grid),
+            Arithmetic::new(),
+        );
+        left.gemm_2d::<crate::linalg::Native>(&u, &rotation, grid, 1., 0.);
+        Ok((left, s, vt))
     }
     /// Collective thin QR: Q has shape m*min(m,n), R has min(m,n)*n.
     /// Householder QR and explicit Q generation execute in ScaLAPACK; output
