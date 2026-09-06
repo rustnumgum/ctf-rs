@@ -1,6 +1,25 @@
 //! The only module allowed to use MPI's raw handles and native entry points.
 use mpi_sys as sys;
 use std::{marker::PhantomData, rc::Rc};
+use crate::algebra::{Monoid,Wire};
+std::thread_local! {
+    static ACTIVE_ALGEBRA: std::cell::Cell<*const std::ffi::c_void> = const {std::cell::Cell::new(std::ptr::null())};
+}
+
+// MPI_Init uses SINGLE; callback state is borrowed only for the blocking call.
+unsafe extern "C" fn monoid_add<A: Monoid>(input: *mut std::ffi::c_void, output: *mut std::ffi::c_void,
+    count: *mut i32,_datatype: *mut sys::MPI_Datatype) where A::Element: Wire {
+    ACTIVE_ALGEBRA.with(|active| {
+        let algebra = unsafe {&*active.get().cast::<A>()};
+        let count = unsafe {*count} as usize;
+        let left = unsafe {std::slice::from_raw_parts(input.cast::<u8>(),count*A::Element::WIDTH)};
+        let right = unsafe {std::slice::from_raw_parts_mut(output.cast::<u8>(),count*A::Element::WIDTH)};
+        for (a,b) in left.chunks_exact(A::Element::WIDTH).zip(right.chunks_exact_mut(A::Element::WIDTH)) {
+            let value = algebra.add(&A::Element::decode(a),&A::Element::decode(b));
+            let mut bytes = Vec::with_capacity(A::Element::WIDTH);value.encode(&mut bytes);b.copy_from_slice(&bytes);
+        }
+    });
+}
 
 pub(crate) struct Runtime { _single_thread: PhantomData<Rc<()>> }
 pub(crate) struct Comm { raw: sys::MPI_Comm, owned: bool, _single_thread: PhantomData<Rc<()>> }
@@ -24,6 +43,30 @@ impl Runtime {
 }
 
 impl Comm {
+    pub(crate) fn all_reduce_monoid<A: Monoid>(&self,algebra: &A,values: &mut [A::Element],commutative: bool)
+    where A::Element: Wire {
+        assert!(A::Element::WIDTH > 0);
+        let mut input = Vec::with_capacity(values.len()*A::Element::WIDTH);
+        for value in values.iter() {value.encode(&mut input);}
+        assert_eq!(input.len(),values.len()*A::Element::WIDTH,"Wire encoding must match its fixed width before MPI reads the buffer");
+        let mut output = vec![0u8;input.len().max(1)];
+        if input.is_empty() {input.push(0);}
+        ACTIVE_ALGEBRA.with(|active| {
+            assert!(active.get().is_null(),"nested MPI user reduction is not supported by MPI callbacks");
+            active.set((algebra as *const A).cast());
+            unsafe {
+                let mut datatype = sys::RSMPI_DATATYPE_NULL;
+                check(sys::MPI_Type_contiguous(A::Element::WIDTH.try_into().unwrap(),sys::RSMPI_UINT8_T,&mut datatype));
+                check(sys::MPI_Type_commit(&mut datatype));
+                let mut operation = std::mem::zeroed();
+                check(sys::MPI_Op_create(Some(monoid_add::<A>),i32::from(commutative),&mut operation));
+                check(sys::MPI_Allreduce(input.as_ptr().cast(),output.as_mut_ptr().cast(),values.len().try_into().unwrap(),datatype,operation,self.raw));
+                check(sys::MPI_Op_free(&mut operation));check(sys::MPI_Type_free(&mut datatype));
+            }
+            active.set(std::ptr::null());
+        });
+        for (value,bytes) in values.iter_mut().zip(output.chunks_exact(A::Element::WIDTH)) {*value = A::Element::decode(bytes);}
+    }
     pub(crate) fn rank(&self) -> usize {
         let mut rank = 0;
         unsafe { check(sys::MPI_Comm_rank(self.raw, &mut rank)); }

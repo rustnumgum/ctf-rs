@@ -181,3 +181,15 @@ once after fixing a zero-count Bcast buffer-address error discovered on the firs
 explicit grid, executes panel broadcasts plus BLAS, and restores the output
 distribution. No global tensor gather is used. This is explicit-grid f64 matrix
 multiplication, not general indexed contraction or automatic cost-based planning.
+
+## 2026-09-06: native custom monoid reduction
+
+`cargo test --test custom_reduce` under MPI at 1,2,4 ranks: PASS once each.
+Exact tests use noncommutative affine-function composition to check rank order,
+a closure-captured modular-addition algebra, multiple elements and zero counts.
+The implementation creates an MPI contiguous element datatype and user operation,
+executes native Allreduce, and explicitly frees both handles before returning.
+After these passes a fixed-width serialization assertion was added before the
+FFI call to enforce the Wire buffer-size contract; no numerical rerun was needed.
+The existing tensor reduction API is unchanged; generic contraction/summation
+communication integration remains unfinished.

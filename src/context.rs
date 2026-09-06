@@ -18,6 +18,11 @@ impl Context<'_> {
     pub fn rank(&self) -> usize { self.inner.rank() }
     pub fn size(&self) -> usize { self.inner.size() }
     pub fn barrier(&self) { self.inner.barrier(); }
+    /// Native MPI user operation over explicitly serialized elements. Set
+    /// commutative=false when rank order matters. Algebra callbacks must not
+    /// invoke MPI or panic. Datatype/operator cleanup is explicit before return.
+    pub fn all_reduce_monoid<A: Monoid>(&self,algebra: &A,values: &mut [A::Element],commutative: bool)
+    where A::Element: Wire {self.inner.all_reduce_monoid(algebra,values,commutative);}
     /// Native MPI sum of one local f64 block. Collective; no global tensor gather.
     pub fn sum_f64(&self, values: &mut [f64]) { self.inner.sum_f64(values); }
     /// Reduce one local block to root; other ranks retain their local contributions.

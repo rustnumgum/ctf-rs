@@ -50,3 +50,8 @@ name = "tensor_gemm"
 path = "tests/tensor_gemm.rs"
 harness = false
 required-features = ["native-linalg"]
+
+[[test]]
+name = "custom_reduce"
+path = "tests/custom_reduce.rs"
+harness = false
