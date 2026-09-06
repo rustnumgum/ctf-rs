@@ -157,3 +157,13 @@ planner-supplied transposed-output flags/operand swapping, and zero reduction
 length. The entry point calls the replaceable LocalKernels trait, initially BLAS.
 It executes an already-folded plan; automatic folding and the 2D communication
 planner remain unfinished.
+
+## 2026-09-06: 2D communication execution level
+
+`cargo test --test ctr_2d` with MPI runners at 1,2,4 ranks: all PASS once with
+exact small-integer-valued results. Covered cyclic input panel broadcasts,
+moving-output MPI_Reduce to cyclic owners, and noncontiguous output scatter with
+beta. Code also carries upstream replication-layer partitioning; that branch
+has not yet been separately accepted. This is one execution level with explicit
+panel metadata and a child kernel, not the complete 2D plan builder or a complete
+Tensor-level distributed contraction. No global tensor gather is performed.

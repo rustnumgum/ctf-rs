@@ -13,5 +13,6 @@ pub mod node_aware;
 pub mod tensor;
 pub mod summation;
 pub mod contraction;
+pub mod ctr_2d;
 pub mod linalg;
 mod ffi;

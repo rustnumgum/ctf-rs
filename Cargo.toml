@@ -39,3 +39,8 @@ harness = false
 name = "replicated_contraction"
 path = "tests/replicated_contraction.rs"
 harness = false
+
+[[test]]
+name = "ctr_2d"
+path = "tests/ctr_2d.rs"
+harness = false

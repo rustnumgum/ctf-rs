@@ -37,6 +37,9 @@ Do not stamp independently written files with the upstream author's copyright.
   input-replica clearing.
   Folded CPU batch layout follows `interface/semiring.cxx::gemm_batch`; output
   operand swapping and prescaling follow `sym_seq_ctr_inr`.
+* `src/ctr_2d.rs`: panel packing/broadcast, output reduction/scatter and layer
+  propagation adapted from `ctr_2d_general::run` and `find_bsizes` in
+  `src/contraction/ctr_2d_general.cxx`.
 * `src/linalg.rs`, `src/ffi/linalg.rs`: new local-kernel interface and bindings to
   standard BLAS/LAPACK operations. No C++ CTF wrapper is linked or copied here.
 
