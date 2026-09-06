@@ -11,6 +11,9 @@ Do not stamp independently written files with the upstream author's copyright.
   adapted from `src/mapping/{mapping,topology,distribution}.cxx`.
 * `src/topology_candidates.rs`: ordered factorization, adjacent folding and
   permutation/folding enumeration adapted from `src/mapping/topology.cxx`.
+* `src/node_aware.rs`: inter-node grid factor assignment/tree enumeration adapted
+  from `src/mapping/node_aware_dist.cxx`, whose author notice names Andreas Irmler;
+  its corresponding upstream header carries the 2022 Edgar Solomonik notice.
 * `src/tensor.rs`: Rust distributed storage implementation using the upstream
   cyclic distribution and key-bucket exchange approach; not a literal complete
   port of all optimized redistribution kernels.

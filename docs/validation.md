@@ -76,3 +76,12 @@ for sizes 1, 4, 7, 12, adjacent-dimension folding order, and permutation/folding
 deduplication order. Implementation ports `get_all_shapes`, `peel_torus`, and
 `peel_perm_torus` from the pinned `src/mapping/topology.cxx`.
 This supplies candidate topology shapes, not a completed contraction planner.
+
+## 2026-09-06: inter-node grids
+
+`cargo test --test node_aware`: exact branch-order and grid-invariant tests PASS.
+The source's retained-tree traversal was subsequently preserved explicitly to
+handle the zero-dimensional, one-process topology; the new `scalar_topology`
+check PASS with the other two already-passing checks filtered out.
+No floating-point computation or precision study was involved.
+Node-aware contraction communication remains outstanding.
