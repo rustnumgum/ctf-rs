@@ -9,6 +9,8 @@ Do not stamp independently written files with the upstream author's copyright.
 
 * `src/mapping.rs`: map-chain phase/rank and topology reorder/inverse routines
   adapted from `src/mapping/{mapping,topology,distribution}.cxx`.
+* `src/map_tensor.rs`: physical-axis assignment and symmetry-phase coordination
+  adapted from `map_tensor`/`map_symtsr` in `src/mapping/mapping.cxx`.
 * `src/topology_candidates.rs`: ordered factorization, adjacent folding and
   permutation/folding enumeration adapted from `src/mapping/topology.cxx`.
 * `src/node_aware.rs`: inter-node grid factor assignment/tree enumeration adapted

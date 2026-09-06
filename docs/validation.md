@@ -85,3 +85,13 @@ handle the zero-dimensional, one-process topology; the new `scalar_topology`
 check PASS with the other two already-passing checks filtered out.
 No floating-point computation or precision study was involved.
 Node-aware contraction communication remains outstanding.
+
+## 2026-09-06: physical-axis assignment
+
+`cargo test --test map_tensor`: 3 exact tests PASS in one execution.
+Covered longest-local-edge selection, adjacent-axis folding, fill/restriction
+behavior, symmetric LCM virtualization and rejection of impossible/over-limit
+candidates. No floating-point checks or additional diagnostic computations.
+The assignment primitive is exposed for planner integration; the tensor
+constructor still takes an explicit distribution. Automatic plan search and
+all upstream mapping edge cases are not yet claimed complete.
