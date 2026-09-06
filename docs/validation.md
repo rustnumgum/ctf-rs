@@ -531,7 +531,8 @@ scope, Solve_Factor, tensor SVD, or the full Windows-native acceptance.
 
 ## Indexed tensor SVD and reshape (2026-09-07)
 
-distributed_tensor_svd passed once each on WSL Ubuntu-26.04 with 1/2/4 ranks,
+distributed_tensor_svd passed on WSL Ubuntu-26.04 with 1/2 ranks initially;
+4 ranks passed after the native one-row SVD layout correction below,
 including parity subcommunicators. Native matrices stay distributed throughout.
 Source test_la.py::test_tsvd shape [4,5,6,3] and output layouts ija/akl,
 ika/ajl, iakj/la, alk/jai exercise input regrouping and arbitrary auxiliary
@@ -544,6 +545,17 @@ No eigenvector or singular-vector component comparisons are used.
 Reshape preserves exact flattened values and the requested distribution for
 [3,2,2] -> [4,3] with ownership changes and [1] -> [1,1] with empty shards.
 The combined module/test review corrected the test Gram-output index labels
-before the first run. All passed, DIGIT / PASS; no additional numerical runs.
+before the first run. DIGIT / PASS for 1/2/4 ranks; no repeated passing runs.
 Other scalar types, optimized merge/split reshapes, tensor-train/batched SVD
 and remaining CPU/native Windows coverage are not claimed complete.
+
+The initial four-rank randomized projection had shape 1x2 on a 2x2 grid.
+Live GDB stacks found one rank in PDLARF/DGSUM2D and others in PDGESVD's final
+DGAMN2D. A trial 1x4 grid failed identically and was removed. Source diagnosis
+then identified PDNRM2's documented N=MX=INCX=1 ambiguity: only the tail owner
+receives its norm, producing inconsistent TAUP and conditional collective calls.
+The correction selects a full-rank Nx1 grid before the one-row native call,
+then restores the requested U/VT distributions. The affected four-rank test
+passed; the prior 1/2-rank configurations and tolerances were unchanged.
+Both hung runs were explicitly terminated after stack diagnosis, not restarted
+on an observation timeout. No precision diagnostics were performed.

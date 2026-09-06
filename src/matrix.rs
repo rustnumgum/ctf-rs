@@ -314,10 +314,20 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
     /// Collective thin SVD returning distributed U, singular-value vector, VT.
     /// Native replicated singular values are assigned directly to their owners;
     /// matrix factors stay distributed throughout PDGESVD and reconstruction.
+    /// One-row matrices use a one-column native grid to avoid PBLAS's
+    /// single-element row-norm ambiguity, then restore the requested layout.
     pub fn svd(&self, grid: [usize; 2]) -> Result<(Self, Self, Self), i32> {
         assert_eq!(self.distribution().shape.len(), 2);
         let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
         let k = m.min(n);
+        assert_eq!(grid[0] * grid[1], self.context().size());
+        let requested_grid = grid;
+        // PDLARFG calls PDNRM2 with N=MX=INCX=1 for the tail of a 1x2
+        // matrix. Only its owner receives the norm, so NPCOL>1 produces
+        // inconsistent TAUP and mismatched PDLARF collective participation.
+        let grid = if m == 1 && n > 1 && grid[1] > 1 {
+            [self.context().size(), 1]
+        } else { grid };
         let mut source = self.clone();
         source.redistribute(distribution(&[m, n], grid));
         let mut u = Self::new(
@@ -357,6 +367,10 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         })();
         blacs.close();
         operation?;
+        if grid != requested_grid {
+            u.redistribute(distribution(&[m, k], requested_grid));
+            vt.redistribute(distribution(&[k, n], requested_grid));
+        }
         Ok((u, singular, vt))
     }
     /// Collective PD POTRF on a caller-selected grid with cyclic block size 1.

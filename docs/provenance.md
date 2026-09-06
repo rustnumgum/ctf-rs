@@ -340,3 +340,33 @@ It accepts an explicit target distribution and works with the crate's monoids.
 Upstream's optimized merge_modes/split_modes and unit-length aliases remain
 unported; using the general key path does not close those optimization items.
 Tensor SVD is not tensor-train SVD or batched SVD; those remain distinct scope.
+
+The installed ScaLAPACK 2.2 one-row SVD has a PBLAS row/column ambiguity:
+PDGEBD2 -> PDLARFG -> PDNRM2 on a one-element tail with matrix row count and
+increment both one returns the norm only to its owner. PDLARF then conditionally
+enters DGSUM2D with inconsistent TAUP. Reference ScaLAPACK SRC/pdlarfg.f:176-229,
+SRC/pdgebd2.f:389-415 and SRC/pdlarf.f:557-601, together with PBLAS PDNRM2's
+documented special case, explain the observed rank stacks. Upstream CTF's
+padding changes local storage, not logical dimensions, and does not fix this.
+Rust selects a one-column native grid for nontrivial one-row SVD, retains all
+ranks in PDGESVD, and redistributes factors back to the requested layout.
+There is no solver retry, matrix gather, padding-induced spectrum change or
+alternate numerical solver in this path.
+
+## Pending Solve_Factor source audit
+
+interface/multilinear.cxx:689-1003 forms one rank-by-rank Gram system per
+target-mode row: LHS_i += T_entry * product_other_factors * product_other_factors^T,
+using lower SYR, then solves against RHS using POSV. Its complementary-mode
+communicator performs Reduce_scatter of Gram blocks, Scatter of RHS rows,
+local solves, then Gather of solutions. This is a different algorithm from
+MTTKRP, not a wrapper around it. The Python production path is f64 and
+auxiliary-first matrices only. test_einsum.py::test_Solve_Factor_mat uses
+numpy.allclose defaults (rtol=1e-5, atol=1e-8), not that file's L1 helper.
+
+The source hardcodes double/MPI_DOUBLE, leaves POSV info unchecked, and has
+broken vector/auxiliary-last branches. Its equal-size RHS Scatter can exceed
+the natural row buffer when rows do not divide communicator size; its Gather
+leaves replicated non-root RHS buffers uncleared. A port must preserve the
+distributed Gram/solve steps without reproducing these memory/error defects.
+No Solve_Factor implementation or acceptance is claimed by this audit.
