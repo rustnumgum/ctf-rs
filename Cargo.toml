@@ -122,3 +122,8 @@ required-features = ["native-linalg"]
 name = "selector"
 path = "tests/selector.rs"
 harness = false
+
+[[test]]
+name = "selection_objective"
+path = "tests/selection_objective.rs"
+harness = false

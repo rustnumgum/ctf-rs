@@ -360,3 +360,13 @@ then identified that ctr_virt inherits a zero internode-volume estimator rather
 than multiplying child volume; this fidelity defect was corrected and only the
 affected recursion_and_layers test rerun, PASS. Unchanged replica test was not
 repeated. DIGIT / PASS, class R, exact formulas; no wall-time or RSS accuracy claim.
+
+## 2026-09-07: time/memory objective selection
+
+WSL selection_objective PASS once at 1/2/4 ranks and split subcontexts. Exact
+synthetic costs check time-optimal versus memory-weighted winners, equality at
+the strict memory limit, no feasible candidate, the 1e-8 cutoff, local/rank tie
+order and exclusion of exhaustive candidates. The selected plan executes an
+exact integer contraction. DIGIT / PASS, class R, tolerance 0. This does not
+validate automatic candidate enumeration, exhaustive refinement, total-memory
+estimation or a low-memory executor.

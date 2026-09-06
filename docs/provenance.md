@@ -155,3 +155,15 @@ volume is zero in this revision, even though its time estimate recurses.
 These are source-model work bytes, not actual Rust peak RSS or total residency.
 Automatic execution-tree construction, redist/fold resident-memory accounting
 and feeding complete costs into candidate discovery remain pending.
+
+## Normal-search objective selection (2026-09-07)
+
+Selector::select_best ports evaluate_mappings' strict memory exclusion, dense
+INT_MAX element limit, time-only/normalized time-plus-memory scoring, and
+first-in-order tie handling. Local winners send time and i64 memory with two
+MPI_Gathers to rank 0; winner rank and executable payload are broadcast.
+The |weight|>1e-8 cutoff and positive weighted baseline requirements are retained.
+Unlike the upstream surrounding mutable tensor search, this consumes explicitly
+supplied complete candidate estimates. It excludes exhaustive candidates: their
+different incumbent/refinement logic and automatic mapping generation remain
+pending. Selection cannot compensate for incomplete supplied memory estimates.

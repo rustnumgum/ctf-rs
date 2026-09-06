@@ -31,6 +31,19 @@ pub fn replication_factor(distribution:&Distribution)->usize {
 }
 #[derive(Clone,Copy)]
 pub enum Filter { MaxMemory(u64),MaxTime(f64),NoReplication(usize) }
+/// evaluate_mappings time/memory objective. Baseline is required only for a
+/// non-negligible weight (source cutoff |weight|>1e-8).
+#[derive(Clone,Copy)]
+pub struct Objective {pub memory_limit:u64,pub weight:f64,pub baseline_seconds:f64,pub baseline_memory:u64}
+impl Objective {
+    fn score(self,seconds:f64,memory:u64)->f64 {
+        if self.weight.abs()>1e-8 {
+            assert!(self.baseline_seconds>0. && self.baseline_memory>0);
+            (seconds-self.baseline_seconds)/self.baseline_seconds+
+                self.weight*(memory as f64-self.baseline_memory as f64)/self.baseline_memory as f64
+        } else {seconds}
+    }
+}
 impl Filter {
     pub fn accepts(self,candidate:&Candidate)->bool {
         match self {
@@ -76,6 +89,41 @@ impl<'context,'runtime> Selector<'context,'runtime> {
     }
     pub fn clear(&mut self) {self.candidates.clear();self.selected=None;}
     pub fn reset(&mut self) {self.clear();self.scan=false;}
+    /// Collective normal-search winner selection for already estimated dense
+    /// candidates. Source strict memory bound and INT_MAX dense-local count limit
+    /// are enforced before ranking. Local and cross-rank ties retain first order.
+    /// Exhaustive-search generation/refinement is not performed by this method.
+    pub fn select_best(&mut self,objective:Objective)->bool {
+        self.scan=false;self.selected=None;
+        let mut local=None;let mut score=f64::MAX;
+        for candidate in &self.candidates {
+            if candidate.exhaustive {continue;}
+            if candidate.memory_bytes>=objective.memory_limit {continue;}
+            if candidate.plan.mapped_distributions().iter().any(|d|d.local_len()>i32::MAX as usize) {continue;}
+            assert!(candidate.seconds>=0.);
+            let current=objective.score(candidate.seconds,candidate.memory_bytes);
+            if current<score {score=current;local=Some(candidate);}
+        }
+        let seconds=local.map_or(f64::MAX,|c|c.seconds);
+        let memory=local.map_or(-1,|c|c.memory_bytes.try_into().unwrap());
+        let (times,memories)=self.context.inner.gather_plan_cost(seconds,memory);
+        let mut winner=[-1i32];
+        if self.context.rank()==0 {
+            let mut best=f64::MAX;
+            for rank in 0..self.context.size() {
+                if memories[rank]<0 {continue;}
+                let value=objective.score(times[rank],memories[rank] as u64);
+                if value<best {best=value;winner[0]=rank as i32;}
+            }
+        }
+        self.context.broadcast(0,&mut winner);
+        if winner[0]<0 {return false;}
+        let root=winner[0] as usize;
+        let mut words=if self.context.rank()==root {local.unwrap().pack()} else {Vec::new()};
+        let mut size=[words.len() as u64];self.context.broadcast(root,&mut size);
+        words.resize(size[0].try_into().unwrap(),0);self.context.broadcast(root,&mut words);
+        self.selected=Some(Candidate::unpack(&words));true
+    }
     /// Collective: first matching local candidate; allgather availability; lowest
     /// matching rank broadcasts payload size then payload, as in selectCandidate.
     /// Returns false on every rank if the requested candidate is absent globally.

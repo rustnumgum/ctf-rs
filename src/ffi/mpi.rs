@@ -139,6 +139,16 @@ impl Comm {
             output.as_mut_ptr().cast(),1,sys::RSMPI_INT32_T,self.raw));}
         output
     }
+    pub(crate) fn gather_plan_cost(&self,seconds:f64,memory:i64)->(Vec<f64>,Vec<i64>) {
+        let mut times=vec![0.;self.size()];let mut bytes=vec![0i64;self.size()];
+        unsafe {
+            check(sys::MPI_Gather((&seconds as *const f64).cast(),1,sys::RSMPI_DOUBLE,
+                times.as_mut_ptr().cast(),1,sys::RSMPI_DOUBLE,0,self.raw));
+            check(sys::MPI_Gather((&memory as *const i64).cast(),1,sys::RSMPI_INT64_T,
+                bytes.as_mut_ptr().cast(),1,sys::RSMPI_INT64_T,0,self.raw));
+        }
+        (times,bytes)
+    }
     pub(crate) fn send_receive(&self, send: &[u8], destination: usize, source: usize, recv: &mut [u8]) {
         assert!(destination < self.size() && source < self.size());
         unsafe { check(sys::MPI_Sendrecv(send.as_ptr().cast(), send.len().try_into().unwrap(), sys::RSMPI_UINT8_T,
