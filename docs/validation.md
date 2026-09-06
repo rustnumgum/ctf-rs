@@ -777,3 +777,14 @@ run: source recursion reruns alignment/factors on the incoming coefficient,
 not the already-adjusted parent coefficient. The new target also compiled and
 linked once on Windows GNU. SY, repeated-label hollow sums and native runtime
 acceptance remain pending; the explicit method contract does not hide these gaps.
+
+## Compressed diagonal extraction and hollow preprocessing (2026-09-07)
+
+distributed_symmetric_diagonal passed once at 1/2/4 WSL MPI ranks, including
+parity contexts. Exact i64 checks cover recursive NS iii extraction, deletion
+of a physically mapped axis, virtual/replicated projected storage, preservation
+of an unaffected AS group, SY ii extraction/reinsertion, AS/SH structural-zero
+diagonals, and repeated iik-to-ii hollow summation with unchanged off-diagonal
+output. No failures or retries; DIGIT / PASS, tolerance zero. The new target
+also compiled and linked once on Windows GNU; native execution remains pending.
+Cross-group symmetry-breaking diagonal patterns were not tested or claimed.

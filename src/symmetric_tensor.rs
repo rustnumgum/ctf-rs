@@ -13,6 +13,8 @@ mod operations;
 mod summation;
 #[path = "symmetric_hollow_sum.rs"]
 mod hollow_summation;
+#[path = "symmetric_diagonal.rs"]
+mod diagonal;
 
 impl<'c, 'r, A: Group + crate::algebra::Semiring> SymmetricTensor<'c, 'r, A>
 where A::Element: Wire {

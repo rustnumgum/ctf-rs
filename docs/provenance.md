@@ -638,3 +638,22 @@ the path allocates distributed intermediate tensors as the source does, never
 a global gather. Unique labels and absence of SY are explicit method contracts.
 Repeated-label preprocessing, SY coincidence-surface corrections and the full
 automatic communication planner remain required for unrestricted sums.
+
+## Compressed diagonal projection (2026-09-07)
+
+src/symmetric_diagonal.rs deletes later duplicate axes in tensor::extract_diag
+first-pair order. The bridge at deleted axis j is preserved only when old links
+j-1 and j agree, otherwise it becomes NS. Shape/mapping axes are deleted while
+the topology is retained, so removing a physical mapping introduces replicas.
+Projected canonical owners request expanded source coordinates; reinsertion
+clears only the corresponding target canonical keys before writing replacements.
+No full NS expansion or global gather is used.
+
+Supported patterns are repeated singleton NS axes, an isolated SY pair ii,
+and structurally zero equalities within AS/SH groups. Unaffected symmetry groups
+retain their compression. Cross-group repeats involving nontrivial symmetry
+are deliberately rejected: source extraction invokes symmetry-aware summation,
+which is not generally interchangeable with sampling signed semantic reads.
+sum_hollow_from now extracts/reinserts supported repeated-label patterns before
+its unique-index recursion. Unrestricted diagonal symmetry handling is still
+pending, not hidden behind a silent NS fallback.

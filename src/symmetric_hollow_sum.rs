@@ -99,10 +99,9 @@ where
 {
     /// Symmetry-aware indexed sum for the hollow AS/SH domain.
     ///
-    /// This is deliberately restricted to unique ASCII labels and NS/AS/SH
-    /// links. Repeated-label diagonal extraction and SY diagonal-sensitive
-    /// unfolding belong to the unrestricted `sym_sum_tsr` path and are not
-    /// approximated here.
+    /// NS/AS/SH links, with repeated labels handled by the supported diagonal
+    /// extraction primitive. Cross-group symmetry-breaking diagonals and SY
+    /// coincidence-surface unfolding are not approximated here.
     pub fn sum_hollow_from(
         &mut self,
         output_indices: &str,
@@ -112,8 +111,6 @@ where
         beta: A::Element,
     ) {
         assert!(std::ptr::eq(self.context, input.context));
-        assert_unique_indices(input_indices, input.distribution.links().len());
-        assert_unique_indices(output_indices, self.distribution.links().len());
         assert!(
             input
                 .distribution
@@ -123,6 +120,18 @@ where
                 .all(|&link| link != Symmetry::SY),
             "sum_hollow_from does not support SY links"
         );
+
+        let repeated = [input_indices, output_indices].iter().any(|labels|
+            labels.bytes().enumerate().any(|(axis,label)| labels.as_bytes()[..axis].contains(&label)));
+        if repeated {
+            let (a, ia) = input.extract_diagonal(input_indices);
+            let (mut b, ib) = self.extract_diagonal(output_indices);
+            b.sum_hollow_from(&ib, &a, &ia, alpha, beta);
+            self.replace_diagonal(output_indices, &b);
+            return;
+        }
+        assert_unique_indices(input_indices, input.distribution.links().len());
+        assert_unique_indices(output_indices, self.distribution.links().len());
 
         self.sum_hollow_recursive(
             output_indices.as_bytes(),
