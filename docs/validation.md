@@ -576,3 +576,21 @@ Combined FFI/test integration was reviewed before the first run; all passed,
 DIGIT / PASS. No reruns or precision diagnostics. Source's random sparse
 rank-ten fixtures have not been migrated by this dense-path test, and sparse
 Solve_Factor and broader CPU/native Windows acceptance remain open.
+
+## Distributed sparse storage/I/O (2026-09-07)
+
+distributed_sparse_io passed once each with 1/2/4 MPI ranks on the Linux work
+copy, including parity subcommunicators. Exact i64 cases cover duplicate
+additive/scaled writes, beta applied once per touched key, unchanged old-only
+keys, repeated/out-of-order/missing reads, explicit-zero retention and separate
+pruning, scaling/stored transforms, slice/permutation, physical/virtual layout
+switches and full replication without reduction overcount.
+
+A 1,000,000 x 1,000,000 logical tensor stores at most two local entries and
+successfully reads/reduces them without dense allocation. Custom max monoids
+use i64::MIN as the absent identity; a noncommutative first-nonzero monoid
+checks source new-before-old overlap order. The combined source/test review
+resolved the source's exact operand order before the first run. All passed,
+DIGIT / PASS with exact comparisons; no reruns or numerical diagnostics.
+This is sparse storage and I/O coverage, not yet distributed sparse/mixed
+contraction, compressed symmetry or the complete upstream sparse CPU suite.

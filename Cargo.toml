@@ -192,3 +192,8 @@ name = "distributed_solve_factor"
 path = "tests/distributed_solve_factor.rs"
 harness = false
 required-features = ["native-linalg"]
+
+[[test]]
+name = "distributed_sparse_io"
+path = "tests/distributed_sparse_io.rs"
+harness = false

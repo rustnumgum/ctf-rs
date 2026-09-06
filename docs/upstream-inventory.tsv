@@ -141,7 +141,7 @@ src/redistribution/redist.cxx	src/redistribution	pending
 src/redistribution/redist.h	src/redistribution	pending
 src/redistribution/slice.cxx	src/redistribution	pending
 src/redistribution/slice.h	src/redistribution	pending
-src/redistribution/sparse_rw.cxx	src/redistribution	pending
+src/redistribution/sparse_rw.cxx	src/sparse.rs	partial: sorted virtual-block storage, indexed additive/scaled writes, absent-key reads and owner routing; optimized sparse communication kernels pending
 src/redistribution/sparse_rw.h	src/redistribution	pending
 src/symmetry/Makefile	Cargo/build tooling	replaced
 src/symmetry/sym_indices.cxx	src/sym_indices.rs	pair/triple alignment, relative signs and both multiplicity factors; exact local checks pass

@@ -387,3 +387,30 @@ Nonzero DPOSV info is propagated collectively before returning an error.
 These are intentional corrections of the audited memory/error defects, not
 replacement algorithms. Sparse source fixtures and non-f64 algebra remain
 unimplemented; the broken C++ vector and auxiliary-last branches are not exposed.
+
+## Distributed sparse storage and I/O (2026-09-07)
+
+sparse.rs follows sparse_rw.cxx's sorted key/value pairs within virtual blocks,
+duplicate reduction with the algebra's addition, and absent-key additive
+identity. Only stored entries are allocated or redistributed; dense local
+storage size is not used for allocation. Physical ownership/virtual offsets
+reuse the shared mapping implementation. Canonical source owners send entries
+to destination replicas, avoiding replica multiplication during redistribution
+and reduction. No tensor gather or implicit collective destructor is used.
+
+As in sp_write:1379-1485, old-only keys stay unchanged, requested existing keys
+are weighted once by beta, incoming values are right-multiplied by alpha and
+duplicate contributions accumulate. Explicit zero results remain stored.
+For an overlapping key, the source adds the first incoming value before the
+old value; later duplicate requests are appended. This noncommutative order
+is retained independently of the right-hand scalar multiplication order.
+Sparsify is a separate predicate-based operation (untyped_tensor.cxx:1670-1711).
+Stored transforms deliberately do not evaluate absent entries. sp_read intends
+missing keys to produce the algebra identity; its trailing-request control-flow
+defect is not reproduced. Sparse views currently use canonical-key routing,
+not all optimized upstream sparse reshuffle kernels.
+
+The source's key-only std::sort leaves equal-key ordering unspecified. Rust
+uses stable sorting and source-rank/request order for duplicate additions;
+this makes the tie order deterministic rather than claiming it reproduces
+an unspecified C++ ordering for noncommutative monoids.
