@@ -133,6 +133,12 @@ impl Comm {
             output.as_mut_ptr().cast(),count,sys::RSMPI_DOUBLE,self.raw));}
         output.truncate(values.len()*self.size());output
     }
+    pub(crate) fn all_gather_i32(&self,value:i32)->Vec<i32> {
+        let mut output=vec![0;self.size()];
+        unsafe {check(sys::MPI_Allgather((&value as *const i32).cast(),1,sys::RSMPI_INT32_T,
+            output.as_mut_ptr().cast(),1,sys::RSMPI_INT32_T,self.raw));}
+        output
+    }
     pub(crate) fn send_receive(&self, send: &[u8], destination: usize, source: usize, recv: &mut [u8]) {
         assert!(destination < self.size() && source < self.size());
         unsafe { check(sys::MPI_Sendrecv(send.as_ptr().cast(), send.len().try_into().unwrap(), sys::RSMPI_UINT8_T,

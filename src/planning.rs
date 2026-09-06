@@ -49,6 +49,48 @@ pub struct GridPlan {
     mapped: [Distribution;3],
 }
 impl GridPlan {
+    pub(crate) fn pack(&self)->Vec<u64> {
+        fn map(m:&Mapping,out:&mut Vec<u64>) {
+            match m {
+                Mapping::Unmapped=>out.push(0),
+                Mapping::Physical{axis,processes,child}=>{out.extend([1,*axis as u64,*processes as u64]);map(child,out);},
+                Mapping::Virtual{copies,child}=>{out.extend([2,*copies as u64]);map(child,out);},
+            }
+        }
+        fn vector(v:&[usize],out:&mut Vec<u64>) {out.push(v.len() as u64);out.extend(v.iter().map(|&x|x as u64));}
+        fn distribution(d:&Distribution,out:&mut Vec<u64>) {
+            vector(&d.shape,out);vector(&d.topology.dimensions,out);
+            for m in &d.mappings {map(m,out);}
+        }
+        let mut out=Vec::new();
+        for d in &self.signature.distributions {distribution(d,&mut out);}
+        for indices in &self.signature.indices {vector(indices,&mut out);}
+        vector(&self.signature.topology.dimensions,&mut out);
+        for d in &self.mapped {distribution(d,&mut out);}
+        out
+    }
+    pub(crate) fn unpack(words:&[u64])->Self {
+        fn value(words:&mut std::slice::Iter<'_,u64>)->usize {(*words.next().unwrap()).try_into().unwrap()}
+        fn vector(words:&mut std::slice::Iter<'_,u64>)->Vec<usize> {(0..value(words)).map(|_|value(words)).collect()}
+        fn map(words:&mut std::slice::Iter<'_,u64>)->Mapping {
+            match value(words) {
+                0=>Mapping::Unmapped,
+                1=>Mapping::Physical{axis:value(words),processes:value(words),child:Box::new(map(words))},
+                2=>Mapping::Virtual{copies:value(words),child:Box::new(map(words))},
+                _=>panic!("invalid mapping tag"),
+            }
+        }
+        fn distribution(words:&mut std::slice::Iter<'_,u64>)->Distribution {
+            let shape=vector(words);let topology=Topology::new(vector(words));
+            let maps=(0..shape.len()).map(|_|map(words)).collect();Distribution::new(shape,topology,maps)
+        }
+        let mut words=words.iter();
+        let distributions=std::array::from_fn(|_|distribution(&mut words));
+        let indices=std::array::from_fn(|_|vector(&mut words));
+        let topology=Topology::new(vector(&mut words));
+        let mapped=std::array::from_fn(|_|distribution(&mut words));assert!(words.next().is_none());
+        Self {signature:Signature{distributions,indices,topology},mapped}
+    }
     pub fn prepare(distributions: [&Distribution;3], indices: [&str;3], topology: Topology) -> Result<Self,Rejected> {
         let signature = Signature::new(distributions,indices,topology);
         Self::from_signature(signature)

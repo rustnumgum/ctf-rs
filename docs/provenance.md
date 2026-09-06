@@ -127,3 +127,16 @@ precision; malformed/missing CPU records return errors instead of source's
 silent zero/substitution behavior. Unknown names, including offload records, are
 ignored. Bulk writer emits the CPU bank; it does not edit unrelated file records.
 These formulas are not yet wired to full contraction-tree candidate selection.
+
+## Collective candidate selection (2026-09-07)
+
+`src/selector.rs` adapts contraction_selector.h's per-signature candidate storage,
+AND filters, replication measure (physical replicas times virtual copies), and
+selectCandidate availability-allgather followed by lowest-owner size/payload
+broadcast. Selector borrows an explicit Context instead of global universe.
+GridPlan packing preserves full mapping chains and uses explicit u64/f64 bits;
+no C++ integer-buffer ABI compatibility is intended. Received plans execute via
+Tensor::contract_with_plan. Time/memory metadata must be supplied explicitly;
+automatic full-tree costs and candidate generation remain pending. The upstream
+unimplemented allgather() method is not exported as a Rust placeholder.
+Clearing or changing candidate signature also clears stale selected state.

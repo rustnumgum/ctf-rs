@@ -117,3 +117,8 @@ name = "model_training"
 path = "tests/model_training.rs"
 harness = false
 required-features = ["native-linalg"]
+
+[[test]]
+name = "selector"
+path = "tests/selector.rs"
+harness = false

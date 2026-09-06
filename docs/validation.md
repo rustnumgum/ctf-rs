@@ -339,3 +339,14 @@ diagnostics or repeats. Existing distributed training tests were not rerun since
 their update algorithm was unchanged. Automatic candidate generation/selection,
 communication-tree memory costs, model instrumentation and Windows acceptance
 remain open.
+
+## 2026-09-07: cross-rank candidate selection
+
+WSL `selector` PASS once at 1/2/4 MPI ranks, also within split contexts. Exact
+checks cover a plan available only on the last rank, size/payload broadcast,
+received plan signatures/maps/scalars, actual integer contraction execution,
+lowest-rank selection when IDs coincide, absent IDs, exhaustive flag matching,
+time/memory filters, changed-signature invalidation, reset and virtual replication
+factor. Metadata uses exactly representable values; no timing accuracy is claimed.
+DIGIT / PASS, class R, tolerance 0. Automatic candidate discovery and full-tree
+time/peak-memory estimation are not validated by this explicit selection test.
