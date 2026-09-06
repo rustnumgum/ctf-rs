@@ -175,3 +175,8 @@ required-features = ["native-scalapack"]
 name = "distributed_tttp"
 path = "tests/distributed_tttp.rs"
 harness = false
+
+[[test]]
+name = "distributed_mttkrp"
+path = "tests/distributed_mttkrp.rs"
+harness = false

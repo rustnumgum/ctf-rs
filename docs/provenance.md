@@ -306,3 +306,21 @@ selection. Dense f64 only; sparse and generic-semiring TTTP remain pending.
 For nonconsecutive matrix modes, indexing uses the selected mode's mapping:
 the source matrix loop's phys_phase[j] instead of phys_phase[modes[j]] is not
 reproduced. This avoids indexing a different mode's physical partition.
+
+## Dense MTTKRP (2026-09-07)
+
+multilinear.rs and multilinear_kernel.rs adapt interface/multilinear.cxx's
+mode-aligned factors and complementary-fiber reduction, and semiring.h's
+fiber-grouped MTTKRP arithmetic. Factors route to each physical shard's root
+through collective indexed reads, then broadcast to its complementary fiber.
+The output is reduced to that fiber root and written into the explicitly
+requested output distribution. Tensor entries are never gathered globally.
+Virtual local blocks are key-sorted before source fiber grouping; replicated
+tensor layers contribute only their canonical owners.
+
+The direct API receives factors excluding the output mode and returns a new
+factor, rather than replacing a member of a pointer array. Vectors and
+auxiliary-first matrices are supported: the pinned semiring matrix kernel
+asserts on auxiliary-last storage. f64 arithmetic only at present; generic
+semirings, sparse tensor integration and specialized source redistribution
+kernels remain pending. Native-library selection is unaffected.

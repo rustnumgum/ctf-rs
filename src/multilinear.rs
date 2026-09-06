@@ -5,6 +5,9 @@
 //! the source's specialized redistribution-plus-fiber-broadcast is pending.
 use crate::{algebra::Arithmetic, mapping::{Distribution, Mapping}, tensor::Tensor};
 
+#[path = "multilinear_kernel.rs"]
+mod kernel;
+
 // TTTP factors follow the tensor's physical mode, not its virtual blocks.
 fn physical_mapping(mapping: &Mapping) -> Mapping {
     match mapping {
@@ -18,6 +21,77 @@ fn physical_mapping(mapping: &Mapping) -> Mapping {
 }
 
 impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
+    /// Matricized tensor times Khatri-Rao product, replacing the output factor.
+    /// Supply all factors except `output_mode`, in ascending tensor-mode order.
+    /// Factors are vectors or auxiliary-first matrices [k, mode_length], as in
+    /// the pinned native MTTKRP kernel. Output shape is [mode_length] or [k, mode_length].
+    pub fn mttkrp(&self, output_mode: usize, factors: &[&Self],
+        output_distribution: Distribution) -> Self {
+        let dist = self.distribution();
+        let order = dist.shape.len();
+        assert!(order >= 2 && output_mode < order);
+        assert_eq!(factors.len(), order - 1);
+        let vector = factors[0].distribution().shape.len() == 1;
+        let width = if vector { 1 } else { factors[0].distribution().shape[0] };
+        let shape_for = |mode: usize| if vector { vec![dist.shape[mode]] }
+            else { vec![width, dist.shape[mode]] };
+        assert_eq!(output_distribution.shape, shape_for(output_mode));
+        assert_eq!(output_distribution.topology.size(), self.context().size());
+        let rank = self.context().rank();
+        let coordinates = dist.topology.coordinates(rank);
+        let phases: Vec<_> = dist.mappings.iter().map(Mapping::physical_phase).collect();
+        let mut arrays = Vec::with_capacity(order);
+        let mut output_mapped = None;
+        let mut factor_index = 0;
+        for mode in 0..order {
+            let mapping = physical_mapping(&dist.mappings[mode]);
+            let color = mapping.physical_rank(&coordinates);
+            let mappings = if vector { vec![mapping] } else { vec![Mapping::Unmapped, mapping] };
+            let mapped = Distribution::new(shape_for(mode), dist.topology.clone(), mappings);
+            let mut values = vec![0.; mapped.local_len()];
+            if mode == output_mode {
+                output_mapped = Some(mapped);
+            } else {
+                let factor = factors[factor_index];
+                factor_index += 1;
+                assert!(std::ptr::eq(self.context(), factor.context()));
+                assert_eq!(factor.distribution().shape, shape_for(mode));
+                // Redistribute only to the canonical rank of each physical
+                // mode shard, then broadcast along its complementary fiber.
+                let fiber = self.context().split(Some(color as i32), rank as i32).unwrap();
+                let keys: Vec<_> = if fiber.rank() == 0 {
+                    (0..values.len()).filter_map(|offset| mapped.global_key(rank, offset)).collect()
+                } else { Vec::new() };
+                for (key, value) in keys.iter().zip(factor.read(&keys)) {
+                    values[mapped.local_offset(rank, *key)] = value;
+                }
+                fiber.broadcast(0, &mut values);
+                fiber.close();
+            }
+            arrays.push(values);
+        }
+        // Virtual blocks need key ordering before the source fiber grouping;
+        // replicated tensor layers must not contribute duplicate reductions.
+        let mut pairs = self.local_pairs();
+        pairs.retain(|(key, _)| dist.owner(*key) == rank);
+        pairs.sort_by_key(|&(key, _)| key);
+        let mut values = std::mem::take(&mut arrays[output_mode]);
+        let factors: Vec<_> = arrays.iter().map(Vec::as_slice).collect();
+        kernel::mttkrp(&dist.shape, &phases, width, output_mode, &pairs, &factors, &mut values);
+        let mapped = output_mapped.unwrap();
+        let color = dist.mappings[output_mode].physical_rank(&coordinates);
+        let fiber = self.context().split(Some(color as i32), rank as i32).unwrap();
+        fiber.reduce_f64(0, &mut values);
+        let output_pairs: Vec<_> = if fiber.rank() == 0 {
+            values.into_iter().enumerate().filter_map(|(offset, value)|
+                mapped.global_key(rank, offset).map(|key| (key, value))).collect()
+        } else { Vec::new() };
+        fiber.close();
+        let mut output = Self::new(self.context(), output_distribution, Arithmetic::new());
+        output.write_add(&output_pairs);
+        output
+    }
+
     /// Multiply entries by a product of mode vectors. Factors are ordered by
     /// strictly increasing mode; omitted modes contribute no factor.
     pub fn tttp_vectors(&mut self, factors: &[(usize, &Self)]) {

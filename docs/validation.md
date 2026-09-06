@@ -511,3 +511,20 @@ Factor communication currently uses general redistribution rather than the
 source's specialized broadcast. Explicit blocked TTTP is not completion of
 automatic low-memory planning. Sparse TTTP and other multilinear routines,
 full CPU coverage and native Windows acceptance remain open.
+
+## Dense MTTKRP (2026-09-07)
+
+distributed_mttkrp passed once each at 1/2/4 MPI ranks in the Linux work copy,
+including world and parity subcommunicators. Shape [3,2,5] and [1,2,1], every
+output mode, first-mode cyclic, third-mode physical and third-mode virtual-2
+layouts cover mode-aligned factor broadcasts, complementary-fiber reductions,
+nonuniform partitions, empty shards and explicit output redistribution.
+Vector fixtures use exact integer arithmetic; auxiliary-first matrix factors
+use fractional values, k=3, and the pinned test_einsum.py global L1 <=1e-5.
+The reference evaluates the defining contraction on the small deterministic
+fixture, not eigenvectors, a different backend, or a gathered tensor.
+Combined delegated-kernel/test integration was reviewed once before execution;
+the test oracle's auxiliary coordinate and scratch-buffer reuse were corrected
+before that first run. All passed: DIGIT / PASS, no diagnostics or repeats.
+This closes the tested dense f64 MTTKRP path, not sparse/generic multilinear
+scope, Solve_Factor, tensor SVD, or the full Windows-native acceptance.
