@@ -370,3 +370,20 @@ the natural row buffer when rows do not divide communicator size; its Gather
 leaves replicated non-root RHS buffers uncleared. A port must preserve the
 distributed Gram/solve steps without reproducing these memory/error defects.
 No Solve_Factor implementation or acceptance is claimed by this audit.
+
+## Distributed dense Solve_Factor (2026-09-07)
+
+solve_factor.rs now ports the audited f64 auxiliary-first production algorithm
+for dense tensor weights. Factor shards are read on canonical physical roots
+and broadcast over complementary fibers. DSYR forms lower Gram systems;
+MPI_Reduce_scatter divides them among the target-mode fiber, MPI_Scatter
+distributes padded RHS rows, and each rank calls DPOSV on its assigned systems.
+Only solutions, not coefficient matrices for root factorization, are gathered
+within the fiber and then written into the requested RHS distribution.
+
+Padding is explicit before equal-count Scatter; mathematically absent rows
+are not solved. Only fiber roots write solved values, excluding stale replicas.
+Nonzero DPOSV info is propagated collectively before returning an error.
+These are intentional corrections of the audited memory/error defects, not
+replacement algorithms. Sparse source fixtures and non-f64 algebra remain
+unimplemented; the broken C++ vector and auxiliary-last branches are not exposed.

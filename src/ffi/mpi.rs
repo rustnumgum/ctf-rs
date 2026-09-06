@@ -1,5 +1,8 @@
 //! The only module allowed to use MPI's raw handles and native entry points.
 use mpi_sys as sys;
+#[cfg(feature = "native-linalg")]
+#[path = "factor_mpi.rs"]
+mod factor_mpi;
 use std::{marker::PhantomData, rc::Rc};
 use crate::algebra::{Monoid,Wire};
 std::thread_local! {

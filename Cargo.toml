@@ -186,3 +186,9 @@ name = "distributed_tensor_svd"
 path = "tests/distributed_tensor_svd.rs"
 harness = false
 required-features = ["native-scalapack"]
+
+[[test]]
+name = "distributed_solve_factor"
+path = "tests/distributed_solve_factor.rs"
+harness = false
+required-features = ["native-linalg"]

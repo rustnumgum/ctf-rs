@@ -14,6 +14,10 @@ mod reshape;
 #[path = "tensor_svd.rs"]
 pub mod tensor_svd;
 
+#[cfg(feature = "native-linalg")]
+#[path = "solve_factor.rs"]
+mod solve_factor;
+
 // TTTP factors follow the tensor's physical mode, not its virtual blocks.
 fn physical_mapping(mapping: &Mapping) -> Mapping {
     match mapping {

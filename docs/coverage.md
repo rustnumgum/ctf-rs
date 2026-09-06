@@ -16,7 +16,7 @@ Statuses below describe implementation, not acceptance passes.
 | 4 | symmetry/*; symmetric sequential kernels | symmetry | NS/SY/AS/SH compressed layouts, mixed symmetry and repeated indices | pending |
 | 4 | interface/{functions,fun_term}; transforms in tensor | algebra; tensor | univar_function, bivar_function, bivar_transform, endomorphism* | pending |
 | 5 | interface/matrix; shared/lapack_symbs | matrix; ffi/linalg; ffi/scalapack | qr, svd, eigh, Cholesky, SPD/triangular solves, randomized SVD | f64 distributed Cholesky/triangular solve/thin QR/SVD, truncated/randomized SVD, square-subworld eigh and padded virtual-column SPD implemented; other scalars and remaining routines pending |
-| 5 | interface/multilinear | multilinear; tensor_svd; reshape | TTTP, MTTKRP, Solve_Factor, tensor SVD | dense f64 TTTP, vector/aux-first MTTKRP, indexed tensor SVD and key-based reshape implemented; Solve_Factor, optimized TTTP/reshape communication, automatic memory selection and sparse paths pending |
+| 5 | interface/multilinear | multilinear; solve_factor; tensor_svd; reshape | TTTP, MTTKRP, Solve_Factor, tensor SVD | dense f64 TTTP, MTTKRP, distributed Gram-system Solve_Factor, indexed tensor SVD and key-based reshape implemented; optimized TTTP/reshape communication, automatic memory selection and sparse paths pending |
 | 5 | interface/schedule; tensor persistence/graph I/O; shared diagnostics | schedule; tensor; shared | schedules, checkpoint, graph input, diagnostics | pending |
 
 All CPU test, example, benchmark and study files are inventoried separately;

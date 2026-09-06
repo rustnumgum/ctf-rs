@@ -559,3 +559,20 @@ then restores the requested U/VT distributions. The affected four-rank test
 passed; the prior 1/2-rank configurations and tolerances were unchanged.
 Both hung runs were explicitly terminated after stack diagnosis, not restarted
 on an observation timeout. No precision diagnostics were performed.
+
+## Distributed dense Solve_Factor (2026-09-07)
+
+distributed_solve_factor passed once each at 1/2/4 MPI ranks in the Linux work
+copy, including parity subcommunicators. Shapes [3,4,5] and [1,3,2], every
+output mode, first-mode cyclic and third-mode physical/virtual-2 layouts cover
+factor broadcasts, Gram Reduce_scatter, padded RHS Scatter, local DPOSV and
+solution Gather/redistribution. Rank-two deterministic positive Gram systems
+use an analytic solution to construct RHS, with test_Solve_Factor_mat's
+numpy.allclose rule abs(error) <=1e-8 +1e-5*abs(reference) per component.
+The result distribution matches RHS exactly. Zero weights exercise singular
+systems: every rank returns Err(1), with no stranded collective participants.
+
+Combined FFI/test integration was reviewed before the first run; all passed,
+DIGIT / PASS. No reruns or precision diagnostics. Source's random sparse
+rank-ten fixtures have not been migrated by this dense-path test, and sparse
+Solve_Factor and broader CPU/native Windows acceptance remain open.
