@@ -605,3 +605,19 @@ Shared local shapes and virtual phases are caller-aligned. It does not supply
 automatic mapping, 2D symmetric communication, operation permutation/sign
 expansion, or symmetry multiplicity normalization. These remain upper-layer
 work; no globally gathered substitute or implicit signed full tensor was added.
+
+## Tensor-level canonical indexed sum (2026-09-07)
+
+src/symmetric_sum_tensor.rs integrates the symmetry-disabled sum_tensors
+canonical-domain operation with distributed compressed storage. Projection
+selects repeated indices, input-only indices reduce by destination key, and
+output-only indices expand into target coordinates. Only already-canonical
+valid output keys are retained. Unique source owners route to all destination
+replicas, with alpha right multiplication and selected old-output beta left
+multiplication once. There is no full-tensor gather or signed read expansion.
+
+The public name sum_canonical_from distinguishes it from future symmetry-aware
+sum_from. The remaining source orchestration, especially broken AS/SH link
+unfolding before permutation enumeration, is documented in
+symmetric-sum-orchestration.md. Existing permutation helpers cannot simply be
+called on arbitrary original operands to claim full operation semantics.

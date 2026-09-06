@@ -9,6 +9,8 @@ use crate::{
 
 #[path = "symmetric_operations.rs"]
 mod operations;
+#[path = "symmetric_sum_tensor.rs"]
+mod summation;
 
 impl<'c, 'r, A: Group + crate::algebra::Semiring> SymmetricTensor<'c, 'r, A>
 where A::Element: Wire {

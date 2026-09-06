@@ -155,7 +155,7 @@ src/summation/spsum_tsr.cxx	src/sparse_sum.rs	partial: distributed canonical-key
 src/summation/spsum_tsr.h	src/summation	pending
 src/summation/sum_tsr.cxx	src/summation.rs; src/symmetric_sum_comm.rs	partial: explicit NS/packed virtual blocks and input-broadcast/output-reduce execution; automatic symmetry plan construction pending
 src/summation/sum_tsr.h	src/summation	pending
-src/summation/summation.cxx	src/summation	pending
+src/summation/summation.cxx	src/symmetric_sum_tensor.rs; src/summation.rs	partial: tensor-level symmetry-disabled canonical indexed sum; broken-symmetry recursion and automatic mapped planner pending
 src/summation/summation.h	src/summation	pending
 src/summation/sym_seq_sum.cxx	src/summation.rs; src/symmetric_sum.rs	partial: NS and physical packed scalar reference kernels; optimized folded/custom-function branches pending
 src/summation/sym_seq_sum.h	src/summation	pending

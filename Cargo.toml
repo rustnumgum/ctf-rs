@@ -262,3 +262,8 @@ harness = false
 name = "distributed_packed_contraction"
 path = "tests/distributed_packed_contraction.rs"
 harness = false
+
+[[test]]
+name = "distributed_canonical_sum"
+path = "tests/distributed_canonical_sum.rs"
+harness = false

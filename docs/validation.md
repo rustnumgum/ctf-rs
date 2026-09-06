@@ -752,3 +752,14 @@ No failures or retries; DIGIT / PASS, tolerance zero. New target also compiled
 and linked once on Windows GNU; runtime MPI acceptance is still pending.
 This validates the explicit raw execution layers, not a complete high-level
 distributed symmetric tensor contraction operation.
+
+## Tensor-level canonical indexed sums (2026-09-07)
+
+distributed_canonical_sum passed once at 1/2/4 WSL MPI ranks, world and parity
+contexts. Exact i64 checks cover packed-to-NS canonical overlap, row and trace
+reductions, repeated output diagonal updates preserving off-diagonal values,
+output-label broadcasting into AS storage, transposed canonical-domain
+intersection, replicated and virtual layouts, and empty input with beta-only
+output. No failures or retries; DIGIT / PASS, tolerance zero. The new target
+also compiled and linked once on Windows GNU; native execution remains pending.
+No general symmetry-aware sum or mixed-symmetry cancellation is claimed.
