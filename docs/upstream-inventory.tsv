@@ -1,0 +1,264 @@
+source	rust_destination	status
+src/Makefile	Cargo/build tooling	replaced
+src/sparse_formats/ccsr.cxx	src/sparse_formats	pending
+src/sparse_formats/ccsr.h	src/sparse_formats	pending
+src/sparse_formats/coo.cxx	src/sparse_formats	pending
+src/sparse_formats/coo.h	src/sparse_formats	pending
+src/sparse_formats/csr.cxx	src/sparse_formats	pending
+src/sparse_formats/csr.h	src/sparse_formats	pending
+src/sparse_formats/Makefile	Cargo/build tooling	replaced
+src/sparse_formats/sparse_matrix.cxx	src/sparse_formats	pending
+src/sparse_formats/sparse_matrix.h	src/sparse_formats	pending
+src/mapping/distribution.cxx	src/mapping	pending
+src/mapping/distribution.h	src/mapping	pending
+src/mapping/Makefile	Cargo/build tooling	replaced
+src/mapping/mapping.cxx	src/mapping	pending
+src/mapping/mapping.h	src/mapping	pending
+src/mapping/node_aware_dist.cxx	src/mapping	pending
+src/mapping/node_aware_dist.h	src/mapping	pending
+src/mapping/topology.cxx	src/mapping	pending
+src/mapping/topology.h	src/mapping	pending
+src/scripts/expand_includes.sh	Cargo/build tooling	replaced
+src/scripts/license.sh	Cargo/build tooling	replaced
+src/scripts/manual_readlink.sh	Cargo/build tooling	replaced
+src/scripts/recursive_expand_includes.sh	Cargo/build tooling	replaced
+src/tensor/algstrct.cxx	src/tensor	pending
+src/tensor/algstrct.h	src/tensor	pending
+src/tensor/Makefile	Cargo/build tooling	replaced
+src/tensor/untyped_tensor_tmpl.h	src/tensor	pending
+src/tensor/untyped_tensor.cxx	src/tensor	pending
+src/tensor/untyped_tensor.h	src/tensor	pending
+src/shared/blas_symbs.cxx	src/shared	pending
+src/shared/blas_symbs.h	src/shared	pending
+src/shared/fompi_wrapper.h	src/shared	pending
+src/shared/init_models.cxx	src/shared	pending
+src/shared/init_models.h	src/shared	pending
+src/shared/int_timer.cxx	src/shared	pending
+src/shared/int_timer.h	src/shared	pending
+src/shared/iter_tsr.h	src/shared	pending
+src/shared/lapack_symbs.cxx	src/shared	pending
+src/shared/lapack_symbs.h	src/shared	pending
+src/shared/Makefile	Cargo/build tooling	replaced
+src/shared/memcontrol.cxx	src/shared	pending
+src/shared/memcontrol.h	src/shared	pending
+src/shared/mkl_symbs.h	src/shared	pending
+src/shared/model.cxx	src/shared	pending
+src/shared/model.h	src/shared	pending
+src/shared/offload.cu	excluded: CUDA/offload	excluded
+src/shared/offload.cxx	excluded: CUDA/offload	excluded
+src/shared/offload.h	excluded: CUDA/offload	excluded
+src/shared/pmpi.h	src/shared	pending
+src/shared/util.cxx	src/shared	pending
+src/shared/util.h	src/shared	pending
+src/interface/back_comp.h	src/interface	pending
+src/interface/common.cxx	src/interface	pending
+src/interface/common.h	src/interface	pending
+src/interface/decomposition.cxx	src/interface	pending
+src/interface/decomposition.h	src/interface	pending
+src/interface/flop_counter.cxx	src/interface	pending
+src/interface/fun_term.cxx	src/interface	pending
+src/interface/fun_term.h	src/interface	pending
+src/interface/functions.h	src/interface	pending
+src/interface/graph_io_aux.cxx	src/interface	pending
+src/interface/group.h	src/interface	pending
+src/interface/idx_tensor.cxx	src/interface	pending
+src/interface/idx_tensor.h	src/interface	pending
+src/interface/kernel.h	src/interface	pending
+src/interface/logger.h	src/interface	pending
+src/interface/Makefile	Cargo/build tooling	replaced
+src/interface/matrix.cxx	src/interface	pending
+src/interface/matrix.h	src/interface	pending
+src/interface/monoid.cxx	src/interface	pending
+src/interface/monoid.h	src/interface	pending
+src/interface/multilinear.cxx	src/interface	pending
+src/interface/multilinear.h	src/interface	pending
+src/interface/partition.cxx	src/interface	pending
+src/interface/partition.h	src/interface	pending
+src/interface/ring.cxx	src/interface	pending
+src/interface/ring.h	src/interface	pending
+src/interface/scalar.cxx	src/interface	pending
+src/interface/scalar.h	src/interface	pending
+src/interface/schedule.cxx	src/interface	pending
+src/interface/schedule.h	src/interface	pending
+src/interface/semiring.cxx	src/interface	pending
+src/interface/semiring.h	src/interface	pending
+src/interface/set.cxx	src/interface	pending
+src/interface/set.h	src/interface	pending
+src/interface/sparse_tensor.cxx	src/interface	pending
+src/interface/sparse_tensor.h	src/interface	pending
+src/interface/tensor.cxx	src/interface	pending
+src/interface/tensor.h	src/interface	pending
+src/interface/term.cxx	src/interface	pending
+src/interface/term.h	src/interface	pending
+src/interface/timer.h	src/interface	pending
+src/interface/vector.cxx	src/interface	pending
+src/interface/vector.h	src/interface	pending
+src/interface/world.cxx	src/interface	pending
+src/interface/world.h	src/interface	pending
+src/contraction/contraction_plan.h	src/contraction	pending
+src/contraction/contraction_selector.h	src/contraction	pending
+src/contraction/contraction_signature.cxx	src/contraction	pending
+src/contraction/contraction_signature.h	src/contraction	pending
+src/contraction/contraction.cxx	src/contraction	pending
+src/contraction/contraction.h	src/contraction	pending
+src/contraction/ctr_2d_general.cxx	src/contraction	pending
+src/contraction/ctr_2d_general.h	src/contraction	pending
+src/contraction/ctr_comm.cxx	src/contraction	pending
+src/contraction/ctr_comm.h	src/contraction	pending
+src/contraction/ctr_offload.cxx	excluded: CUDA/offload	excluded
+src/contraction/ctr_offload.h	excluded: CUDA/offload	excluded
+src/contraction/ctr_tsr.cxx	src/contraction	pending
+src/contraction/ctr_tsr.h	src/contraction	pending
+src/contraction/Makefile	Cargo/build tooling	replaced
+src/contraction/sp_seq_ctr.cxx	src/contraction	pending
+src/contraction/sp_seq_ctr.h	src/contraction	pending
+src/contraction/spctr_2d_general.cxx	src/contraction	pending
+src/contraction/spctr_2d_general.h	src/contraction	pending
+src/contraction/spctr_comm.cxx	src/contraction	pending
+src/contraction/spctr_comm.h	src/contraction	pending
+src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
+src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
+src/contraction/spctr_tsr.cxx	src/contraction	pending
+src/contraction/spctr_tsr.h	src/contraction	pending
+src/contraction/sym_seq_ctr.cxx	src/contraction	pending
+src/contraction/sym_seq_ctr.h	src/contraction	pending
+src/redistribution/cyclic_reshuffle.cxx	src/redistribution	pending
+src/redistribution/cyclic_reshuffle.h	src/redistribution	pending
+src/redistribution/dgtog_bucket.h	src/redistribution	pending
+src/redistribution/dgtog_calc_cnt.cxx	src/redistribution	pending
+src/redistribution/dgtog_calc_cnt.h	src/redistribution	pending
+src/redistribution/dgtog_redist_ror.h	src/redistribution	pending
+src/redistribution/dgtog_redist.cxx	src/redistribution	pending
+src/redistribution/dgtog_redist.h	src/redistribution	pending
+src/redistribution/glb_cyclic_reshuffle.cxx	src/redistribution	pending
+src/redistribution/glb_cyclic_reshuffle.h	src/redistribution	pending
+src/redistribution/Makefile	Cargo/build tooling	replaced
+src/redistribution/nosym_transp.cxx	src/redistribution	pending
+src/redistribution/nosym_transp.h	src/redistribution	pending
+src/redistribution/pad.cxx	src/redistribution	pending
+src/redistribution/pad.h	src/redistribution	pending
+src/redistribution/redist.cxx	src/redistribution	pending
+src/redistribution/redist.h	src/redistribution	pending
+src/redistribution/slice.cxx	src/redistribution	pending
+src/redistribution/slice.h	src/redistribution	pending
+src/redistribution/sparse_rw.cxx	src/redistribution	pending
+src/redistribution/sparse_rw.h	src/redistribution	pending
+src/symmetry/Makefile	Cargo/build tooling	replaced
+src/symmetry/sym_indices.cxx	src/symmetry	pending
+src/symmetry/sym_indices.h	src/symmetry	pending
+src/symmetry/symmetrization.cxx	src/symmetry	pending
+src/symmetry/symmetrization.h	src/symmetry	pending
+src/summation/Makefile	Cargo/build tooling	replaced
+src/summation/spr_seq_sum.cxx	src/summation	pending
+src/summation/spr_seq_sum.h	src/summation	pending
+src/summation/spsum_tsr.cxx	src/summation	pending
+src/summation/spsum_tsr.h	src/summation	pending
+src/summation/sum_tsr.cxx	src/summation	pending
+src/summation/sum_tsr.h	src/summation	pending
+src/summation/summation.cxx	src/summation	pending
+src/summation/summation.h	src/summation	pending
+src/summation/sym_seq_sum.cxx	src/summation	pending
+src/summation/sym_seq_sum.h	src/summation	pending
+src/scaling/Makefile	Cargo/build tooling	replaced
+src/scaling/scale_tsr.cxx	src/scaling	pending
+src/scaling/scale_tsr.h	src/scaling	pending
+src/scaling/scaling.cxx	src/scaling	pending
+src/scaling/scaling.h	src/scaling	pending
+src/scaling/strp_tsr.cxx	src/scaling	pending
+src/scaling/strp_tsr.h	src/scaling	pending
+src/scaling/sym_seq_scl.cxx	src/scaling	pending
+src/scaling/sym_seq_scl.h	src/scaling	pending
+test/bivar_function.cxx	tests/upstream/test/bivar_function.rs	pending
+test/bivar_transform.cxx	tests/upstream/test/bivar_transform.rs	pending
+test/ccsdt_map_test.cxx	tests/upstream/test/ccsdt_map_test.rs	pending
+test/ccsdt_t3_to_t2.cxx	tests/upstream/test/ccsdt_t3_to_t2.rs	pending
+test/dft.cxx	tests/upstream/test/dft.rs	pending
+test/diag_ctr.cxx	tests/upstream/test/diag_ctr.rs	pending
+test/diag_sym.cxx	tests/upstream/test/diag_sym.rs	pending
+test/endomorphism_cust_sp.cxx	tests/upstream/test/endomorphism_cust_sp.rs	pending
+test/endomorphism_cust.cxx	tests/upstream/test/endomorphism_cust.rs	pending
+test/endomorphism.cxx	tests/upstream/test/endomorphism.rs	pending
+test/gemm_4D.cxx	tests/upstream/test/gemm_4D.rs	pending
+test/Makefile	Cargo/build tooling	replaced
+test/multi_tsr_sym.cxx	tests/upstream/test/multi_tsr_sym.rs	pending
+test/permute_multiworld.cxx	tests/upstream/test/permute_multiworld.rs	pending
+test/readall_test.cxx	tests/upstream/test/readall_test.rs	pending
+test/readwrite_test.cxx	tests/upstream/test/readwrite_test.rs	pending
+test/reduce_bcast.cxx	tests/upstream/test/reduce_bcast.rs	pending
+test/repack.cxx	tests/upstream/test/repack.rs	pending
+test/scalar.cxx	tests/upstream/test/scalar.rs	pending
+test/speye.cxx	tests/upstream/test/speye.rs	pending
+test/sptensor_sum.cxx	tests/upstream/test/sptensor_sum.rs	pending
+test/subworld_gemm.cxx	tests/upstream/test/subworld_gemm.rs	pending
+test/sy_times_ns.cxx	tests/upstream/test/sy_times_ns.rs	pending
+test/test_suite.cxx	tests/upstream/test/test_suite.rs	pending
+test/univar_function.cxx	tests/upstream/test/univar_function.rs	pending
+test/weigh_4D.cxx	tests/upstream/test/weigh_4D.rs	pending
+test/python/test_base.py	Rust semantic tests (no Python interface)	pending
+test/python/test_dot.py	Rust semantic tests (no Python interface)	pending
+test/python/test_einsum.py	Rust semantic tests (no Python interface)	pending
+test/python/test_fancyindex.py	Rust semantic tests (no Python interface)	pending
+test/python/test_la.py	Rust semantic tests (no Python interface)	pending
+test/python/test_partition.py	Rust semantic tests (no Python interface)	pending
+test/python/test_sparse.py	Rust semantic tests (no Python interface)	pending
+test/python/test_ufunc.py	Rust semantic tests (no Python interface)	pending
+examples/algebraic_multigrid.cxx	tests/upstream/examples/algebraic_multigrid.rs	pending
+examples/ao_mo_transf.cxx	tests/upstream/examples/ao_mo_transf.rs	pending
+examples/apsp.cxx	tests/upstream/examples/apsp.rs	pending
+examples/bitonic_sort.cxx	tests/upstream/examples/bitonic_sort.rs	pending
+examples/block_sparse.cxx	tests/upstream/examples/block_sparse.rs	pending
+examples/btwn_central_kernels.cxx	tests/upstream/examples/btwn_central_kernels.rs	pending
+examples/btwn_central.cxx	tests/upstream/examples/btwn_central.rs	pending
+examples/btwn_central.h	tests/upstream/examples/btwn_central.h	pending
+examples/ccsd.cxx	tests/upstream/examples/ccsd.rs	pending
+examples/checkpoint_sparse.cxx	tests/upstream/examples/checkpoint_sparse.rs	pending
+examples/checkpoint.cxx	tests/upstream/examples/checkpoint.rs	pending
+examples/dft_3D.cxx	tests/upstream/examples/dft_3D.rs	pending
+examples/fft_with_idx_partition.cxx	tests/upstream/examples/fft_with_idx_partition.rs	pending
+examples/fft.cxx	tests/upstream/examples/fft.rs	pending
+examples/force_integration_sparse.cxx	tests/upstream/examples/force_integration_sparse.rs	pending
+examples/force_integration.cxx	tests/upstream/examples/force_integration.rs	pending
+examples/hosvd.cxx	tests/upstream/examples/hosvd.rs	pending
+examples/jacobi.cxx	tests/upstream/examples/jacobi.rs	pending
+examples/Makefile	Cargo/build tooling	replaced
+examples/matmul.cxx	tests/upstream/examples/matmul.rs	pending
+examples/mis.cxx	tests/upstream/examples/mis.rs	pending
+examples/mis2.cxx	tests/upstream/examples/mis2.rs	pending
+examples/moldynamics.h	tests/upstream/examples/moldynamics.h	pending
+examples/mttkrp.cxx	tests/upstream/examples/mttkrp.rs	pending
+examples/neural_network.cxx	tests/upstream/examples/neural_network.rs	pending
+examples/particle_interaction.cxx	tests/upstream/examples/particle_interaction.rs	pending
+examples/qinformatics.cxx	tests/upstream/examples/qinformatics.rs	pending
+examples/recursive_matmul.cxx	tests/upstream/examples/recursive_matmul.rs	pending
+examples/scan.cxx	tests/upstream/examples/scan.rs	pending
+examples/sparse_mp3.cxx	tests/upstream/examples/sparse_mp3.rs	pending
+examples/sparse_permuted_slice.cxx	tests/upstream/examples/sparse_permuted_slice.rs	pending
+examples/spectral_element.cxx	tests/upstream/examples/spectral_element.rs	pending
+examples/spmv.cxx	tests/upstream/examples/spmv.rs	pending
+examples/sssp.cxx	tests/upstream/examples/sssp.rs	pending
+examples/strassen.cxx	tests/upstream/examples/strassen.rs	pending
+examples/trace.cxx	tests/upstream/examples/trace.rs	pending
+scalapack_tests/conj.h	tests/upstream/scalapack_tests/conj.h	pending
+scalapack_tests/eigh.cxx	tests/upstream/scalapack_tests/eigh.rs	pending
+scalapack_tests/Makefile	Cargo/build tooling	replaced
+scalapack_tests/qr.cxx	tests/upstream/scalapack_tests/qr.rs	pending
+scalapack_tests/svd.cxx	tests/upstream/scalapack_tests/svd.rs	pending
+bench/bench_contraction.cxx	tests/upstream/bench/bench_contraction.rs	pending
+bench/bench_nosym_transp.cxx	tests/upstream/bench/bench_nosym_transp.rs	pending
+bench/bench_redistribution.cxx	tests/upstream/bench/bench_redistribution.rs	pending
+bench/Makefile	Cargo/build tooling	replaced
+bench/model_trainer_kernels.cxx	tests/upstream/bench/model_trainer_kernels.rs	pending
+bench/model_trainer.cxx	tests/upstream/bench/model_trainer.rs	pending
+bench/python/bench_smttkrp.py	Rust semantic tests (no Python interface)	pending
+bench/python/bench_solve.py	Rust semantic tests (no Python interface)	pending
+bench/python/bench_sttm.py	Rust semantic tests (no Python interface)	pending
+bench/python/bench_stttp.py	Rust semantic tests (no Python interface)	pending
+bench/python/sbench_args.py	Rust semantic tests (no Python interface)	pending
+studies/fast_3mm.cxx	tests/upstream/studies/fast_3mm.rs	pending
+studies/fast_as_as_sy_tensor_ctr.cxx	tests/upstream/studies/fast_as_as_sy_tensor_ctr.rs	pending
+studies/fast_diagram.cxx	tests/upstream/studies/fast_diagram.rs	pending
+studies/fast_sy_as_as_tensor_ctr.cxx	tests/upstream/studies/fast_sy_as_as_tensor_ctr.rs	pending
+studies/fast_sym_4D.cxx	tests/upstream/studies/fast_sym_4D.rs	pending
+studies/fast_sym.cxx	tests/upstream/studies/fast_sym.rs	pending
+studies/fast_tensor_ctr.cxx	tests/upstream/studies/fast_tensor_ctr.rs	pending
+studies/Makefile	Cargo/build tooling	replaced

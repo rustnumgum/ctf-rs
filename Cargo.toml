@@ -1,0 +1,26 @@
+[package]
+name = "ctf"
+version = "0.1.0"
+edition = "2024"
+license = "BSD-2-Clause"
+description = "Rust CPU/MPI port of the cc4s Cyclops Tensor Framework"
+
+[dependencies]
+mpi-sys = "0.2"
+
+[features]
+default = ["native-linalg"]
+native-linalg = []
+
+[lib]
+path = "src/lib.rs"
+
+[[test]]
+name = "foundation"
+path = "tests/foundation.rs"
+harness = false
+
+[[test]]
+name = "dense_views"
+path = "tests/dense_views.rs"
+harness = false
