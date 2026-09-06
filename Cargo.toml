@@ -164,3 +164,14 @@ name = "distributed_eigh"
 path = "tests/distributed_eigh.rs"
 harness = false
 required-features = ["native-scalapack"]
+
+[[test]]
+name = "distributed_spd"
+path = "tests/distributed_spd.rs"
+harness = false
+required-features = ["native-scalapack"]
+
+[[test]]
+name = "distributed_tttp"
+path = "tests/distributed_tttp.rs"
+harness = false

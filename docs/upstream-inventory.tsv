@@ -66,12 +66,12 @@ src/interface/idx_tensor.h	src/interface	pending
 src/interface/kernel.h	src/interface	pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
-src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: explicit-grid f64 distributed Cholesky, triangular solve, thin QR and SVD; other matrix routines pending
+src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: f64 distributed Cholesky, triangular/SPD solve, QR, full/truncated/randomized SVD and square-subworld eigh; other scalar types and remaining routines pending
 src/interface/matrix.h	src/matrix.rs	partial direct Rust Tensor matrix APIs
 src/interface/monoid.cxx	src/interface	pending
 src/interface/monoid.h	src/interface	pending
-src/interface/multilinear.cxx	src/interface	pending
-src/interface/multilinear.h	src/interface	pending
+src/interface/multilinear.cxx	src/multilinear.rs	partial: dense f64 vector/matrix TTTP with explicit auxiliary blocking; optimized communication, automatic memory choice and other multilinear routines pending
+src/interface/multilinear.h	src/multilinear.rs	partial: direct Rust TTTP APIs
 src/interface/partition.cxx	src/interface	pending
 src/interface/partition.h	src/interface	pending
 src/interface/ring.cxx	src/interface	pending

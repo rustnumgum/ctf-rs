@@ -17,6 +17,69 @@ fn distribution(shape: &[usize], grid: [usize; 2]) -> Distribution {
     Distribution::new(shape.to_vec(), topology, vec![row, column])
 }
 impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
+    /// Solve A X = self for symmetric positive definite A (lower triangle).
+    /// Uses upstream's paired-prime grid, virtual columns and identity padding
+    /// to reinterpret cyclic storage as square-block ScaLAPACK storage.
+    pub fn solve_spd(&self, coefficient: &Self) -> Result<Self, i32> {
+        assert!(std::ptr::eq(self.context(), coefficient.context()));
+        assert_eq!(self.distribution().shape.len(), 2);
+        let (n, nrhs) = (self.distribution().shape[0], self.distribution().shape[1]);
+        assert!(n > 0 && nrhs > 0);
+        assert_eq!(coefficient.distribution().shape, vec![n, n]);
+        let np = self.context().size();
+        let mut remaining = np;
+        let mut prime = 2;
+        let mut phase = 1;
+        while remaining > 1 {
+            let mut exponent = 0usize;
+            while remaining % prime == 0 {
+                remaining /= prime;
+                exponent += 1;
+            }
+            phase *= prime.pow(exponent.div_ceil(2) as u32);
+            prime += 1;
+        }
+        let grid = [phase, np / phase];
+        let virtual_columns = phase / grid[1];
+        let mut a_dist = distribution(&[n, n], grid);
+        a_dist.mappings[1].augment_virtual(phase);
+        let mut a = coefficient.clone();
+        a.redistribute(a_dist);
+        let mut result = self.clone();
+        result.redistribute(distribution(&[n, nrhs], grid));
+        let block = n.div_ceil(phase);
+        let rhs_block = nrhs.div_ceil(grid[1]);
+        let rank = self.context().rank();
+        let row = rank % grid[0];
+        let column = rank / grid[0];
+        let mut av = a.local_storage().to_vec();
+        // Missing cyclic rows represent independent identity equations. The
+        // virtual-column block order is also the blocked solver's column order.
+        for local_row in n / phase + usize::from(row < n % phase)..block {
+            let global_row = local_row * phase + row;
+            if global_row % grid[1] == column {
+                let local_column = global_row / phase
+                    + ((global_row / grid[1]) % virtual_columns) * block;
+                av[local_row + local_column * block] = 1.;
+            }
+        }
+        let mut values = result.local_storage().to_vec();
+        let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
+        let operation = (|| {
+            let padded = block * phase;
+            let padded_rhs = rhs_block * grid[1];
+            let da = blacs.descriptor(padded, padded, block, block, block)?;
+            let db = blacs.descriptor(padded, padded_rhs, block, rhs_block, block)?;
+            blacs.solve_spd(padded, padded_rhs, &mut av, &da, &mut values, &db)
+        })();
+        blacs.close();
+        operation?;
+        let dist = result.distribution().clone();
+        result.transform(|key, value| *value = values[dist.local_offset(rank, key)]);
+        result.redistribute(self.distribution().clone());
+        Ok(result)
+    }
+
     /// Symmetric eigensolve using the source's largest-square-grid subworld
     /// strategy. Reads the upper triangle; returns (eigenvectors, eigenvalues).
     /// For non-square process counts, only the first floor(sqrt(np))^2 ranks

@@ -15,8 +15,8 @@ Statuses below describe implementation, not acceptance passes.
 | 4 | sparse_formats/*; contraction/sp*; summation/spr*; tensor sparse paths | sparse_formats; contraction; summation | speye, sptensor_sum, sparse_mp3, custom sparse endomorphisms | local COO/CSR/CCSR conversion, cyclic strips, addition and CSR/CCSR matrix kernels implemented; distributed tensor paths and upstream sparse tests pending |
 | 4 | symmetry/*; symmetric sequential kernels | symmetry | NS/SY/AS/SH compressed layouts, mixed symmetry and repeated indices | pending |
 | 4 | interface/{functions,fun_term}; transforms in tensor | algebra; tensor | univar_function, bivar_function, bivar_transform, endomorphism* | pending |
-| 5 | interface/matrix; shared/lapack_symbs | matrix; ffi/linalg; ffi/scalapack | qr, svd, eigh, Cholesky, SPD/triangular solves, randomized SVD | explicit-grid f64 ScaLAPACK Cholesky/triangular solve/thin QR/SVD implemented; distributed eigh/SPD, truncated/randomized SVD and other scalars pending |
-| 5 | interface/multilinear | multilinear | TTTP, MTTKRP, Solve_Factor, tensor SVD | pending |
+| 5 | interface/matrix; shared/lapack_symbs | matrix; ffi/linalg; ffi/scalapack | qr, svd, eigh, Cholesky, SPD/triangular solves, randomized SVD | f64 distributed Cholesky/triangular solve/thin QR/SVD, truncated/randomized SVD, square-subworld eigh and padded virtual-column SPD implemented; other scalars and remaining routines pending |
+| 5 | interface/multilinear | multilinear | TTTP, MTTKRP, Solve_Factor, tensor SVD | dense f64 vector/matrix TTTP and explicit auxiliary blocking implemented; optimized factor broadcast, automatic memory selection, sparse TTTP and other multilinear routines pending |
 | 5 | interface/schedule; tensor persistence/graph I/O; shared diagnostics | schedule; tensor; shared | schedules, checkpoint, graph input, diagnostics | pending |
 
 All CPU test, example, benchmark and study files are inventoried separately;

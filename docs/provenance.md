@@ -284,3 +284,25 @@ uses all four. This is not a claim of two-rank parallel eigensolver execution.
 The matrix transfer is key-based subworld routing rather than the remaining
 optimized add_to_subworld implementation; no matrix gather replaces the four-rank
 ScaLAPACK computation.
+
+## SPD solve and dense TTTP (2026-09-07)
+
+Tensor::solve_spd follows matrix.cxx's paired-prime physical grid and virtual
+column factor, redistributes the coefficient/RHS, pads missing cyclic rows with
+identity equations, then interprets local buffers using square-block descriptors
+for PDPOSV(L). The output returns to the RHS distribution. Inputs are unchanged;
+no matrix gather or substitution with POTRF/TRSM is used. The direct API solves
+A X = B, while the upstream Python wrapper presents its transposed convention.
+The Rust path explicitly chooses the source-derived grid, including when an
+input already has equal row/column phases. Zero global dimensions are rejected.
+
+multilinear.rs adapts TTTP's vector products, matrix auxiliary sum, balanced
+k/div + (d < k%div) slicing and delayed multiplication for multiple blocks.
+Mode factors align to physical tensor mappings, without virtual factor storage.
+Current factor replication uses existing key-based tensor redistribution, not
+the upstream specialized redistribution plus fiber broadcast. Explicit divisions
+expose the blocked execution but do not implement automatic available-memory
+selection. Dense f64 only; sparse and generic-semiring TTTP remain pending.
+For nonconsecutive matrix modes, indexing uses the selected mode's mapping:
+the source matrix loop's phys_phase[j] instead of phys_phase[modes[j]] is not
+reproduced. This avoids indexing a different mode's physical partition.

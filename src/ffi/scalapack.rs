@@ -35,6 +35,20 @@ unsafe extern "C" {
         desc: *const i32,
         info: *mut i32,
     );
+    fn pdposv_(
+        uplo: *const c_char,
+        n: *const i32,
+        nrhs: *const i32,
+        a: *mut f64,
+        ia: *const i32,
+        ja: *const i32,
+        desc_a: *const i32,
+        b: *mut f64,
+        ib: *const i32,
+        jb: *const i32,
+        desc_b: *const i32,
+        info: *mut i32,
+    );
     fn pdsyevx_(
         job_z: *const c_char,
         range: *const c_char,
@@ -265,6 +279,43 @@ impl Grid {
                 &one,
                 &one,
                 desc.as_ptr(),
+                &mut info,
+            );
+        }
+        result(info)
+    }
+
+    pub(crate) fn solve_spd(
+        &self,
+        n: usize,
+        nrhs: usize,
+        a: &mut [f64],
+        desc_a: &[i32; 9],
+        b: &mut [f64],
+        desc_b: &[i32; 9],
+    ) -> Result<(), i32> {
+        self.validate_matrix(desc_a, a.len());
+        self.validate_matrix(desc_b, b.len());
+        let (n, nrhs) = (int(n), int(nrhs));
+        assert!(n <= desc_a[2] && n <= desc_a[3]);
+        assert!(n <= desc_b[2] && nrhs <= desc_b[3]);
+
+        let uplo = b'L' as c_char;
+        let one = 1;
+        let mut info = 0;
+        unsafe {
+            pdposv_(
+                &uplo,
+                &n,
+                &nrhs,
+                a.as_mut_ptr(),
+                &one,
+                &one,
+                desc_a.as_ptr(),
+                b.as_mut_ptr(),
+                &one,
+                &one,
+                desc_b.as_ptr(),
                 &mut info,
             );
         }

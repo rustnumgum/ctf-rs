@@ -19,6 +19,7 @@ pub mod linalg;
 pub mod sparse_formats;
 pub mod planning;
 pub mod model;
+pub mod multilinear;
 pub mod cost;
 pub mod initial_models;
 pub mod selector;

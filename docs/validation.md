@@ -492,3 +492,22 @@ Combined FFI/subworld integration review was performed once. An agent's accident
 cargo check was interrupted during compilation; it ran no numerical tests.
 Prior broad dirty edits remain preserved outside this commit. Remaining scalar
 types, SPD solve and full CPU/native Windows acceptance are not closed.
+
+## SPD and dense TTTP batch (2026-09-07)
+
+WSL Ubuntu-26.04, source /home/xylxp/ctf-rs-work, Cargo cache on Linux FS.
+distributed_spd passed once each with 1/2/4 MPI ranks, world and parity split
+contexts. Shapes (1,1), (5,3), and n=11 with RHS counts 1/4/12/15/31 cover
+empty mathematical local shards, nonuniform blocks, virtual columns on two
+ranks, and padded square-block PDPOSV. Original test_la.py test_solve L1
+residual <=1e-3 OR relative L1 <=1e-3 retained; result layout exact.
+
+distributed_tttp passed once each with 1/2/4 MPI ranks. It covers vector products (exact integer-valued results) and
+matrix factors (original test_einsum.py global L1 <=1e-5), both auxiliary
+orientations, divisions 1/3 for k=5, selected/all modes, first/third-mode
+physical distribution, empty local shards, world/parity contexts. Matrix
+fixtures use fractional entries; no extra precision or backend comparison.
+Factor communication currently uses general redistribution rather than the
+source's specialized broadcast. Explicit blocked TTTP is not completion of
+automatic low-memory planning. Sparse TTTP and other multilinear routines,
+full CPU coverage and native Windows acceptance remain open.
