@@ -460,3 +460,19 @@ SVD ~5.54e-15; all required norms pass. DIGIT / PASS, class R. No coefficient/
 singular-vector component comparison, tighter precision run or repeated passing
 suite. Complex/f32, eigensolvers, rank truncation, randomized paths and Windows
 native remain unfinished; the whole goal is not complete.
+
+## 2026-09-07: truncated/randomized SVD paths
+
+Combined test/implementation review performed once. Initial compilation required
+explicit context/runtime lifetimes in fixture helpers; fixed before numerical
+execution. distributed_svd_paths PASS once at WSL 1/2/4 ranks and split contexts:
+rank and threshold truncation, equality at threshold, source zero-retained-rank
+behavior, supplied guess, fixed-seed random guess, oversampling and one power
+iteration on an exact rank-two fixture. Shapes are checked exactly; reconstruction
+and orthogonality retain m*n*n*1e-6 and m*n*1e-6 Frobenius bounds. DIGIT / PASS,
+class R. No numerical diagnostics or repetitions of passing suites. This is not
+a stochastic accuracy study or evidence for arbitrary fixed-rank approximation.
+
+Pre-existing broad local edits were preserved and excluded from this stage
+commit. Acceptance ran against the current working copy, not a clean-tree full
+regression. Full CPU coverage and Windows native acceptance remain incomplete.

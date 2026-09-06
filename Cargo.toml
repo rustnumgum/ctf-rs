@@ -152,3 +152,9 @@ name = "distributed_qr_svd"
 path = "tests/distributed_qr_svd.rs"
 harness = false
 required-features = ["native-scalapack"]
+
+[[test]]
+name = "distributed_svd_paths"
+path = "tests/distributed_svd_paths.rs"
+harness = false
+required-features = ["native-scalapack"]

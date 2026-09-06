@@ -260,3 +260,13 @@ Explicit grids replace automatic descriptor choice for these entry points.
 Full thin SVD is implemented here; source rank/threshold truncation and randomized
 paths remain pending. Test metrics follow scalapack_tests/qr.cxx and svd.cxx;
 fixtures are deterministic real matrices, not every upstream dtype/test branch.
+
+## Distributed truncated and randomized SVD (2026-09-07)
+
+matrix.rs now implements source svd rank/threshold slicing and svd_rand's QR,
+power iteration A*A^T*U, projected U^T*A decomposition and final rotation. All
+matrix products and decompositions remain distributed. A supplied guess bypasses
+initial QR as upstream; generated guesses use explicit rank-seeded drand48 values
+in [-1,1), rather than the source's implicit global random state. Source's zero
+retained-rank behavior (no slice, full factors returned) is preserved and stated
+in the API. This is not an adaptive iteration or oversampling redesign.
