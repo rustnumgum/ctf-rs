@@ -29,7 +29,7 @@ $mpiTests = @(
     'distributed_sparse_transform','distributed_dense_sparse','upstream_sparse_mp3_t',
     'distributed_sparse_diagonal','distributed_symmetric_io','distributed_symmetric_operations',
     'distributed_symmetric_repack','distributed_packed_sum','distributed_packed_contraction',
-    'distributed_canonical_sum'
+    'distributed_canonical_sum','distributed_hollow_sum'
 )
 $arguments = @()
 foreach ($test in $mpiTests) { $arguments += @('--test', $test) }

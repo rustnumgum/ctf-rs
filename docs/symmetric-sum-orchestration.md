@@ -41,5 +41,15 @@ owners/replicas, selects repeated indices, reduces input-only labels and expands
 output-only labels. It intersects canonical domains without permutation sums,
 and scales selected old output by beta once. It does not gather tensors or
 perform implicit semantic reads. This provides the symmetry-disabled task used
-by the source orchestration, but optimized mapped communication, recursive
-unfold/desymmetrize and full symmetry-aware summation remain unfinished.
+by the source orchestration; optimized mapped communication and unrestricted
+symmetry-aware summation remain unfinished.
+
+## Implemented hollow branch
+
+sum_hollow_from now executes broken-link recursion for unique-index NS/AS/SH
+operands. SY and repeated-index preprocessing remain outside its explicit
+contract. Each recursive source stage starts with the unadjusted coefficient
+copied into new_sum before the outer stage changes alpha; it then reruns
+alignment and factor handling. Only terminal canonical tasks receive the
+stage-adjusted coefficient. B-side old-output scaling follows the source scaling
+operation's right multiplication, distinct from raw sum beta on the left.

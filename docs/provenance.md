@@ -621,3 +621,20 @@ sum_from. The remaining source orchestration, especially broken AS/SH link
 unfolding before permutation enumeration, is documented in
 symmetric-sum-orchestration.md. Existing permutation helpers cannot simply be
 called on arbitrary original operands to claim full operation semantics.
+
+## Hollow symmetry-aware indexed sums (2026-09-07)
+
+src/symmetric_hollow_sum.rs implements sum_hollow_from for unique-index
+NS/AS/SH operations. It follows summation.cxx's broken-link test and recursion:
+relax the first broken link, materialize a desymmetrized input when more links
+remain, or compute into a zero less-symmetric output and symmetrize it back.
+Only the terminal broken-link case enumerates permutations on current operands.
+This is not a direct enumeration shortcut on the original mixed AS/SH layouts.
+
+Alignment sign and factorial/cancellation factors use algebra addition and
+negation, not scalar casts. Input/output materialization uses the same explicit
+physical distribution with relaxed links and existing canonical key exchanges;
+the path allocates distributed intermediate tensors as the source does, never
+a global gather. Unique labels and absence of SY are explicit method contracts.
+Repeated-label preprocessing, SY coincidence-surface corrections and the full
+automatic communication planner remain required for unrestricted sums.

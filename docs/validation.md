@@ -763,3 +763,17 @@ intersection, replicated and virtual layouts, and empty input with beta-only
 output. No failures or retries; DIGIT / PASS, tolerance zero. The new target
 also compiled and linked once on Windows GNU; native execution remains pending.
 No general symmetry-aware sum or mixed-symmetry cancellation is claimed.
+
+## Hollow symmetry-aware summation (2026-09-07)
+
+distributed_hollow_sum passed once at each of 1/2/4 WSL MPI ranks, including
+parity contexts. Exact i64 checks cover AS/SH signed or unsigned expansion into
+NS, NS-to-AS/SH projection, preserved-symmetry transposes, AS reduction
+cancellation, SH factorial reduction, mixed AS/SH cancellation through recursive
+unfolding, and three-axis input/output recursion. Replica and virtual layouts
+are included. No failures or retries; DIGIT / PASS, tolerance zero.
+Integration review corrected recursive coefficient ownership before the first
+run: source recursion reruns alignment/factors on the incoming coefficient,
+not the already-adjusted parent coefficient. The new target also compiled and
+linked once on Windows GNU. SY, repeated-label hollow sums and native runtime
+acceptance remain pending; the explicit method contract does not hide these gaps.
