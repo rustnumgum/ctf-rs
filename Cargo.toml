@@ -146,3 +146,9 @@ name = "distributed_matrix"
 path = "tests/distributed_matrix.rs"
 harness = false
 required-features = ["native-scalapack"]
+
+[[test]]
+name = "distributed_qr_svd"
+path = "tests/distributed_qr_svd.rs"
+harness = false
+required-features = ["native-scalapack"]

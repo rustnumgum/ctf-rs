@@ -35,6 +35,53 @@ unsafe extern "C" {
         desc: *const i32,
         info: *mut i32,
     );
+    fn pdgeqrf_(
+        m: *const i32,
+        n: *const i32,
+        a: *mut f64,
+        ia: *const i32,
+        ja: *const i32,
+        desc: *const i32,
+        tau: *mut f64,
+        work: *mut f64,
+        lwork: *const i32,
+        info: *mut i32,
+    );
+    fn pdorgqr_(
+        m: *const i32,
+        n: *const i32,
+        k: *const i32,
+        a: *mut f64,
+        ia: *const i32,
+        ja: *const i32,
+        desc: *const i32,
+        tau: *const f64,
+        work: *mut f64,
+        lwork: *const i32,
+        info: *mut i32,
+    );
+    fn pdgesvd_(
+        job_u: *const c_char,
+        job_vt: *const c_char,
+        m: *const i32,
+        n: *const i32,
+        a: *mut f64,
+        ia: *const i32,
+        ja: *const i32,
+        desc_a: *const i32,
+        s: *mut f64,
+        u: *mut f64,
+        iu: *const i32,
+        ju: *const i32,
+        desc_u: *const i32,
+        vt: *mut f64,
+        ivt: *const i32,
+        jvt: *const i32,
+        desc_vt: *const i32,
+        work: *mut f64,
+        lwork: *const i32,
+        info: *mut i32,
+    );
     fn pdtrsm_(
         side: *const c_char,
         uplo: *const c_char,
@@ -191,6 +238,187 @@ impl Grid {
             );
         }
         result(info)
+    }
+
+    pub(crate) fn qr(
+        &self,
+        m: usize,
+        n: usize,
+        a: &[f64],
+        desc: &[i32; 9],
+    ) -> Result<(Vec<f64>, Vec<f64>), i32> {
+        self.validate_matrix(desc, a.len());
+        let (m, n) = (int(m), int(n));
+        assert!(m <= desc[2] && n <= desc[3]);
+
+        let k = m.min(n);
+        let tau_len = numroc(
+            k as usize,
+            desc[5] as usize,
+            self.col,
+            desc[7] as usize,
+            self.cols,
+        );
+        let mut tau = vec![0.0; tau_len];
+        let mut q = a.to_vec();
+        let one = 1;
+        let query = -1;
+        let mut work_query = [0.0];
+        let mut info = 0;
+        unsafe {
+            pdgeqrf_(
+                &m,
+                &n,
+                q.as_mut_ptr(),
+                &one,
+                &one,
+                desc.as_ptr(),
+                tau.as_mut_ptr(),
+                work_query.as_mut_ptr(),
+                &query,
+                &mut info,
+            );
+        }
+        result(info)?;
+
+        let lwork = int(work_query[0] as usize);
+        let mut work = vec![0.0; lwork as usize];
+        unsafe {
+            pdgeqrf_(
+                &m,
+                &n,
+                q.as_mut_ptr(),
+                &one,
+                &one,
+                desc.as_ptr(),
+                tau.as_mut_ptr(),
+                work.as_mut_ptr(),
+                &lwork,
+                &mut info,
+            );
+        }
+        result(info)?;
+
+        let r = q.clone();
+        work_query[0] = 0.0;
+        unsafe {
+            pdorgqr_(
+                &m,
+                &k,
+                &k,
+                q.as_mut_ptr(),
+                &one,
+                &one,
+                desc.as_ptr(),
+                tau.as_ptr(),
+                work_query.as_mut_ptr(),
+                &query,
+                &mut info,
+            );
+        }
+        result(info)?;
+
+        let lwork = int(work_query[0] as usize);
+        let mut work = vec![0.0; lwork as usize];
+        unsafe {
+            pdorgqr_(
+                &m,
+                &k,
+                &k,
+                q.as_mut_ptr(),
+                &one,
+                &one,
+                desc.as_ptr(),
+                tau.as_ptr(),
+                work.as_mut_ptr(),
+                &lwork,
+                &mut info,
+            );
+        }
+        result(info).map(|()| (q, r))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn svd(
+        &self,
+        m: usize,
+        n: usize,
+        a: &[f64],
+        desc_a: &[i32; 9],
+        u: &mut [f64],
+        desc_u: &[i32; 9],
+        vt: &mut [f64],
+        desc_vt: &[i32; 9],
+    ) -> Result<Vec<f64>, i32> {
+        self.validate_matrix(desc_a, a.len());
+        self.validate_matrix(desc_u, u.len());
+        self.validate_matrix(desc_vt, vt.len());
+        let (m, n) = (int(m), int(n));
+        let k = m.min(n);
+        assert!(m <= desc_a[2] && n <= desc_a[3]);
+        assert!(m <= desc_u[2] && k <= desc_u[3]);
+        assert!(k <= desc_vt[2] && n <= desc_vt[3]);
+
+        let mut a = a.to_vec();
+        let mut s = vec![0.0; k as usize];
+        let vectors = b'V' as c_char;
+        let one = 1;
+        let query = -1;
+        let mut work_query = [0.0];
+        let mut info = 0;
+        unsafe {
+            pdgesvd_(
+                &vectors,
+                &vectors,
+                &m,
+                &n,
+                a.as_mut_ptr(),
+                &one,
+                &one,
+                desc_a.as_ptr(),
+                s.as_mut_ptr(),
+                u.as_mut_ptr(),
+                &one,
+                &one,
+                desc_u.as_ptr(),
+                vt.as_mut_ptr(),
+                &one,
+                &one,
+                desc_vt.as_ptr(),
+                work_query.as_mut_ptr(),
+                &query,
+                &mut info,
+            );
+        }
+        result(info)?;
+
+        let lwork = int(work_query[0] as usize);
+        let mut work = vec![0.0; lwork as usize];
+        unsafe {
+            pdgesvd_(
+                &vectors,
+                &vectors,
+                &m,
+                &n,
+                a.as_mut_ptr(),
+                &one,
+                &one,
+                desc_a.as_ptr(),
+                s.as_mut_ptr(),
+                u.as_mut_ptr(),
+                &one,
+                &one,
+                desc_u.as_ptr(),
+                vt.as_mut_ptr(),
+                &one,
+                &one,
+                desc_vt.as_ptr(),
+                work.as_mut_ptr(),
+                &lwork,
+                &mut info,
+            );
+        }
+        result(info).map(|()| s)
     }
 
     #[allow(clippy::too_many_arguments)]

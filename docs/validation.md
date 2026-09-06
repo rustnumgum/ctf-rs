@@ -444,3 +444,19 @@ class R; no tighter checks, vector-component comparisons or numerical diagnostic
 No global tensor gather and no C++ CTF linkage. This validates only the stated
 f64 operations, not distributed QR/SVD/eigh, solve_spd, all scalar types, or
 native Windows. Whole-goal acceptance remains incomplete.
+
+## 2026-09-07: distributed QR and SVD
+
+One combined review of new delegated FFI and parent output layout integration
+preceded tests. distributed_qr_svd PASS once at WSL 1/2/4 ranks and split
+subcommunicators. Shapes 13x7, 5x8 and 1x1 cover tall/wide matrices, nonuniform
+local dimensions and empty mathematical local rows/columns. Reconstruction and
+orthogonality use distributed GEMM, no matrix gather. Only singular-value vectors
+are collectively read for test reconstruction.
+
+Original bounds retained: QR and both SVD orthogonality Frobenius norms <=m*n*1e-6;
+reconstruction <=m*n*n*1e-6. Largest printed QR reconstruction residual ~2.64e-15,
+SVD ~5.54e-15; all required norms pass. DIGIT / PASS, class R. No coefficient/
+singular-vector component comparison, tighter precision run or repeated passing
+suite. Complex/f32, eigensolvers, rank truncation, randomized paths and Windows
+native remain unfinished; the whole goal is not complete.

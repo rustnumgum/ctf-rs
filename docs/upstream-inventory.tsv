@@ -66,7 +66,7 @@ src/interface/idx_tensor.h	src/interface	pending
 src/interface/kernel.h	src/interface	pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
-src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: explicit-grid f64 distributed Cholesky and triangular solve; other matrix routines pending
+src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: explicit-grid f64 distributed Cholesky, triangular solve, thin QR and SVD; other matrix routines pending
 src/interface/matrix.h	src/matrix.rs	partial direct Rust Tensor matrix APIs
 src/interface/monoid.cxx	src/interface	pending
 src/interface/monoid.h	src/interface	pending
@@ -241,8 +241,8 @@ examples/trace.cxx	tests/upstream/examples/trace.rs	pending
 scalapack_tests/conj.h	tests/upstream/scalapack_tests/conj.h	pending
 scalapack_tests/eigh.cxx	tests/upstream/scalapack_tests/eigh.rs	pending
 scalapack_tests/Makefile	Cargo/build tooling	replaced
-scalapack_tests/qr.cxx	tests/upstream/scalapack_tests/qr.rs	pending
-scalapack_tests/svd.cxx	tests/upstream/scalapack_tests/svd.rs	pending
+scalapack_tests/qr.cxx	tests/distributed_qr_svd.rs	partial f64 thin QR residual/orthogonality criteria PASS WSL 1/2/4; other scalar types pending
+scalapack_tests/svd.cxx	tests/distributed_qr_svd.rs	partial f64 thin SVD residual/orthogonality criteria PASS WSL 1/2/4; other scalar types/truncation pending
 bench/bench_contraction.cxx	tests/upstream/bench/bench_contraction.rs	pending
 bench/bench_nosym_transp.cxx	tests/upstream/bench/bench_nosym_transp.rs	pending
 bench/bench_redistribution.cxx	tests/upstream/bench/bench_redistribution.rs	pending

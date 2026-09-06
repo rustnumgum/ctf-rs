@@ -245,3 +245,18 @@ Validation ports Cholesky/triangular reconstruction and triangle criteria from
 test/python/test_la.py into Rust (no Python interface/runtime). Fixtures are
 deterministic SPD/triangular matrices rather than a claim of identical NumPy
 random inputs. QR/SVD/eigh distributed implementations are not implied.
+
+## Distributed thin QR and SVD (2026-09-07)
+
+matrix.rs now follows interface/matrix.cxx QR's PDGEQRF -> retain R -> PDORGQR
+sequence, and SVD's descriptor-specific PDGESVD('V','V') sequence. Shapes of thin
+outputs are Q(m,k), R(k,n), U(m,k), S(k), VT(k,n), k=min(m,n); vectors/matrices
+are returned as Rust tensors. Packing/extraction is rank-local with cyclic
+block size 1; neither algorithm gathers matrix factors. ScaLAPACK's replicated
+singular values are copied directly to vector owners. Native symbol declarations
+and workspace management are confined to ffi/scalapack.rs.
+
+Explicit grids replace automatic descriptor choice for these entry points.
+Full thin SVD is implemented here; source rank/threshold truncation and randomized
+paths remain pending. Test metrics follow scalapack_tests/qr.cxx and svd.cxx;
+fixtures are deterministic real matrices, not every upstream dtype/test branch.
