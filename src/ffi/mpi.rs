@@ -52,6 +52,15 @@ impl Comm {
         if self.owned { unsafe { check(sys::MPI_Comm_free(&mut self.raw)); } }
     }
     pub(crate) fn barrier(&self) { unsafe { check(sys::MPI_Barrier(self.raw)); } }
+    pub(crate) fn reduce_f64(&self, root: usize, values: &mut [f64]) {
+        assert!(root < self.size());
+        let mut input = values.to_vec();
+        if input.is_empty() { input.push(0.); }
+        let mut output = vec![0.;values.len().max(1)];
+        unsafe { check(sys::MPI_Reduce(input.as_ptr().cast(),output.as_mut_ptr().cast(),values.len().try_into().unwrap(),
+            sys::RSMPI_DOUBLE,sys::RSMPI_SUM,root as i32,self.raw)); }
+        if self.rank() == root { values.copy_from_slice(&output[..values.len()]); }
+    }
     pub(crate) fn sum_f64(&self, values: &mut [f64]) {
         let input = values.to_vec();
         if values.is_empty() {

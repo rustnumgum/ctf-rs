@@ -20,6 +20,8 @@ impl Context<'_> {
     pub fn barrier(&self) { self.inner.barrier(); }
     /// Native MPI sum of one local f64 block. Collective; no global tensor gather.
     pub fn sum_f64(&self, values: &mut [f64]) { self.inner.sum_f64(values); }
+    /// Reduce one local block to root; other ranks retain their local contributions.
+    pub fn reduce_f64(&self, root: usize, values: &mut [f64]) { self.inner.reduce_f64(root,values); }
     pub fn split(&self, color: Option<i32>, key: i32) -> Option<Context<'_>> {
         self.inner.split(color, key).map(|inner| Context { inner, _runtime: self._runtime })
     }

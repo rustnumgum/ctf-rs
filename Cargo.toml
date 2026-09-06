@@ -34,3 +34,8 @@ harness = false
 name = "tensor_sum"
 path = "tests/tensor_sum.rs"
 harness = false
+
+[[test]]
+name = "replicated_contraction"
+path = "tests/replicated_contraction.rs"
+harness = false

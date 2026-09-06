@@ -32,6 +32,9 @@ Do not stamp independently written files with the upstream author's copyright.
   `tsum_replicate::run` in `src/summation/sum_tsr.cxx`.
 * `src/contraction.rs`: dense NS reference contraction and custom function/alpha
   ordering adapted from `src/contraction/sym_seq_ctr.cxx`.
+  Virtual traversal follows `ctr_virt::run` in `ctr_tsr.cxx`; replicated execution
+  follows `ctr_replicate::run` in `ctr_comm.cxx`, including root reduction and
+  input-replica clearing.
 * `src/linalg.rs`, `src/ffi/linalg.rs`: new local-kernel interface and bindings to
   standard BLAS/LAPACK operations. No C++ CTF wrapper is linked or copied here.
 

@@ -138,3 +138,13 @@ bivariate function before alpha scaling. As upstream's local reference kernel,
 the supplied output block is beta-scaled in full; Tensor-level diagonal extraction
 is not implemented by this primitive. BLAS folding, distributed contraction
 communication and Tensor-level contraction remain outstanding.
+
+## 2026-09-06: virtual and replicated contraction
+
+`cargo test --test replicated_contraction` under MPI runners at 1,2,4 ranks:
+each PASS once, using exact small-integer-valued results. Covered virtual
+reduction with beta applied once, root-only beta before native MPI_Reduce,
+two-input broadcast and cleanup of nonroot input replicas. The implementation
+preserves ctr_replicate's Reduce semantics rather than substituting Allreduce.
+These are local-block execution layers; 2D communication, BLAS folding and
+Tensor-level contraction integration remain unfinished.
