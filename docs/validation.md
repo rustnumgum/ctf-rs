@@ -118,3 +118,13 @@ The communication sequence is ported from `tsum_replicate::run`, while virtual
 traversal follows `tsum_virt::run`. No global tensor gather is used. This is the
 native-double layer; custom reduction operators, automatic mapping, complete
 Tensor-level summation and packed symmetry are still outstanding.
+
+## 2026-09-06: aligned Tensor summation
+
+`cargo test --test tensor_sum` with MPI runners at 1,2,4 ranks: all PASS once.
+Exact small-integer-valued f64 checks cover local-index reduction, physical-axis
+reduction with virtual blocks and padding, output broadcast and transposition.
+The `sum_from_aligned` Tensor entry point uses explicitly aligned unique-label
+distributions; it creates and explicitly closes the required topology fibers.
+Automatic distribution alignment, repeated-label Tensor summation and generic
+algebra communication remain separate unfinished requirements.

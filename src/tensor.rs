@@ -2,6 +2,62 @@
 //! Distributed dense storage and key-based all-to-all read/write.
 use crate::{algebra::{Monoid, Semiring, Wire}, context::Context, mapping::Distribution};
 
+impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
+    /// Collective sum for unique labels with explicitly aligned distributions.
+    /// Shared labels have identical maps; each topology axis maps to the same
+    /// label in both operands, or to only one operand. Automatic remapping is
+    /// deliberately not hidden in this entry point.
+    pub fn sum_from_aligned(&mut self, indices_b: &str, input: &Self, indices_a: &str, alpha: f64, beta: f64) {
+        use crate::mapping::Mapping;
+        assert!(std::ptr::eq(self.context,input.context));
+        assert_eq!(self.distribution.topology,input.distribution.topology);
+        for (indices,distribution) in [(indices_a,&input.distribution),(indices_b,&self.distribution)] {
+            assert!(indices.is_ascii());
+            assert_eq!(indices.len(),distribution.shape.len());
+            for (i,label) in indices.bytes().enumerate() { assert!(!indices.as_bytes()[..i].contains(&label),"aligned entry point requires unique labels"); }
+        }
+        for (ia,label) in indices_a.bytes().enumerate() {
+            if let Some(ib) = indices_b.bytes().position(|x|x == label) {
+                assert_eq!(input.distribution.shape[ia],self.distribution.shape[ib]);
+                assert_eq!(input.distribution.mappings[ia],self.distribution.mappings[ib]);
+            }
+        }
+        fn map_labels(map: &Mapping, label: u8, axes: &mut [Option<u8>]) {
+            match map {
+                Mapping::Unmapped => {},
+                Mapping::Physical {axis,child,..} => { axes[*axis] = Some(label); map_labels(child,label,axes); }
+                Mapping::Virtual {child,..} => map_labels(child,label,axes),
+            }
+        }
+        let topology = &self.distribution.topology;
+        let mut a_axes = vec![None;topology.dimensions.len()];
+        let mut b_axes = a_axes.clone();
+        for (map,label) in input.distribution.mappings.iter().zip(indices_a.bytes()) { map_labels(map,label,&mut a_axes); }
+        for (map,label) in self.distribution.mappings.iter().zip(indices_b.bytes()) { map_labels(map,label,&mut b_axes); }
+        for (a,b) in a_axes.iter().zip(&b_axes) { if a.is_some() && b.is_some() { assert_eq!(a,b); } }
+        let mut input_comms = Vec::new();
+        let mut output_comms = Vec::new();
+        for axis in 0..a_axes.len() {
+            match (a_axes[axis],b_axes[axis]) {
+                (None,Some(_)) => input_comms.push(topology.fiber(self.context,axis)),
+                (Some(_),None) => output_comms.push(topology.fiber(self.context,axis)),
+                _ => {},
+            }
+        }
+        let virtual_a: Vec<_> = input.distribution.mappings.iter().map(|m|m.phase()/m.physical_phase()).collect();
+        let virtual_b: Vec<_> = self.distribution.mappings.iter().map(|m|m.phase()/m.physical_phase()).collect();
+        let mut a = input.data.clone();
+        crate::summation::replicated_f64(&input_comms.iter().collect::<Vec<_>>(),&output_comms.iter().collect::<Vec<_>>(),
+            &input.distribution.block_shape(),&virtual_a,indices_a,&mut a,
+            &self.distribution.block_shape(),&virtual_b,indices_b,&mut self.data,alpha,beta);
+        for (offset,value) in self.data.iter_mut().enumerate() {
+            if self.distribution.global_key(self.context.rank(),offset).is_none() { *value = 0.; }
+        }
+        for comm in input_comms { comm.close(); }
+        for comm in output_comms { comm.close(); }
+    }
+}
+
 pub struct Tensor<'context, 'runtime, A: Monoid> {
     context: &'context Context<'runtime>,
     algebra: A,

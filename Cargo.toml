@@ -29,3 +29,8 @@ harness = false
 name = "replicated_sum"
 path = "tests/replicated_sum.rs"
 harness = false
+
+[[test]]
+name = "tensor_sum"
+path = "tests/tensor_sum.rs"
+harness = false
