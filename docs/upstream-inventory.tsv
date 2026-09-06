@@ -185,7 +185,7 @@ test/permute_multiworld.cxx	tests/upstream/test/permute_multiworld.rs	pending
 test/readall_test.cxx	tests/upstream/test/readall_test.rs	pending
 test/readwrite_test.cxx	tests/upstream/test/readwrite_test.rs	pending
 test/reduce_bcast.cxx	tests/upstream_dense.rs	both identities ported; WSL 1/2/4 pass
-test/repack.cxx	tests/upstream/test/repack.rs	pending
+test/repack.cxx	tests/distributed_symmetric_repack.rs	canonical-only source repack semantics ported; exact SY/AS/SH and partial-group WSL checks at 1/2/4 ranks; original random driver pending
 test/scalar.cxx	tests/upstream/test/scalar.rs	pending
 test/speye.cxx	tests/upstream/test/speye.rs	pending
 test/sptensor_sum.cxx	tests/upstream/test/sptensor_sum.rs	pending

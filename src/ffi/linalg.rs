@@ -3,7 +3,8 @@
 use crate::linalg::{Gemm, Svd, Transpose};
 use std::ffi::c_char;
 
-#[link(name = "blas")]
+#[cfg_attr(target_os = "windows", link(name = "openblas"))]
+#[cfg_attr(not(target_os = "windows"), link(name = "blas"))]
 unsafe extern "C" {
     fn dormqr_(side:*const c_char,trans:*const c_char,m:*const i32,n:*const i32,k:*const i32,
         a:*const f64,lda:*const i32,tau:*const f64,c:*mut f64,ldc:*const i32,work:*mut f64,lwork:*const i32,info:*mut i32);
@@ -13,7 +14,8 @@ unsafe extern "C" {
         alpha: *const f64, a: *const f64, lda: *const i32, b: *const f64, ldb: *const i32,
         beta: *const f64, c: *mut f64, ldc: *const i32);
 }
-#[link(name = "lapack")]
+#[cfg_attr(target_os = "windows", link(name = "openblas"))]
+#[cfg_attr(not(target_os = "windows"), link(name = "lapack"))]
 unsafe extern "C" {
     fn dpotrf_(uplo: *const c_char, n: *const i32, a: *mut f64, lda: *const i32, info: *mut i32);
     fn dgeqrf_(m: *const i32, n: *const i32, a: *mut f64, lda: *const i32, tau: *mut f64,

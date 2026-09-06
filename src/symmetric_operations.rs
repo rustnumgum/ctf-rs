@@ -1,12 +1,36 @@
 // Adapted from cc4s CTF sym_seq_scl and group-preserving tensor repack.
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 use crate::{
-    algebra::{Group, Semiring},
+    algebra::{Group, Semiring, Wire},
     symmetry::Symmetry,
     symmetric_distribution::SymmetricDistribution,
 };
 
 use super::SymmetricTensor;
+
+impl<'c, 'r, A: Group + Clone> SymmetricTensor<'c, 'r, A>
+where A::Element: Wire {
+    /// Source tensor repack (home_sum_tsr with symmetry handling disabled).
+    /// Copy the intersection of source and target canonical domains, without
+    /// orbit expansion or symmetrization. Target mapping is explicit.
+    pub fn repack_to(&self, target: SymmetricDistribution) -> Self {
+        assert_eq!(self.distribution.distribution().shape, target.distribution().shape);
+        let mut added = false;
+        let mut removed = false;
+        for (&old, &new) in self.distribution.links().iter().zip(target.links()) {
+            added |= old == Symmetry::NS && new != Symmetry::NS;
+            removed |= old != Symmetry::NS && new == Symmetry::NS;
+        }
+        assert!(!(added && removed), "repack cannot both add and remove symmetry boundaries");
+        let pairs: Vec<_> = self.local_pairs().into_iter().filter(|(key, _)| {
+            self.distribution.distribution().owner(*key) == self.context.rank()
+                && target.canonicalize(*key) == Some((*key, 1))
+        }).collect();
+        let mut result = Self::new(self.context, target, self.algebra.clone());
+        result.write_add(&pairs);
+        result
+    }
+}
 
 fn validate_indices<A: Group>(tensor: &SymmetricTensor<'_, '_, A>, indices: &str) {
     assert!(indices.is_ascii());

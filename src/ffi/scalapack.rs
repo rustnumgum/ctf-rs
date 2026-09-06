@@ -6,7 +6,8 @@
 use mpi_sys as sys;
 use std::{ffi::c_char, marker::PhantomData, rc::Rc};
 
-#[link(name = "scalapack-openmpi")]
+#[cfg_attr(target_os = "windows", link(name = "scalapack"))]
+#[cfg_attr(not(target_os = "windows"), link(name = "scalapack-openmpi"))]
 unsafe extern "C" {
     fn Csys2blacs_handle(comm: sys::MPI_Comm) -> i32;
     fn Cfree_blacs_system_handle(context: i32);

@@ -1,6 +1,7 @@
 use std::ffi::c_char;
 
-#[link(name = "blas")]
+#[cfg_attr(target_os = "windows", link(name = "openblas"))]
+#[cfg_attr(not(target_os = "windows"), link(name = "blas"))]
 unsafe extern "C" {
     fn dsyr_(
         uplo: *const c_char,
@@ -13,7 +14,8 @@ unsafe extern "C" {
     );
 }
 
-#[link(name = "lapack")]
+#[cfg_attr(target_os = "windows", link(name = "openblas"))]
+#[cfg_attr(not(target_os = "windows"), link(name = "lapack"))]
 unsafe extern "C" {
     fn dposv_(
         uplo: *const c_char,

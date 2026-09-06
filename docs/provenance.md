@@ -548,3 +548,22 @@ SymmetricTensor::write_scaled canonicalizes keys and AS signs, applies incoming
 value times alpha plus old value times beta, and applies beta once per touched
 canonical key. Untouched entries and AS/SH structural zeros are unchanged.
 Equivalent requested permutations contribute to the same canonical entry.
+
+## Symmetry-boundary repack (2026-09-07)
+
+repack_to implements tensor/untyped_tensor.cxx 261-269's identity summation
+with home_sum_tsr(true,false). The false argument bypasses sym_sum_tsr
+(summation.cxx 948-958,1080-1087). sym_seq_sum.cxx 39-75,126-166 intersects
+source and destination canonical bounds; no orbit expansion, signs, averages,
+or multiplicity factors are applied. test/repack.cxx 33-63 explicitly expects
+SY-to-NS to populate only the original canonical chamber, not its mirror.
+Thus this operation differs intentionally from mathematical symmetrization
+and from semantic reads, which do mirror/sign-adjust.
+
+The Rust operation filters unique-owner canonical source entries by target
+canonical validity and routes unchanged pairs to explicit target owners and
+replicas. It supports adding or removing NS boundaries but, like the source,
+rejects simultaneously adding and removing them. Source automatic mapping and
+optimized aligned summation communication remain pending; current key routing
+does not gather or allocate a full global tensor. Genuine symmetry-aware sums
+and contractions remain separate unfinished work.

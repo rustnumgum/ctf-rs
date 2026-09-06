@@ -712,3 +712,19 @@ first run. No runtime failures or retries. DIGIT / PASS; tolerance zero.
 Noncommutative scaling order is source-inspected here, not separately validated
 by this integer fixture. NS-boundary changes and symmetric contractions remain
 unfinished.
+
+## Boundary repack and Windows build (2026-09-07)
+
+distributed_symmetric_repack passed once at 1/2/4 WSL MPI ranks, world and
+parity contexts. Exact i64 checks cover NS-to-SY/AS/SH canonical sampling,
+canonical-only reverse copies, three-axis and partial groups, virtual blocks,
+and replicated destination/source ownership. No numerical failures or retries.
+DIGIT / PASS for this repack scope only.
+
+Native Windows GNU compiled and linked all then-current Cargo test targets;
+the newly added repack target also compiled and linked separately afterward.
+Only native library names changed for Windows (OpenBLAS and ScaLAPACK).
+The acceptance PowerShell script passed syntax parsing. Native execution is
+not accepted: Microsoft MPI runtime installation was canceled (0x800704c7),
+msmpi.dll was absent, and local_linalg exited before any test output. See
+native-windows.md for exact setup and remaining runtime acceptance.
