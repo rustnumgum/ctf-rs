@@ -95,3 +95,11 @@ candidates. No floating-point checks or additional diagnostic computations.
 The assignment primitive is exposed for planner integration; the tensor
 constructor still takes an explicit distribution. Automatic plan search and
 all upstream mapping edge cases are not yet claimed complete.
+
+## 2026-09-06: local dense summation kernel
+
+`cargo test --test sequential_sum`: 4 exact integer tests PASS in one execution.
+Covered transpose with alpha/beta, reduction plus broadcast, repeated input and
+output indices, zero-length reduction, and custom-function application after
+input scaling. The kernel processes local column-major blocks; distributed
+tsum replication/reduction and compressed-symmetry integration remain pending.

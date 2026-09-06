@@ -25,6 +25,9 @@ Do not stamp independently written files with the upstream author's copyright.
 * `src/algebra.rs`, `src/context.rs`, `src/ffi/mpi.rs`: new Rust traits, lifetimes,
   serialization and native-call encapsulation. Upstream responsibility references
   document compatibility targets, not authorship of these files.
+* `src/summation.rs`: local NS sequential summation control flow and alpha/beta
+  ordering adapted from `src/summation/sym_seq_sum.cxx`; Rust index offset tables
+  replace byte offsets and explicit C++ buffer management.
 * `src/linalg.rs`, `src/ffi/linalg.rs`: new local-kernel interface and bindings to
   standard BLAS/LAPACK operations. No C++ CTF wrapper is linked or copied here.
 
