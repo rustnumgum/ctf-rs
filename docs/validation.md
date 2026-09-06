@@ -128,3 +128,13 @@ The `sum_from_aligned` Tensor entry point uses explicitly aligned unique-label
 distributions; it creates and explicitly closes the required topology fibers.
 Automatic distribution alignment, repeated-label Tensor summation and generic
 algebra communication remain separate unfinished requirements.
+
+## 2026-09-06: local reference contraction
+
+`cargo test --test sequential_contraction`: 4 tests PASS once using exact integer
+and Boolean semiring expectations. Covered matrix product with alpha/beta,
+repeated input labels, scalar products, empty contraction dimension, and custom
+bivariate function before alpha scaling. As upstream's local reference kernel,
+the supplied output block is beta-scaled in full; Tensor-level diagonal extraction
+is not implemented by this primitive. BLAS folding, distributed contraction
+communication and Tensor-level contraction remain outstanding.

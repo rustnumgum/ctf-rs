@@ -19,9 +19,9 @@ pub fn replicated_f64(input_comms: &[&Context<'_>], output_comms: &[&Context<'_>
     for comm in output_comms { comm.sum_f64(b); }
 }
 
-struct Indices { dimensions: Vec<usize>, offsets: Vec<Vec<usize>> }
+pub(crate) struct Indices { dimensions: Vec<usize>, offsets: Vec<Vec<usize>> }
 impl Indices {
-    fn new(operands: &[(&[usize], &str)]) -> Self {
+    pub(crate) fn new(operands: &[(&[usize], &str)]) -> Self {
         let mut labels = Vec::new();
         let mut dimensions = Vec::new();
         for &(shape,indices) in operands {
@@ -44,7 +44,7 @@ impl Indices {
         }).collect();
         Self {dimensions,offsets}
     }
-    fn for_each(&self, mut visit: impl FnMut(&[usize])) {
+    pub(crate) fn for_each(&self, mut visit: impl FnMut(&[usize])) {
         if self.dimensions.contains(&0) { return; }
         let mut index = vec![0;self.dimensions.len()];
         let mut positions = vec![0;self.offsets.len()];

@@ -12,5 +12,6 @@ pub mod topology_candidates;
 pub mod node_aware;
 pub mod tensor;
 pub mod summation;
+pub mod contraction;
 pub mod linalg;
 mod ffi;

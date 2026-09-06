@@ -30,6 +30,8 @@ Do not stamp independently written files with the upstream author's copyright.
   replace byte offsets and explicit C++ buffer management.
   Its virtual-block and replicated-block layers follow `tsum_virt::run` and
   `tsum_replicate::run` in `src/summation/sum_tsr.cxx`.
+* `src/contraction.rs`: dense NS reference contraction and custom function/alpha
+  ordering adapted from `src/contraction/sym_seq_ctr.cxx`.
 * `src/linalg.rs`, `src/ffi/linalg.rs`: new local-kernel interface and bindings to
   standard BLAS/LAPACK operations. No C++ CTF wrapper is linked or copied here.
 
