@@ -6,9 +6,13 @@
 //! Unique labels are classified as AB=`k`, AC=`m`, BC=`n`, and ABC=`l`.
 //! Axes are matricized as `A[m,k,l]`, `B[k,n,l]`, and `C[m,n,l]`; every
 //! `l` coordinate is then executed by the existing distributed sparse GEMM.
+//! Repeated labels are projected onto diagonals before folding; output
+//! reinsertion preserves off-diagonal values. One-operand-only labels are
+//! not supported by this folded path.
 
 use crate::{
     algebra::{Semiring, Wire},
+    diagonal::Projection,
     folding::{Operand, Rejected},
     mapping::Distribution,
     sparse::SparseTensor,
@@ -171,11 +175,38 @@ fn validate_grid(grid: [usize; 2], processes: usize) {
     assert_eq!(grid[0].checked_mul(grid[1]), Some(processes));
 }
 
+// Preserve typed validation errors before any diagonal redistribution occurs.
+fn repeated_projections(shapes: [&[usize]; 3], indices: [&str; 3])
+    -> Result<Option<[Projection; 3]>, Rejected> {
+    if !indices.iter().any(|labels| labels.bytes().enumerate()
+        .any(|(axis, label)| labels.as_bytes()[..axis].contains(&label))) { return Ok(None); }
+    let operands = [Operand::A, Operand::B, Operand::C];
+    let mut dimensions = [None; 256];
+    for operand in 0..3 {
+        if !indices[operand].is_ascii() { return Err(Rejected::NonAsciiIndices { operand: operands[operand] }); }
+        if shapes[operand].len() != indices[operand].len() {
+            return Err(Rejected::RankMismatch { operand: operands[operand],
+                shape: shapes[operand].len(), indices: indices[operand].len() });
+        }
+        for (&dimension, label) in shapes[operand].iter().zip(indices[operand].bytes()) {
+            if dimensions[label as usize].is_some_and(|old| old != dimension) {
+                return Err(Rejected::DimensionMismatch { label: label as char });
+            }
+            dimensions[label as usize] = Some(dimension);
+        }
+    }
+    let projections = std::array::from_fn(|operand| Projection::new(shapes[operand], indices[operand]));
+    let [a, b, c] = &projections;
+    Plan::new([&a.shape, &b.shape, &c.shape], [&a.labels, &b.labels, &c.labels])?;
+    Ok(Some(projections))
+}
+
 impl<'c, 'r, A: Semiring + Clone> SparseTensor<'c, 'r, A>
 where
     A::Element: Wire,
 {
-    /// Contract fully foldable unique-index sparse tensors without gathering.
+    /// Contract fully foldable sparse tensors, including diagonal labels,
+    /// without gathering.
     pub fn contract_from(
         &mut self,
         indices_c: &str,
@@ -187,6 +218,19 @@ where
         alpha: A::Element,
         beta: A::Element,
     ) -> Result<(), Rejected> {
+        if let Some([_, _, output]) = repeated_projections(
+            [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
+            [indices_a, indices_b, indices_c])? {
+            assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+            validate_grid(grid, self.context().size());
+            let (aa, ia) = a.extract_diagonal(indices_a);
+            let (bb, ib) = b.extract_diagonal(indices_b);
+            let (mut cc, ic) = self.extract_diagonal(indices_c);
+            cc.contract_from(&ic, &aa, &ia, &bb, &ib, grid, alpha, beta)?;
+            if output.repeated() { self.replace_diagonal(indices_c, &cc); }
+            else { *self = cc; }
+            return Ok(());
+        }
         let plan = Plan::new(
             [
                 &a.distribution().shape,
@@ -266,6 +310,19 @@ where
         alpha: A::Element,
         beta: A::Element,
     ) -> Result<(), Rejected> {
+        if let Some([_, _, output]) = repeated_projections(
+            [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
+            [indices_a, indices_b, indices_c])? {
+            assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+            validate_grid(grid, self.context().size());
+            let (aa, ia) = a.extract_diagonal(indices_a);
+            let (bb, ib) = b.extract_diagonal(indices_b);
+            let (mut cc, ic) = self.extract_diagonal(indices_c);
+            cc.contract_from_sparse(&ic, &aa, &ia, &bb, &ib, grid, alpha, beta)?;
+            if output.repeated() { self.replace_diagonal(indices_c, &cc); }
+            else { *self = cc; }
+            return Ok(());
+        }
         let plan = Plan::new(
             [
                 &a.distribution().shape,
@@ -340,6 +397,19 @@ where
         alpha: A::Element,
         beta: A::Element,
     ) -> Result<(), Rejected> {
+        if let Some([_, _, output]) = repeated_projections(
+            [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
+            [indices_a, indices_b, indices_c])? {
+            assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+            validate_grid(grid, self.context().size());
+            let (aa, ia) = a.extract_diagonal(indices_a);
+            let (bb, ib) = b.extract_diagonal(indices_b);
+            let (mut cc, ic) = self.extract_diagonal(indices_c);
+            cc.contract_from_sparse_dense(&ic, &aa, &ia, &bb, &ib, grid, alpha, beta)?;
+            if output.repeated() { self.replace_diagonal(indices_c, &cc); }
+            else { *self = cc; }
+            return Ok(());
+        }
         let plan = Plan::new(
             [
                 &a.distribution().shape,
@@ -414,6 +484,19 @@ where
         alpha: A::Element,
         beta: A::Element,
     ) -> Result<(), Rejected> {
+        if let Some([_, _, output]) = repeated_projections(
+            [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
+            [indices_a, indices_b, indices_c])? {
+            assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+            validate_grid(grid, self.context().size());
+            let (aa, ia) = a.extract_diagonal(indices_a);
+            let (bb, ib) = b.extract_diagonal(indices_b);
+            let (mut cc, ic) = self.extract_diagonal(indices_c);
+            cc.contract_from_dense_sparse(&ic, &aa, &ia, &bb, &ib, grid, alpha, beta)?;
+            if output.repeated() { self.replace_diagonal(indices_c, &cc); }
+            else { *self = cc; }
+            return Ok(());
+        }
         let plan = Plan::new(
             [
                 &a.distribution().shape,

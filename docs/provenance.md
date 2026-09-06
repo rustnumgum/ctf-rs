@@ -494,3 +494,21 @@ denominator chain, four orbital-energy accumulations, sparse amplitude map-back,
 dense Fock times sparse T, sparse integral times sparse T and final energy.
 Its deterministic fixture and Vijab-storage adaptation match the prior dense-T
 test; the original relative-energy acceptance rule is unchanged.
+
+## Sparse diagonal projection and reinsertion (2026-09-07)
+
+src/sparse_diagonal.rs extends the tensor extract_diag/reinsertion approach
+to stored sparse keys. Canonical owners route selected entries into projected
+cyclic storage; reinsertion replaces only selected diagonal structure and
+retains the original distribution and all off-diagonal keys. It does not
+allocate a dense tensor or gather the global sparse tensor.
+src/sparse_fold.rs applies this preprocessing to all four sparse/mixed
+contraction APIs, then uses the existing unique-label folding and panel
+communication. Shape/index and foldability validation precedes redistribution.
+One-operand-only labels and optimized upstream sparse diagonal kernels remain
+pending. The new exact fixtures are independently written Rust tests.
+
+The pinned distributed symmetry source audit is recorded in
+distributed-symmetry-layout.md. It establishes local SY-sized storage with
+padding/noncanonical holes, including for AS/SH; it is not an implementation
+or acceptance claim for distributed compressed symmetry.

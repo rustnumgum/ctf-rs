@@ -15,6 +15,9 @@ mod folding;
 #[path = "sparse_functions.rs"]
 mod functions;
 
+#[path = "sparse_diagonal.rs"]
+mod diagonal;
+
 #[derive(Clone)]
 pub struct SparseTensor<'c, 'r, A: Monoid> {
     context: &'c Context<'r>,

@@ -232,3 +232,8 @@ harness = false
 name = "upstream_sparse_mp3_t"
 path = "tests/upstream_sparse_mp3_t.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_diagonal"
+path = "tests/distributed_sparse_diagonal.rs"
+harness = false

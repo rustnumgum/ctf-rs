@@ -671,3 +671,16 @@ first run; all tests passed without retries. DIGIT / PASS, no extra precision
 or repeated passing checks. General custom function contractions, non-foldable
 sparse indices, compressed symmetry, automatic planning and native Windows
 acceptance remain unfinished.
+
+## Sparse repeated indices (2026-09-07)
+
+distributed_sparse_diagonal passed once at each of 1/2/4 MPI ranks in the
+Linux work copy, with world and parity contexts. Exact i64 oracles cover all
+four sparse/mixed high-order contraction APIs, repeated A/B/output labels,
+alpha=2 and beta=3, virtual-2 output distribution, triple-index extraction,
+replacement with absent/explicit-zero keys and empty local shards.
+Off-diagonal input entries are ignored; off-diagonal output entries remain
+unchanged, including under nonunit beta. The delegated fixture initially
+scaled off-diagonal output by beta; this expectation was corrected during
+integration review before the first run. No runtime failures or retries.
+DIGIT / PASS; integer tolerance zero; no additional numerical checks.
