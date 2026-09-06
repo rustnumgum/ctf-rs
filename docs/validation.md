@@ -806,3 +806,15 @@ cancellation, supported repeated diagonals, and a three-axis distinct-index
 fixture. Both targets compiled and linked on Windows GNU. DIGIT / PASS;
 verification closed. This does not establish arbitrary high-order coincidence
 surfaces, other SY scalar types, or native MPI runtime acceptance.
+
+## Generic SY scalar paths (2026-09-07)
+
+distributed_sy_scalars passed once at each of 1/2/4 WSL MPI ranks, world and
+parity contexts. Exactly representable fixtures verify f32, i32/i64, complex
+f32/f64, and a heap-owned non-Copy custom ring through SY expansion and
+reduction. Complex alpha includes a nonzero imaginary component. The custom
+ring supplies its explicit CastFromF64 and Wire implementations.
+No failures/retries; DIGIT / PASS. Existing passing f64 numerical fixtures were
+not rerun. The new target compiled and linked once on Windows GNU; native MPI
+runtime acceptance is still pending. These tests do not add a study of
+higher-order fractional coincidence corrections.

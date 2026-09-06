@@ -2,7 +2,8 @@
 // and symmetry/symmetrization.cxx. Copyright (c) 2011, Edgar Solomonik.
 // See LICENSE.
 use crate::{
-    algebra::Arithmetic,
+    algebra::{Group, Semiring, Wire},
+    scalar_conversion::CastFromF64,
     sym_indices::{align_pair, summation_factor},
     sym_permutations,
     symmetric_distribution::SymmetricDistribution,
@@ -110,7 +111,11 @@ fn broken_link(
     None
 }
 
-impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
+impl<'c, 'r, A> SymmetricTensor<'c, 'r, A>
+where
+    A: Group + Semiring + Clone + CastFromF64,
+    A::Element: Wire,
+{
     /// Symmetry-aware indexed sum `B[indices_b] = alpha*A[indices_a]
     /// + beta*B[indices_b]` for NS/SY/AS/SH tensors.
     ///
@@ -123,8 +128,8 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
         indices_b: &str,
         a: &Self,
         indices_a: &str,
-        alpha: f64,
-        beta: f64,
+        alpha: A::Element,
+        beta: A::Element,
     ) {
         assert!(std::ptr::eq(self.context, a.context));
         assert!(indices_a.is_ascii());
@@ -162,8 +167,8 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
         output_indices: &[u8],
         input: &Self,
         input_indices: &[u8],
-        alpha: f64,
-        beta: f64,
+        alpha: A::Element,
+        beta: A::Element,
     ) {
         let mut output_indices = output_indices.to_vec();
         let sign = align_pair(
@@ -177,9 +182,13 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
             input.distribution.links(),
             &output_indices,
         );
-        let mut adjusted_alpha = 0.0;
-        for _ in 0..factor { adjusted_alpha += alpha; }
-        if sign == -1 { adjusted_alpha = -adjusted_alpha; }
+        let mut adjusted_alpha = self.algebra.zero();
+        for _ in 0..factor {
+            adjusted_alpha = self.algebra.add(&adjusted_alpha, &alpha);
+        }
+        if sign == -1 {
+            adjusted_alpha = self.algebra.negate(&adjusted_alpha);
+        }
 
         let Some(first) = broken_link(
             input_indices,
@@ -225,7 +234,8 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
         // by explicit permutations, whereas an input SY break always unfolds;
         // an output SY break unfolds only when beta is nonzero.
         if second.is_some()
-            || (sy && (matches!(first, BrokenLink::Input(_)) || beta != 0.0))
+            || (sy
+                && (matches!(first, BrokenLink::Input(_)) || beta != self.algebra.zero()))
         {
             match first {
                 BrokenLink::Input(_) => {
@@ -259,7 +269,7 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
                         // Preserve the incoming coefficient, as in the copied
                         // source summation object.
                         alpha,
-                        beta,
+                        beta.clone(),
                     );
 
                     self.scale(&beta);
@@ -275,14 +285,19 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
         );
         let mut task_beta = beta;
         for permutation in permutations {
+            let task_alpha = if permutation.sign == 1 {
+                adjusted_alpha.clone()
+            } else {
+                self.algebra.negate(&adjusted_alpha)
+            };
             self.sum_canonical_from(
                 labels(&permutation.indices[1]),
                 input,
                 labels(&permutation.indices[0]),
-                adjusted_alpha * permutation.sign as f64,
+                task_alpha,
                 task_beta,
             );
-            task_beta = 1.0;
+            task_beta = self.algebra.one();
         }
     }
 
@@ -300,7 +315,7 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
             source.distribution.distribution().clone(),
             target_links,
         );
-        let mut result = Self::new(source.context, distribution, source.algebra);
+        let mut result = Self::new(source.context, distribution, source.algebra.clone());
 
         let source_links = source.distribution.links();
         let target_links = result.distribution.links();
@@ -322,11 +337,17 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
                     labels(indices),
                     source,
                     labels(indices),
-                    1.0,
-                    1.0,
+                    source.algebra.one(),
+                    source.algebra.one(),
                 );
             } else {
-                result.sum_sy_recursive(indices, source, indices, 1.0, 1.0);
+                result.sum_sy_recursive(
+                    indices,
+                    source,
+                    indices,
+                    source.algebra.one(),
+                    source.algebra.one(),
+                );
             }
             return result;
         }
@@ -368,20 +389,21 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
                 labels(indices),
                 transpose_source,
                 labels(&transposed),
-                1.0,
-                1.0,
+                source.algebra.one(),
+                source.algebra.one(),
             );
         }
         result.sum_canonical_from(
             labels(indices),
             source,
             labels(indices),
-            1.0,
-            1.0,
+            source.algebra.one(),
+            source.algebra.one(),
         );
 
         if other_axes > 1 {
             let coincidence_scale = (other_axes - 1) as f64 / other_axes as f64;
+            let coincidence_scale = result.algebra.cast_f64(coincidence_scale);
             for relative in -(negative as isize) - 1..positive as isize {
                 if relative == -1 {
                     continue;
@@ -404,7 +426,7 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
         let mut intermediate = Self::new(
             self.context,
             self.distribution.clone(),
-            self.algebra,
+            self.algebra.clone(),
         );
         if !contains_sy(self.distribution.links())
             && !contains_sy(nonsymmetric.distribution.links())
@@ -413,19 +435,31 @@ impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<f64>> {
                 labels(indices),
                 nonsymmetric,
                 labels(indices),
-                1.0,
-                0.0,
+                self.algebra.one(),
+                self.algebra.zero(),
             );
             self.sum_hollow_from(
                 labels(indices),
                 &intermediate,
                 labels(indices),
-                1.0,
-                1.0,
+                self.algebra.one(),
+                self.algebra.one(),
             );
         } else {
-            intermediate.sum_sy_recursive(indices, nonsymmetric, indices, 1.0, 0.0);
-            self.sum_sy_recursive(indices, &intermediate, indices, 1.0, 1.0);
+            intermediate.sum_sy_recursive(
+                indices,
+                nonsymmetric,
+                indices,
+                self.algebra.one(),
+                self.algebra.zero(),
+            );
+            self.sum_sy_recursive(
+                indices,
+                &intermediate,
+                indices,
+                self.algebra.one(),
+                self.algebra.one(),
+            );
         }
     }
 }

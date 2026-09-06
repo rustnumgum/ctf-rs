@@ -282,3 +282,8 @@ harness = false
 name = "distributed_sy_sum"
 path = "tests/distributed_sy_sum.rs"
 harness = false
+
+[[test]]
+name = "distributed_sy_scalars"
+path = "tests/distributed_sy_scalars.rs"
+harness = false

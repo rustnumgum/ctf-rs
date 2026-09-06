@@ -677,3 +677,20 @@ Consequently transposed SY-to-SY raw tasks cover the full aligned canonical
 domain, rather than only the unaligned diagonal intersection. Earlier notes
 describing that transposed case as diagonal-only are superseded by this source
 correction; identity-map repack semantics remain unchanged.
+
+## Generic SY scalar algebra (2026-09-07)
+
+The SY orchestration now uses Group/Semiring algebra operations and owned
+coefficients instead of hardcoded f64 arithmetic. The independently written
+CastFromF64 capability in scalar_conversion.rs makes the source cast_double
+coefficient conversion explicit for custom algebras. Built-in arithmetic
+supports f32/f64, i32/i64 and complex f32/f64. Integer fractional conversions
+truncate, matching the relevant source coefficient casts; they are not silently
+promoted to floating point. Conversion callers require finite representable
+coefficients. No numerical backend framework or implicit custom-algebra
+fallback is introduced.
+
+The source recursion, transpose tasks and coincidence-surface formula are
+unchanged. Algebra and element cloning follows ownership needs, with no Copy
+requirement on custom elements. Full cross-group diagonal semantics and source
+higher-order coincidence limitations remain separate from this scalar extension.
