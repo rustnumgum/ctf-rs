@@ -148,3 +148,12 @@ two-input broadcast and cleanup of nonroot input replicas. The implementation
 preserves ctr_replicate's Reduce semantics rather than substituting Allreduce.
 These are local-block execution layers; 2D communication, BLAS folding and
 Tensor-level contraction integration remain unfinished.
+
+## 2026-09-06: folded local BLAS batches
+
+`OPENBLAS_NUM_THREADS=1 cargo test --test folded_contraction`: 3 tests PASS once.
+Exact small-integer-valued f64 cases cover contiguous batches with alpha/beta,
+planner-supplied transposed-output flags/operand swapping, and zero reduction
+length. The entry point calls the replaceable LocalKernels trait, initially BLAS.
+It executes an already-folded plan; automatic folding and the 2D communication
+planner remain unfinished.

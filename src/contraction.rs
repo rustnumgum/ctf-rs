@@ -2,6 +2,35 @@
 // Dense NS reference branch adapted from contraction/sym_seq_ctr.cxx.
 use crate::{algebra::Semiring,summation::Indices};
 
+/// Parameters supplied by upstream-style folding. Transpose flags are the GEMM
+/// flags chosen by the planner; transposed_output swaps operands/dimensions just
+/// as sym_seq_ctr_inr does, rather than inferring or changing those flags here.
+#[derive(Clone,Copy)]
+pub struct Folded {
+    pub m: usize, pub n: usize, pub k: usize, pub batches: usize,
+    pub trans_a: crate::linalg::Transpose, pub trans_b: crate::linalg::Transpose,
+    pub transposed_output: bool,
+}
+
+/// CPU contiguous-batch kernel from interface/semiring.cxx and sym_seq_ctr_inr.
+/// K is a compile-time local-kernel choice (initially native BLAS), not a plugin.
+pub fn folded_f64<K: crate::linalg::LocalKernels>(plan: Folded, a: &[f64],b: &[f64],c: &mut [f64],alpha: f64,beta: f64) {
+    use crate::linalg::{Gemm,Transpose};
+    let (sa,sb,sc) = (plan.m*plan.k,plan.k*plan.n,plan.m*plan.n);
+    assert_eq!(a.len(),sa*plan.batches); assert_eq!(b.len(),sb*plan.batches); assert_eq!(c.len(),sc*plan.batches);
+    // The inner contraction scales C before invoking batch GEMM with beta=1.
+    if beta == 0. {c.fill(0.);} else if beta != 1. {for value in c.iter_mut() {*value *= beta;}}
+    for batch in 0..plan.batches {
+        let a = &a[batch*sa..(batch+1)*sa]; let b = &b[batch*sb..(batch+1)*sb];
+        let c = &mut c[batch*sc..(batch+1)*sc];
+        let (m,n,ta,tb,a,b) = if plan.transposed_output {(plan.n,plan.m,plan.trans_b,plan.trans_a,b,a)}
+            else {(plan.m,plan.n,plan.trans_a,plan.trans_b,a,b)};
+        let lda = match ta {Transpose::No=>m,Transpose::Yes=>plan.k}.max(1);
+        let ldb = match tb {Transpose::No=>plan.k,Transpose::Yes=>n}.max(1);
+        K::gemm(Gemm {trans_a:ta,trans_b:tb,m,n,k:plan.k,alpha,a,lda,b,ldb,beta:1.,c,ldc:m.max(1)});
+    }
+}
+
 /// ctr_virt traversal, applying beta once to each visited local C virtual block.
 pub fn virtualized<A: Semiring>(algebra: &A,
     shape_a: &[usize], virtual_a: &[usize], indices_a: &str, a: &[A::Element],
