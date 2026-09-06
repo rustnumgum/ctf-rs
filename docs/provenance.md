@@ -324,3 +324,19 @@ auxiliary-first matrices are supported: the pinned semiring matrix kernel
 asserts on auxiliary-last storage. f64 arithmetic only at present; generic
 semirings, sparse tensor integration and specialized source redistribution
 kernels remain pending. Native-library selection is unaffected.
+
+## Tensor SVD and reshape (2026-09-07)
+
+tensor_svd.rs follows interface/multilinear.cxx's indexed tensor SVD: order
+left non-auxiliary modes before right non-auxiliary modes, flatten to a matrix,
+invoke the existing distributed deterministic/truncated or randomized matrix
+SVD, reshape the factors, then move the auxiliary index to its requested
+position. The singular-value vector determines the actual retained rank.
+No C++ expressions, pointers to output tensors or full matrix gather are used.
+
+reshape.rs implements reshape_tensor's general canonical-key read/write path
+from tensor/untyped_tensor.cxx, preserving column-major flattened indices.
+It accepts an explicit target distribution and works with the crate's monoids.
+Upstream's optimized merge_modes/split_modes and unit-length aliases remain
+unported; using the general key path does not close those optimization items.
+Tensor SVD is not tensor-train SVD or batched SVD; those remain distinct scope.

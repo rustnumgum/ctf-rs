@@ -180,3 +180,9 @@ harness = false
 name = "distributed_mttkrp"
 path = "tests/distributed_mttkrp.rs"
 harness = false
+
+[[test]]
+name = "distributed_tensor_svd"
+path = "tests/distributed_tensor_svd.rs"
+harness = false
+required-features = ["native-scalapack"]

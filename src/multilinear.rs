@@ -8,6 +8,12 @@ use crate::{algebra::Arithmetic, mapping::{Distribution, Mapping}, tensor::Tenso
 #[path = "multilinear_kernel.rs"]
 mod kernel;
 
+#[path = "reshape.rs"]
+mod reshape;
+#[cfg(feature = "native-scalapack")]
+#[path = "tensor_svd.rs"]
+pub mod tensor_svd;
+
 // TTTP factors follow the tensor's physical mode, not its virtual blocks.
 fn physical_mapping(mapping: &Mapping) -> Mapping {
     match mapping {

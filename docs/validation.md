@@ -528,3 +528,22 @@ the test oracle's auxiliary coordinate and scratch-buffer reuse were corrected
 before that first run. All passed: DIGIT / PASS, no diagnostics or repeats.
 This closes the tested dense f64 MTTKRP path, not sparse/generic multilinear
 scope, Solve_Factor, tensor SVD, or the full Windows-native acceptance.
+
+## Indexed tensor SVD and reshape (2026-09-07)
+
+distributed_tensor_svd passed once each on WSL Ubuntu-26.04 with 1/2/4 ranks,
+including parity subcommunicators. Native matrices stay distributed throughout.
+Source test_la.py::test_tsvd shape [4,5,6,3] and output layouts ija/akl,
+ika/ajl, iakj/la, alk/jai exercise input regrouping and arbitrary auxiliary
+placement. Smaller [3,2,2] fixtures also cover explicit rank-one truncation
+and fixed-seed randomized tensor SVD, without adding stochastic studies.
+Reconstruction uses the source Frobenius norm / total elements <1e-6;
+factor orthogonality uses source L1 <=1e-3 OR relative L1 <=1e-3.
+No eigenvector or singular-vector component comparisons are used.
+
+Reshape preserves exact flattened values and the requested distribution for
+[3,2,2] -> [4,3] with ownership changes and [1] -> [1,1] with empty shards.
+The combined module/test review corrected the test Gram-output index labels
+before the first run. All passed, DIGIT / PASS; no additional numerical runs.
+Other scalar types, optimized merge/split reshapes, tensor-train/batched SVD
+and remaining CPU/native Windows coverage are not claimed complete.
