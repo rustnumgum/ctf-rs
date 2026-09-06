@@ -350,3 +350,13 @@ time/memory filters, changed-signature invalidation, reset and virtual replicati
 factor. Metadata uses exactly representable values; no timing accuracy is claimed.
 DIGIT / PASS, class R, tolerance 0. Automatic candidate discovery and full-tree
 time/peak-memory estimation are not validated by this explicit selection test.
+
+## 2026-09-07: recursive tree cost arithmetic
+
+WSL `plan_cost` 2 tests PASS with exact synthetic coefficients: virtual repeats,
+panel layers including layers>steps, nested panel child-layer reset, replicated
+broadcast/reduction, auxiliary maxima and additive work memory. Source inspection
+then identified that ctr_virt inherits a zero internode-volume estimator rather
+than multiplying child volume; this fidelity defect was corrected and only the
+affected recursion_and_layers test rerun, PASS. Unchanged replica test was not
+repeated. DIGIT / PASS, class R, exact formulas; no wall-time or RSS accuracy claim.

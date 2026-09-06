@@ -140,3 +140,18 @@ Tensor::contract_with_plan. Time/memory metadata must be supplied explicitly;
 automatic full-tree costs and candidate generation remain pending. The upstream
 unimplemented allgather() method is not exported as a Rust placeholder.
 Clearing or changing candidate signature also clears stale selected state.
+
+## Recursive execution-tree cost formulas (2026-09-07)
+
+`src/plan_cost.rs` ports local, virtual, replicated and 2D-panel time/mem_rec
+formulas from ctr_tsr.cxx, ctr_comm.cxx and ctr_2d_general.cxx. Panel work memory
+includes all three panels plus the largest moving auxiliary panel; virtual
+bookkeeping retains source sizeof(int)=4 and VIRT_NTD=1. Layer division resets
+the child's layer argument to 1 at panel nodes, as upstream. Node counts use
+the source comm_nodes volume formula, not inferred hardware measurements.
+ctr_virt does not override the base internode-volume estimator, so its reported
+volume is zero in this revision, even though its time estimate recurses.
+
+These are source-model work bytes, not actual Rust peak RSS or total residency.
+Automatic execution-tree construction, redist/fold resident-memory accounting
+and feeding complete costs into candidate discovery remain pending.

@@ -22,4 +22,5 @@ pub mod model;
 pub mod cost;
 pub mod initial_models;
 pub mod selector;
+pub mod plan_cost;
 mod ffi;
