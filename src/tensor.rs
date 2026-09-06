@@ -40,6 +40,39 @@ impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
 }
 
 impl<A: Semiring> Tensor<'_, '_, A> where A::Element: Wire {
+    /// Align unique-label operands on a requested topology using the upstream
+    /// physical-axis assignment primitive, execute, and restore output layout.
+    /// Returns a mapping candidate rejection without changing either tensor.
+    pub fn sum_from_on_grid(&mut self,indices_b: &str,input: &Self,indices_a: &str,
+        topology: crate::mapping::Topology,alpha: A::Element,beta: A::Element) -> Result<(),crate::map_tensor::Rejected>
+    where A: Clone {
+        use crate::mapping::Mapping;
+        assert!(std::ptr::eq(self.context,input.context));assert_eq!(topology.size(),self.context.size());
+        let mut labels=Vec::new();let mut shape=Vec::new();
+        for (indices,distribution) in [(indices_a,&input.distribution),(indices_b,&self.distribution)] {
+            assert!(indices.is_ascii());assert_eq!(indices.len(),distribution.shape.len());
+            for (i,label) in indices.bytes().enumerate() {
+                assert!(!indices.as_bytes()[..i].contains(&label),"unique labels required by this entry point");
+                if let Some(j)=labels.iter().position(|&l|l==label) {assert_eq!(shape[j],distribution.shape[i]);}
+                else {labels.push(label);shape.push(distribution.shape[i]);}
+            }
+        }
+        let mut maps=vec![Mapping::Unmapped;labels.len()];
+        // A scalar has no mapped dimensions; all physical axes remain replicas.
+        if !labels.is_empty() {
+            crate::map_tensor::assign(&shape,&topology,&(0..topology.dimensions.len()).collect::<Vec<_>>(),
+                &vec![false;labels.len()*labels.len()],&mut vec![false;labels.len()],&mut maps,true)?;
+        }
+        let mapped=|indices:&str,shape:&[usize]|Distribution::new(shape.to_vec(),topology.clone(),
+            indices.bytes().map(|label|maps[labels.iter().position(|&l|l==label).unwrap()].clone()).collect());
+        let mut a=Self {context:input.context,algebra:input.algebra.clone(),distribution:input.distribution.clone(),data:input.data.clone()};
+        let mut b=Self {context:self.context,algebra:self.algebra.clone(),distribution:self.distribution.clone(),data:self.data.clone()};
+        a.redistribute(mapped(indices_a,&a.distribution.shape));
+        b.redistribute(mapped(indices_b,&b.distribution.shape));
+        b.sum_from_aligned(indices_b,&a,indices_a,alpha,beta);
+        b.redistribute(self.distribution.clone());self.data=b.data;
+        Ok(())
+    }
     /// Collective sum for unique labels with explicitly aligned distributions.
     /// Shared labels have identical maps; each topology axis maps to the same
     /// label in both operands, or to only one operand. Automatic remapping is

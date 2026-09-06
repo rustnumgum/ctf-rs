@@ -21,6 +21,7 @@ pub trait Ring: Group + Semiring {}
 impl<A: Group + Semiring> Ring for A {}
 
 /// User-defined associative addition with its explicit identity.
+#[derive(Clone)]
 pub struct CustomMonoid<T, Add> {
     pub identity: T,
     pub addition: Add,
@@ -31,6 +32,7 @@ impl<T: Clone + PartialEq, Add: Fn(&T, &T) -> T> Monoid for CustomMonoid<T, Add>
     fn add(&self, a: &T, b: &T) -> T { (self.addition)(a, b) }
 }
 
+#[derive(Clone)]
 pub struct CustomSemiring<M: Monoid, Mul> {
     pub monoid: M,
     pub identity: M::Element,
@@ -50,6 +52,7 @@ impl<M: Monoid, Mul: Fn(&M::Element, &M::Element) -> M::Element> Semiring for Cu
     }
 }
 
+#[derive(Clone)]
 pub struct CustomRing<S: Semiring, Neg> {
     pub semiring: S,
     pub negation: Neg,

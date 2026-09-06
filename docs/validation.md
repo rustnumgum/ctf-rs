@@ -211,3 +211,12 @@ test-only temporary-borrow compile fix. Exact small-integer complex values cover
 f32/f64 arithmetic, conjugation, norm squared, local indexed contraction, native
 MPI user reduction, distributed key I/O and scaling. Complex native BLAS/LAPACK/
 ScaLAPACK bindings are not supplied by this scalar-algebra addition.
+
+## 2026-09-06: summation distribution alignment
+
+`cargo test --test sum_remap` under MPI at 1,2,4: PASS once each, exact integers.
+The new `sum_from_on_grid` assigns union indices with map_tensor on a requested
+topology, redistributes local data, executes generic aligned sums, and restores
+the output layout. Tested combined reduction/broadcast and transpose on uneven
+dimensions, including a 2x2 grid. No global tensor gather is used. Repeated labels
+and cost-based choice among topology candidates remain pending.

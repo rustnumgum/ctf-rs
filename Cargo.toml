@@ -65,3 +65,8 @@ harness = false
 name = "complex_scalar"
 path = "tests/complex_scalar.rs"
 harness = false
+
+[[test]]
+name = "sum_remap"
+path = "tests/sum_remap.rs"
+harness = false
