@@ -167,3 +167,13 @@ Unlike the upstream surrounding mutable tensor search, this consumes explicitly
 supplied complete candidate estimates. It excludes exhaustive candidates: their
 different incumbent/refinement logic and automatic mapping generation remain
 pending. Selection cannot compensate for incomplete supplied memory estimates.
+
+## Local packed symmetry layout (2026-09-07)
+
+`src/symmetry.rs` adapts shared/util.cxx packed_size/sy_packed_size recurrences
+and combinatorial offset summation from shared/iter_tsr.h. Rust-owned Packed
+adds local canonical coordinate reads/additive writes, adjacent-swap AS parity
+and AS/SH structural zeros. This is not a port of sym_indices alignment or
+symmetrization contraction factors. u128 intermediate products replace signed
+intermediate products. True AS/SH sizes and SY-compatible intermediate sizes are
+separate. Distributed packed tensor ownership and contraction remain pending.

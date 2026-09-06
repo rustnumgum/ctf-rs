@@ -370,3 +370,14 @@ order and exclusion of exhaustive candidates. The selected plan executes an
 exact integer contraction. DIGIT / PASS, class R, tolerance 0. This does not
 validate automatic candidate enumeration, exhaustive refinement, total-memory
 estimation or a low-memory executor.
+
+## 2026-09-07: local compressed symmetry
+
+symmetry_layout: both local tests now PASS. Exact checks enumerate canonical
+3-axis coordinates at length 4 for SY/AS/SH, verifying sizes and column-major
+offsets; mixed groups, scalars, empty groups, AS permutation parity, signed
+additive writes and SH diagonal zeros are covered. Initial mixed-group test
+expected 64 incorrectly; the analytical offset is 4+6+4*12=58. Corrected that
+reference and reran only the failed test; signed-storage pass was not repeated.
+DIGIT / PASS, class R, tolerance 0. No floating-point runs. Distributed packed
+symmetry, alignment multiplicities and upstream symmetry CPU tests remain open.
