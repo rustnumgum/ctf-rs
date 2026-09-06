@@ -407,3 +407,23 @@ runs or extra diagnostics; previous passing suites were not rerun. These remain
 local checks, not full upstream distributed symmetry acceptance. This batch
 combines the related APIs and tests in one stage commit rather than stopping
 after the initial triple-alignment helper.
+
+## 2026-09-07: high-order BLAS layout and distributed execution
+
+One combined source/API review of the delegated local fold implementation and
+its parent MPI integration was completed before acceptance. Local folding 3/3
+PASS once: reordered high-order/multiple contraction labels/shared batches,
+outer products, alpha/beta and explicit unsupported-fold rejection. New
+tensor_blas_fold PASS once at 1/2/4 ranks, including split subcontexts, uneven
+high-order distributed shapes, output layout restoration, empty contracted
+dimension, scalar operands and outer products. Those f64 fixtures represent
+small integers and use exact equality.
+
+upstream_gemm4d NS PASS once at 1/2/4 ranks. Maximum observed elementwise
+associativity difference across those runs was approximately 4.0e-15, below the
+source strict 1e-6 bound. DIGIT / PASS; no precision explanation, stricter bound,
+extra numerical diagnostics or repetitions of earlier passing suites.
+
+This closes the new explicit-grid full-NS BLAS path only. SY/AS upstream test
+branches, partial folding, automatic full candidate discovery, low-memory
+execution, distributed decompositions and Windows native acceptance remain open.

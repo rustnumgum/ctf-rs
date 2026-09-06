@@ -2,7 +2,68 @@
 //! Distributed dense storage and key-based all-to-all read/write.
 use crate::{algebra::{Monoid, Semiring, Wire}, context::Context, mapping::Distribution};
 
+#[derive(Debug)]
+pub enum BlasContractionError { Mapping(crate::map_tensor::Rejected), Folding(crate::folding::Rejected) }
+
 impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
+    /// Fully foldable unique-label dense contraction on an explicit grid. Uses
+    /// upstream aligned replication/virtual traversal with a folded BLAS child.
+    /// Unsupported folds return an error before any tensor redistribution; no
+    /// reference-kernel fallback or global gather is hidden here.
+    pub fn contract_blas_on_grid<K:crate::linalg::LocalKernels>(&mut self,indices_c:&str,
+        a:&Self,indices_a:&str,b:&Self,indices_b:&str,topology:crate::mapping::Topology,
+        alpha:f64,beta:f64)->Result<(),BlasContractionError> {
+        assert!(std::ptr::eq(self.context,a.context)&&std::ptr::eq(self.context,b.context));
+        assert_eq!(topology.size(),self.context.size());
+        let indices=[indices_a,indices_b,indices_c];
+        // Check semantic foldability before asking the mapping layer to assign it.
+        crate::folding::Plan::new([&a.distribution.shape,&b.distribution.shape,&self.distribution.shape],indices)
+            .map_err(BlasContractionError::Folding)?;
+        let plan=crate::planning::GridPlan::prepare([&a.distribution,&b.distribution,&self.distribution],indices,topology)
+            .map_err(BlasContractionError::Mapping)?;
+        let mapped=plan.mapped_distributions();
+        let shapes:Vec<_>=mapped.iter().map(|d|d.block_shape()).collect();
+        let local=crate::folding::Plan::new([&shapes[0],&shapes[1],&shapes[2]],indices)
+            .map_err(BlasContractionError::Folding)?;
+        let phases:Vec<Vec<_>>=mapped.iter().map(|d|d.mappings.iter().map(|m|m.phase()/m.physical_phase()).collect()).collect();
+        let block_sizes:Vec<usize>=shapes.iter().map(|shape|shape.iter().product()).collect();
+        let mut aa=Self{context:a.context,algebra:a.algebra,distribution:a.distribution.clone(),data:a.data.clone()};
+        let mut bb=Self{context:b.context,algebra:b.algebra,distribution:b.distribution.clone(),data:b.data.clone()};
+        let mut cc=Self{context:self.context,algebra:self.algebra,distribution:self.distribution.clone(),data:self.data.clone()};
+        aa.redistribute(mapped[0].clone());bb.redistribute(mapped[1].clone());cc.redistribute(mapped[2].clone());
+        fn mark(map:&crate::mapping::Mapping,used:&mut [bool]) {
+            use crate::mapping::Mapping;
+            match map {Mapping::Unmapped=>{},Mapping::Virtual{child,..}=>mark(child,used),
+                Mapping::Physical{axis,child,..}=>{used[*axis]=true;mark(child,used);}}
+        }
+        let topology=&mapped[0].topology;
+        let mut used=vec![vec![false;topology.dimensions.len()];3];
+        for operand in 0..3 {for map in &mapped[operand].mappings {mark(map,&mut used[operand]);}}
+        let mut comms:[Vec<Context<'_>>;3]=std::array::from_fn(|_|Vec::new());
+        for axis in 0..topology.dimensions.len() {
+            if !(0..3).any(|operand|used[operand][axis]) {continue;}
+            for operand in 0..3 {if !used[operand][axis] {comms[operand].push(topology.fiber(self.context,axis));}}
+        }
+        for comm in &comms[0] {comm.broadcast(0,&mut aa.data);}
+        for comm in &comms[1] {comm.broadcast(0,&mut bb.data);}
+        let root=comms[2].iter().all(|comm|comm.rank()==0);
+        if root {
+            if beta==0. {cc.data.fill(0.);} else if beta!=1. {for value in &mut cc.data {*value*=beta;}}
+        }
+        let space=crate::summation::Indices::new(&[(&phases[0],indices_a),(&phases[1],indices_b),(&phases[2],indices_c)]);
+        let mut visited=vec![false;phases[2].iter().product()];
+        space.for_each(|offsets| {
+            let [ia,ib,ic]=[offsets[0],offsets[1],offsets[2]];
+            local.execute::<K>(&aa.data[ia*block_sizes[0]..(ia+1)*block_sizes[0]],
+                &bb.data[ib*block_sizes[1]..(ib+1)*block_sizes[1]],
+                &mut cc.data[ic*block_sizes[2]..(ic+1)*block_sizes[2]],alpha,
+                if root||visited[ic] {1.} else {0.});
+            visited[ic]=true;
+        });
+        for comm in &comms[2] {comm.reduce_f64(0,&mut cc.data);}
+        for group in comms {for comm in group {comm.close();}}
+        cc.redistribute(self.distribution.clone());self.data=cc.data;Ok(())
+    }
     /// Explicit-grid distributed matrix multiplication C = alpha*A*B + beta*C.
     /// Cyclic k phases are equalized to lcm(grid rows, grid columns), then the
     /// upstream 2D panel executor drives local BLAS. Original distributions stay.

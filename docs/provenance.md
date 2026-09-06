@@ -200,3 +200,26 @@ endomorphisms touch only represented coordinates. These use the true compressed
 layout, not a port of the source SY-padded intermediate iterator ABI. The tensor
 symmetrize/desymmetrize routines, permutation execution, and distributed packed
 mapping still need implementation. No dense tensor expansion is used here.
+
+## Integrated high-order BLAS folding (2026-09-07)
+
+`src/folding.rs` adapts get_len_ordering/calc_fold_lnmk's fully foldable NS path:
+AB/AC/BC/ABC label classes become k/m/n/l; canonical packed buffers A[k,m,l],
+B[k,n,l], C[m,n,l] use the existing folded_f64 kernel with A transposed. It
+restores C's original axis order after the batch GEMMs. This implements one
+source layout choice, not the six-way transpose-cost search. Single-operand
+labels and repeated labels explicitly reject at this entry point; no silent
+reference fallback is introduced. Partial/symmetric folding remains pending.
+
+Tensor::contract_blas_on_grid combines existing GridPlan mapping with local
+folding through ctr_replicate-style input broadcasts, root-only beta, virtual
+block traversal and output root Reduce. Explicit key redistribution restores the
+output tensor distribution. Input clones preserve caller ownership. It does not
+gather a global tensor or replace the requested distributed execution with a
+single-rank GEMM. Automatic generic API dispatch and node-aware/2D plan building
+are separate, still unfinished tasks. Compile-time LocalKernels remains the
+native BLAS/faer substitution boundary.
+
+`tests/upstream_gemm4d.rs` ports the NS associativity branch of test/gemm_4D.cxx,
+using n=7, rank-seeded drand48 and the original strict elementwise 1e-6 bound.
+Rust uses separate intermediates instead of aliasing output/input expressions.

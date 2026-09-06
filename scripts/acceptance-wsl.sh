@@ -8,7 +8,7 @@ export OPENBLAS_NUM_THREADS=1
 # Each required rank configuration runs once; failed commands stop the set.
 mpi_tests=(foundation dense_views replicated_sum tensor_sum custom_reduce algebra_sum
   complex_scalar sum_remap replicated_contraction ctr_2d tensor_gemm
-  algebra_contraction tensor_contract contract_remap dense_semantics upstream_dense subcomm_dense plan_cache model_training selector selection_objective)
+  algebra_contraction tensor_contract contract_remap dense_semantics upstream_dense subcomm_dense plan_cache model_training selector selection_objective tensor_blas_fold upstream_gemm4d)
 args=()
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
@@ -17,4 +17,4 @@ for ranks in 1 2 4; do
 done
 cargo test --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
   --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction \
-  --test sparse_formats --test cost_models --test plan_cost --test symmetry_layout --test sym_indices --test sym_triple --test sym_operations -- --nocapture
+  --test sparse_formats --test cost_models --test plan_cost --test symmetry_layout --test sym_indices --test sym_triple --test sym_operations --test folding -- --nocapture

@@ -26,4 +26,5 @@ pub mod plan_cost;
 pub mod symmetry;
 pub mod sym_indices;
 pub mod sym_permutations;
+pub mod folding;
 mod ffi;

@@ -99,7 +99,7 @@ src/contraction/contraction_plan.h	src/planning.rs	partial: executable explicit-
 src/contraction/contraction_selector.h	src/contraction	pending
 src/contraction/contraction_signature.cxx	src/planning.rs	partial: dense structural signature and context-scoped cache; sparse/symmetry signatures pending
 src/contraction/contraction_signature.h	src/planning.rs	partial: dense structural signature, full collision-safe equality
-src/contraction/contraction.cxx	src/contraction	pending
+src/contraction/contraction.cxx	src/folding.rs; src/planning.rs; src/selector.rs	partial: full NS fold ordering/BLAS execution, explicit-grid plans and candidate selection; automatic/general/symmetric planning pending
 src/contraction/contraction.h	src/contraction	pending
 src/contraction/ctr_2d_general.cxx	src/contraction	pending
 src/contraction/ctr_2d_general.h	src/contraction	pending
@@ -178,7 +178,7 @@ test/diag_sym.cxx	tests/upstream/test/diag_sym.rs	pending
 test/endomorphism_cust_sp.cxx	tests/upstream/test/endomorphism_cust_sp.rs	pending
 test/endomorphism_cust.cxx	tests/upstream/test/endomorphism_cust.rs	pending
 test/endomorphism.cxx	tests/upstream/test/endomorphism.rs	pending
-test/gemm_4D.cxx	tests/upstream/test/gemm_4D.rs	pending
+test/gemm_4D.cxx	tests/upstream_gemm4d.rs	NS associativity port PASS WSL 1/2/4; SY/AS branches pending
 test/Makefile	Cargo/build tooling	replaced
 test/multi_tsr_sym.cxx	tests/upstream/test/multi_tsr_sym.rs	pending
 test/permute_multiworld.cxx	tests/upstream/test/permute_multiworld.rs	pending
