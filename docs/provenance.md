@@ -512,3 +512,23 @@ The pinned distributed symmetry source audit is recorded in
 distributed-symmetry-layout.md. It establishes local SY-sized storage with
 padding/noncanonical holes, including for AS/SH; it is not an implementation
 or acceptance claim for distributed compressed symmetry.
+
+## Distributed compressed storage (2026-09-07)
+
+src/symmetric_distribution.rs implements the pinned layout rules documented
+in distributed-symmetry-layout.md: equal group total phases, per-virtual-block
+SY-sized packing for SY/AS/SH, and removal of global noncanonical/padded holes
+from visible local pairs. Global normalization preserves AS permutation sign.
+The rectangular distribution remains the physical ownership model, not the
+compressed local offset model.
+
+src/symmetric_tensor.rs owns those compressed slots and borrows its explicit
+communication context. Indexed writes canonicalize and sign-adjust before
+routing to owners/replicas; reads preserve caller ordering and return AS/SH
+structural zeros. Same-symmetry redistribution routes only canonical owner
+entries and never gathers or materializes the full NS tensor. Local transforms
+touch valid canonical entries only, leaving allocated holes at additive zero.
+Communication currently uses key-based exchange rather than all optimized
+upstream cyclic reshuffle/readwrite kernels. Symmetry-changing repack,
+distributed symmetric sums/contractions and automatic symmetry mapping remain
+pending; this storage implementation does not imply their completion.

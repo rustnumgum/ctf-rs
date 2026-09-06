@@ -32,3 +32,5 @@ pub mod folding;
 #[cfg(feature = "native-scalapack")]
 pub mod matrix;
 mod ffi;
+pub mod symmetric_distribution;
+pub mod symmetric_tensor;

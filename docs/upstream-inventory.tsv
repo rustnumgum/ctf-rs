@@ -135,7 +135,7 @@ src/redistribution/glb_cyclic_reshuffle.h	src/redistribution	pending
 src/redistribution/Makefile	Cargo/build tooling	replaced
 src/redistribution/nosym_transp.cxx	src/redistribution	pending
 src/redistribution/nosym_transp.h	src/redistribution	pending
-src/redistribution/pad.cxx	src/redistribution	pending
+src/redistribution/pad.cxx	src/symmetric_distribution.rs; src/symmetric_tensor.rs	partial: compressed physical padding and global canonical-hole filtering; optimized source padding kernels pending
 src/redistribution/pad.h	src/redistribution	pending
 src/redistribution/redist.cxx	src/redistribution	pending
 src/redistribution/redist.h	src/redistribution	pending

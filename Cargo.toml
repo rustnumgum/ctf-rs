@@ -237,3 +237,8 @@ harness = false
 name = "distributed_sparse_diagonal"
 path = "tests/distributed_sparse_diagonal.rs"
 harness = false
+
+[[test]]
+name = "distributed_symmetric_io"
+path = "tests/distributed_symmetric_io.rs"
+harness = false

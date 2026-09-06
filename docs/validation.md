@@ -684,3 +684,17 @@ unchanged, including under nonunit beta. The delegated fixture initially
 scaled off-diagonal output by beta; this expectation was corrected during
 integration review before the first run. No runtime failures or retries.
 DIGIT / PASS; integer tolerance zero; no additional numerical checks.
+
+## Distributed compressed symmetric I/O (2026-09-07)
+
+distributed_symmetric_io passed once at each of 1/2/4 MPI ranks with world and
+parity contexts. Exact i64 checks cover SY/AS/SH canonical normalization,
+reversed-coordinate writes, AS permutation signs including three axes,
+structural zeros, repeated requests, duplicate/equivalent writes, local
+transforms, virtual-block redistribution and replicated storage round trips.
+The 5x5 matrix on a 2x2 grid asserts six allocated slots per rank and the
+specific valid offsets/keys on rank coordinates (1,0). All allocated holes
+remain zero. Extent-one cases exercise empty canonical local shards.
+No compilation/runtime failures or retries; DIGIT / PASS, tolerance zero.
+These checks establish compressed storage/I/O, not symmetric contraction or
+symmetry-changing repack. Native Windows acceptance remains pending.
