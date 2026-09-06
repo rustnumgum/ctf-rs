@@ -67,3 +67,12 @@ tensor. Rank-shift semantics follow upstream `redistribution/slice.cxx`.
 
 This closes only these new tests. Slice insertion/accumulation, arbitrary index
 permutations, full summation and contraction are still outstanding.
+
+## 2026-09-06: topology candidate ordering
+
+`cargo test --test topology_candidates`: 2 tests PASS, one execution, exact
+integer comparisons. Tests preserve the ordered prime-power divisor enumeration
+for sizes 1, 4, 7, 12, adjacent-dimension folding order, and permutation/folding
+deduplication order. Implementation ports `get_all_shapes`, `peel_torus`, and
+`peel_perm_torus` from the pinned `src/mapping/topology.cxx`.
+This supplies candidate topology shapes, not a completed contraction planner.

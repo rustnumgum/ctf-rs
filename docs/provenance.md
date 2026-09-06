@@ -9,6 +9,8 @@ Do not stamp independently written files with the upstream author's copyright.
 
 * `src/mapping.rs`: map-chain phase/rank and topology reorder/inverse routines
   adapted from `src/mapping/{mapping,topology,distribution}.cxx`.
+* `src/topology_candidates.rs`: ordered factorization, adjacent folding and
+  permutation/folding enumeration adapted from `src/mapping/topology.cxx`.
 * `src/tensor.rs`: Rust distributed storage implementation using the upstream
   cyclic distribution and key-bucket exchange approach; not a literal complete
   port of all optimized redistribution kernels.

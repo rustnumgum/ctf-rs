@@ -7,6 +7,7 @@
 pub mod algebra;
 pub mod context;
 pub mod mapping;
+pub mod topology_candidates;
 pub mod tensor;
 pub mod linalg;
 mod ffi;
