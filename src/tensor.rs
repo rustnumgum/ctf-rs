@@ -40,6 +40,54 @@ impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
 }
 
 impl<A: Semiring> Tensor<'_, '_, A> where A::Element: Wire {
+    /// Collective unique-label contraction on already aligned distributions.
+    /// Shared labels must have identical maps; mismatched physical labels need
+    /// the 2D/planning layer instead. Native user reductions support custom rings.
+    pub fn contract_from_aligned(&mut self,indices_c:&str,a:&Self,indices_a:&str,b:&Self,indices_b:&str,
+        alpha:A::Element,beta:A::Element) {
+        use crate::mapping::Mapping;
+        assert!(std::ptr::eq(self.context,a.context)&&std::ptr::eq(self.context,b.context));
+        let operands=[(indices_a,&a.distribution),(indices_b,&b.distribution),(indices_c,&self.distribution)];
+        for &(indices,d) in &operands {
+            assert_eq!(d.topology,self.distribution.topology);assert!(indices.is_ascii());assert_eq!(indices.len(),d.shape.len());
+            for (i,label) in indices.bytes().enumerate() {assert!(!indices.as_bytes()[..i].contains(&label),"aligned contraction requires unique labels");}
+        }
+        for i in 0..3 {for j in 0..i {
+            for (di,label) in operands[i].0.bytes().enumerate() {
+                if let Some(dj)=operands[j].0.bytes().position(|l|l==label) {
+                    assert_eq!(operands[i].1.shape[di],operands[j].1.shape[dj]);
+                    assert_eq!(operands[i].1.mappings[di],operands[j].1.mappings[dj]);
+                }
+            }
+        }}
+        fn mark(map:&Mapping,label:u8,axes:&mut [Option<u8>]) {
+            match map {
+                Mapping::Unmapped=>{},
+                Mapping::Physical {axis,child,..}=>{axes[*axis]=Some(label);mark(child,label,axes);},
+                Mapping::Virtual {child,..}=>mark(child,label,axes),
+            }
+        }
+        let topology=&self.distribution.topology;
+        let mut axes=vec![vec![None;topology.dimensions.len()];3];
+        for i in 0..3 {for (map,label) in operands[i].1.mappings.iter().zip(operands[i].0.bytes()) {mark(map,label,&mut axes[i]);}}
+        let mut comms:[Vec<Context<'_>>;3]=std::array::from_fn(|_|Vec::new());
+        for axis in 0..topology.dimensions.len() {
+            let labels:Vec<_>=(0..3).filter_map(|i|axes[i][axis]).collect();
+            if labels.is_empty() {continue;}
+            assert!(labels.iter().all(|&label|label==labels[0]),"mismatched physical labels require 2D communication");
+            for i in 0..3 {if axes[i][axis].is_none() {comms[i].push(topology.fiber(self.context,axis));}}
+        }
+        let phases:Vec<Vec<_>>=operands.iter().map(|(_,d)|d.mappings.iter().map(|m|m.phase()/m.physical_phase()).collect()).collect();
+        let shapes:Vec<_>=operands.iter().map(|(_,d)|d.block_shape()).collect();
+        let mut adata=a.data.clone();let mut bdata=b.data.clone();
+        crate::contraction::replicated(&self.algebra,&comms[0].iter().collect::<Vec<_>>(),&comms[1].iter().collect::<Vec<_>>(),&comms[2].iter().collect::<Vec<_>>(),
+            &shapes[0],&phases[0],indices_a,&mut adata,&shapes[1],&phases[1],indices_b,&mut bdata,
+            &shapes[2],&phases[2],indices_c,&mut self.data,&alpha,&beta,false);
+        for group in comms {for comm in group {comm.close();}}
+        // ctr_replicate leaves valid output on roots only. Key redistribution
+        // reads canonical owners and restores the Tensor's replica invariant.
+        self.redistribute(self.distribution.clone());
+    }
     /// Align unique-label operands on a requested topology using the upstream
     /// physical-axis assignment primitive, execute, and restore output layout.
     /// Returns a mapping candidate rejection without changing either tensor.

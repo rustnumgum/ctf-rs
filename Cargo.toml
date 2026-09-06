@@ -75,3 +75,8 @@ harness = false
 name = "algebra_contraction"
 path = "tests/algebra_contraction.rs"
 harness = false
+
+[[test]]
+name = "tensor_contract"
+path = "tests/tensor_contract.rs"
+harness = false

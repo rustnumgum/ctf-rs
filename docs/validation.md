@@ -228,3 +228,13 @@ exact integer/Boolean results. Generic replicated contraction now uses MPI user
 Reduce with root-only beta and native datatype/operator cleanup. Checks cover
 integer and Boolean contractions and a nonzero reduction root. Generic Tensor-
 level contraction and native typed 2D kernels beyond f64 are still pending.
+
+## 2026-09-06: generic aligned Tensor contraction
+
+`cargo test --test tensor_contract` under MPI at 1,2,4: PASS once each using exact
+integer matrix expectations. The new `contract_from_aligned` identifies topology
+fibers from aligned unique-label maps, invokes generic replicated/virtual/local
+layers, and restores valid output replicas from canonical owners. Tests cover
+combined physical and virtual k reduction and preserving input tensors.
+General repeated-index contraction, automatic remapping/folding and planning are
+not established by this explicitly aligned entry point.
