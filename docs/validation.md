@@ -220,3 +220,11 @@ topology, redistributes local data, executes generic aligned sums, and restores
 the output layout. Tested combined reduction/broadcast and transpose on uneven
 dimensions, including a 2x2 grid. No global tensor gather is used. Repeated labels
 and cost-based choice among topology candidates remain pending.
+
+## 2026-09-06: generic contraction root reductions
+
+`cargo test --test algebra_contraction` under MPI at 1,2,4: PASS once each with
+exact integer/Boolean results. Generic replicated contraction now uses MPI user
+Reduce with root-only beta and native datatype/operator cleanup. Checks cover
+integer and Boolean contractions and a nonzero reduction root. Generic Tensor-
+level contraction and native typed 2D kernels beyond f64 are still pending.

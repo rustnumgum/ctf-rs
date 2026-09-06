@@ -44,7 +44,10 @@ impl Runtime {
 
 impl Comm {
     pub(crate) fn all_reduce_monoid<A: Monoid>(&self,algebra: &A,values: &mut [A::Element],commutative: bool)
+    where A::Element: Wire {self.reduce_monoid(algebra,values,commutative,None);}
+    pub(crate) fn reduce_monoid<A: Monoid>(&self,algebra: &A,values: &mut [A::Element],commutative: bool,root: Option<usize>)
     where A::Element: Wire {
+        if let Some(root)=root {assert!(root<self.size());}
         assert!(A::Element::WIDTH > 0);
         let mut input = Vec::with_capacity(values.len()*A::Element::WIDTH);
         for value in values.iter() {value.encode(&mut input);}
@@ -60,12 +63,18 @@ impl Comm {
                 check(sys::MPI_Type_commit(&mut datatype));
                 let mut operation = std::mem::zeroed();
                 check(sys::MPI_Op_create(Some(monoid_add::<A>),i32::from(commutative),&mut operation));
-                check(sys::MPI_Allreduce(input.as_ptr().cast(),output.as_mut_ptr().cast(),values.len().try_into().unwrap(),datatype,operation,self.raw));
+                if let Some(root)=root {
+                    check(sys::MPI_Reduce(input.as_ptr().cast(),output.as_mut_ptr().cast(),values.len().try_into().unwrap(),datatype,operation,root as i32,self.raw));
+                } else {
+                    check(sys::MPI_Allreduce(input.as_ptr().cast(),output.as_mut_ptr().cast(),values.len().try_into().unwrap(),datatype,operation,self.raw));
+                }
                 check(sys::MPI_Op_free(&mut operation));check(sys::MPI_Type_free(&mut datatype));
             }
             active.set(std::ptr::null());
         });
-        for (value,bytes) in values.iter_mut().zip(output.chunks_exact(A::Element::WIDTH)) {*value = A::Element::decode(bytes);}
+        if root.is_none() || root==Some(self.rank()) {
+            for (value,bytes) in values.iter_mut().zip(output.chunks_exact(A::Element::WIDTH)) {*value = A::Element::decode(bytes);}
+        }
     }
     pub(crate) fn rank(&self) -> usize {
         let mut rank = 0;

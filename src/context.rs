@@ -23,6 +23,9 @@ impl Context<'_> {
     /// invoke MPI or panic. Datatype/operator cleanup is explicit before return.
     pub fn all_reduce_monoid<A: Monoid>(&self,algebra: &A,values: &mut [A::Element],commutative: bool)
     where A::Element: Wire {self.inner.all_reduce_monoid(algebra,values,commutative);}
+    /// Native MPI user reduction to a specified root; nonroots retain contributions.
+    pub fn reduce_monoid<A: Monoid>(&self,algebra: &A,values: &mut [A::Element],commutative: bool,root: usize)
+    where A::Element: Wire {self.inner.reduce_monoid(algebra,values,commutative,Some(root));}
     /// Native MPI sum of one local f64 block. Collective; no global tensor gather.
     pub fn sum_f64(&self, values: &mut [f64]) { self.inner.sum_f64(values); }
     /// Reduce one local block to root; other ranks retain their local contributions.

@@ -2,6 +2,27 @@
 // Dense NS reference branch adapted from contraction/sym_seq_ctr.cxx.
 use crate::{algebra::Semiring,summation::Indices};
 
+/// Generic ctr_replicate layer using native MPI user operations.
+pub fn replicated<A: Semiring>(algebra: &A,
+    a_comms: &[&crate::context::Context<'_>],b_comms: &[&crate::context::Context<'_>],c_comms: &[&crate::context::Context<'_>],
+    shape_a: &[usize],virtual_a: &[usize],indices_a: &str,a: &mut [A::Element],
+    shape_b: &[usize],virtual_b: &[usize],indices_b: &str,b: &mut [A::Element],
+    shape_c: &[usize],virtual_c: &[usize],indices_c: &str,c: &mut [A::Element],
+    alpha: &A::Element,beta: &A::Element,commutative: bool) where A::Element: crate::algebra::Wire {
+    for comm in a_comms {comm.broadcast(0,a);}
+    for comm in b_comms {comm.broadcast(0,b);}
+    let root=c_comms.iter().all(|comm|comm.rank()==0);
+    if root && *beta!=algebra.one() {
+        for value in c.iter_mut() {*value=if *beta==algebra.zero() {algebra.zero()} else {algebra.multiply(beta,value)};}
+    }
+    let child_beta=if root {algebra.one()} else {algebra.zero()};
+    virtualized(algebra,shape_a,virtual_a,indices_a,a,shape_b,virtual_b,indices_b,b,
+        shape_c,virtual_c,indices_c,c,alpha,&child_beta);
+    for comm in c_comms {comm.reduce_monoid(algebra,c,commutative,0);}
+    if a_comms.iter().any(|comm|comm.rank()!=0) {a.fill(algebra.zero());}
+    if b_comms.iter().any(|comm|comm.rank()!=0) {b.fill(algebra.zero());}
+}
+
 /// Parameters supplied by upstream-style folding. Transpose flags are the GEMM
 /// flags chosen by the planner; transposed_output swaps operands/dimensions just
 /// as sym_seq_ctr_inr does, rather than inferring or changing those flags here.
