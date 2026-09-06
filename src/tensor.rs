@@ -350,6 +350,7 @@ impl<A: Semiring> Tensor<'_, '_, A> where A::Element: Wire {
     }
 }
 
+#[derive(Clone)]
 pub struct Tensor<'context, 'runtime, A: Monoid> {
     context: &'context Context<'runtime>,
     algebra: A,

@@ -9,8 +9,9 @@ description = "Rust CPU/MPI port of the cc4s Cyclops Tensor Framework"
 mpi-sys = "0.2"
 
 [features]
-default = ["native-linalg"]
+default = ["native-linalg", "native-scalapack"]
 native-linalg = []
+native-scalapack = ["native-linalg"]
 
 [lib]
 path = "src/lib.rs"
@@ -139,3 +140,9 @@ name = "upstream_gemm4d"
 path = "tests/upstream_gemm4d.rs"
 harness = false
 required-features = ["native-linalg"]
+
+[[test]]
+name = "distributed_matrix"
+path = "tests/distributed_matrix.rs"
+harness = false
+required-features = ["native-scalapack"]

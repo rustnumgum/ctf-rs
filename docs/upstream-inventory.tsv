@@ -66,8 +66,8 @@ src/interface/idx_tensor.h	src/interface	pending
 src/interface/kernel.h	src/interface	pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
-src/interface/matrix.cxx	src/interface	pending
-src/interface/matrix.h	src/interface	pending
+src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: explicit-grid f64 distributed Cholesky and triangular solve; other matrix routines pending
+src/interface/matrix.h	src/matrix.rs	partial direct Rust Tensor matrix APIs
 src/interface/monoid.cxx	src/interface	pending
 src/interface/monoid.h	src/interface	pending
 src/interface/multilinear.cxx	src/interface	pending
@@ -198,7 +198,7 @@ test/python/test_base.py	Rust semantic tests (no Python interface)	pending
 test/python/test_dot.py	Rust semantic tests (no Python interface)	pending
 test/python/test_einsum.py	Rust semantic tests (no Python interface)	pending
 test/python/test_fancyindex.py	Rust semantic tests (no Python interface)	pending
-test/python/test_la.py	Rust semantic tests (no Python interface)	pending
+test/python/test_la.py	tests/distributed_matrix.rs	partial f64 Cholesky/triangular solve reconstruction criteria PASS WSL 1/2/4; other types/algorithms pending
 test/python/test_partition.py	Rust semantic tests (no Python interface)	pending
 test/python/test_sparse.py	Rust semantic tests (no Python interface)	pending
 test/python/test_ufunc.py	Rust semantic tests (no Python interface)	pending

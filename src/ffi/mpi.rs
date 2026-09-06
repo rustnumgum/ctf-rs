@@ -139,6 +139,10 @@ impl Comm {
             output.as_mut_ptr().cast(),1,sys::RSMPI_INT32_T,self.raw));}
         output
     }
+    #[cfg(feature = "native-scalapack")]
+    pub(crate) fn scalapack_grid(&self,rows:usize,cols:usize)->super::scalapack::Grid {
+        assert_eq!(rows*cols,self.size());super::scalapack::Grid::new(self.raw,rows,cols)
+    }
     pub(crate) fn gather_plan_cost(&self,seconds:f64,memory:i64)->(Vec<f64>,Vec<i64>) {
         let mut times=vec![0.;self.size()];let mut bytes=vec![0i64;self.size()];
         unsafe {

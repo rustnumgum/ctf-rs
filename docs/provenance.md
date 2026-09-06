@@ -223,3 +223,25 @@ native BLAS/faer substitution boundary.
 `tests/upstream_gemm4d.rs` ports the NS associativity branch of test/gemm_4D.cxx,
 using n=7, rank-seeded drand48 and the original strict elementwise 1e-6 bound.
 Rust uses separate intermediates instead of aliasing output/input expressions.
+
+## Distributed ScaLAPACK Cholesky and triangular solves (2026-09-07)
+
+`src/matrix.rs` adapts interface/matrix.cxx's NS cholesky/solve_tri sequence:
+read into descriptor distribution, PDPOTRF or PDTRSM, reconstruct distributed
+tensor and (for Cholesky) retain the requested triangle. This first entry point
+accepts an explicit grid and uses block size 1, retaining cyclic local storage;
+it does not implement automatic descriptor selection or the separate solve_spd
+padding/PPOSV algorithm. Source tensors remain unchanged via owned local clones.
+
+`src/ffi/scalapack.rs` independently binds BLACS/DESCINIT/PDPOTRF/PDTRSM. Native
+handles remain internal; the grid comes from the supplied MPI subcommunicator,
+not an implicit MPI_COMM_WORLD. Explicit gridexit/system-handle cleanup occurs
+before returning, including LAPACK info errors; Drop never communicates.
+native-scalapack is default-enabled and depends on native-linalg. WSL links
+scalapack-openmpi; native Windows library selection remains pending. Local
+BLAS/LAPACK's compile-time replacement boundary is unchanged.
+
+Validation ports Cholesky/triangular reconstruction and triangle criteria from
+test/python/test_la.py into Rust (no Python interface/runtime). Fixtures are
+deterministic SPD/triangular matrices rather than a claim of identical NumPy
+random inputs. QR/SVD/eigh distributed implementations are not implied.

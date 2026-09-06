@@ -27,4 +27,6 @@ pub mod symmetry;
 pub mod sym_indices;
 pub mod sym_permutations;
 pub mod folding;
+#[cfg(feature = "native-scalapack")]
+pub mod matrix;
 mod ffi;

@@ -427,3 +427,20 @@ extra numerical diagnostics or repetitions of earlier passing suites.
 This closes the new explicit-grid full-NS BLAS path only. SY/AS upstream test
 branches, partial folding, automatic full candidate discovery, low-memory
 execution, distributed decompositions and Windows native acceptance remain open.
+
+## 2026-09-07: native distributed Cholesky / triangular solve
+
+Combined review of delegated FFI and parent descriptor/local-storage integration
+completed once before execution. distributed_matrix PASS once at WSL 1/2/4 MPI
+ranks, with OPENBLAS_NUM_THREADS=1 and the Linux source/cache directories.
+The test covers upper/lower Cholesky for dimensions 1,4,5, empty mathematical
+local rows at n=1, uneven cyclic blocks, all lower/upper left/right transpose
+triangular solves for a 4x7 RHS, and split subcommunicators. Factors/solutions
+retain the caller's original distribution; reconstruction uses distributed GEMM.
+
+Acceptance: source test_la.py L1 reconstruction error <=1e-3 OR relative L1
+error <=1e-3; opposite-triangle Frobenius norm <=1e-6. All passed. DIGIT / PASS,
+class R; no tighter checks, vector-component comparisons or numerical diagnostics.
+No global tensor gather and no C++ CTF linkage. This validates only the stated
+f64 operations, not distributed QR/SVD/eigh, solve_spd, all scalar types, or
+native Windows. Whole-goal acceptance remains incomplete.
