@@ -652,3 +652,22 @@ A read-only native readiness probe found stable-x86_64-pc-windows-gnu installed
 under C:/Users/xylxp/.cargo/bin but not on this shell's PATH. No mpiexec was
 found on PATH or the usual Microsoft MPI directories. No native numerical
 build/test was attempted in this batch; this is not Windows acceptance.
+
+## Sparse functions and sparse-amplitude MP3 (2026-09-07)
+
+distributed_sparse_transform, distributed_dense_sparse and upstream_sparse_mp3_t
+passed once each with 1/2/4 MPI ranks in the Linux work copy, including parity
+contexts. Typed Pair/Mat wire formats, sparse structure preservation, explicit
+zeros, missing input keys, diagonal restrictions, virtual redistribution and
+dense-input identity filtering have exact integer checks. Matrix-valued scalar
+multiplication verifies E12*E21=E11 rather than E22 through dense-by-sparse
+matrix and high-order APIs, preserving noncommutative operand order.
+
+The sparse-T MP3 path retains the source DPair transformation chain and energy
+criterion abs((dense-sparse)/dense)<1e-6. Maximum observed relative difference
+was 7.9112e-16. Combined source/implementation/test review corrected the initial
+dense-zero callback expectation to the upstream sparsify behavior before the
+first run; all tests passed without retries. DIGIT / PASS, no extra precision
+or repeated passing checks. General custom function contractions, non-foldable
+sparse indices, compressed symmetry, automatic planning and native Windows
+acceptance remain unfinished.

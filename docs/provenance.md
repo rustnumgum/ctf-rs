@@ -474,3 +474,23 @@ all five integral tensors (the source calls Vabcd.sparsify twice and leaves
 Vijab dense); this changes storage, not the equations or values. The original
 relative-energy criterion is retained. The custom-function sparse-T branch
 is not claimed implemented or tested here.
+
+## Sparse functions, dense-by-sparse products and sparse-T MP3 (2026-09-07)
+
+sparse_functions.rs provides typed local maps of stored pairs and indexed
+accumulator transforms restricted to existing output keys. Dense input's
+additive-identity values are skipped, matching high-level summation's implicit
+sparsify before its sparse kernel. For already-sparse input, explicit stored
+zeros invoke the accumulator, while missing entries do not. Repeated output
+indices select only the diagonal. The current implementation routes requested
+input keys, not the remaining optimized broadcast/replication function planner.
+Input-only reduction labels and full custom function contraction are pending.
+
+Dense-by-sparse matrix and folded contractions now broadcast dense A panels
+and sparse CSR B panels without swapping the operands. The local kernel
+preserves alpha*(A*B) for noncommutative semirings and restores C's distribution.
+tests/upstream_sparse_mp3_t.rs implements the source's sparse DPair numerator/
+denominator chain, four orbital-energy accumulations, sparse amplitude map-back,
+dense Fock times sparse T, sparse integral times sparse T and final energy.
+Its deterministic fixture and Vijab-storage adaptation match the prior dense-T
+test; the original relative-energy acceptance rule is unchanged.

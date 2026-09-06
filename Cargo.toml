@@ -217,3 +217,18 @@ harness = false
 name = "upstream_sparse_mp3"
 path = "tests/upstream_sparse_mp3.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_transform"
+path = "tests/distributed_sparse_transform.rs"
+harness = false
+
+[[test]]
+name = "distributed_dense_sparse"
+path = "tests/distributed_dense_sparse.rs"
+harness = false
+
+[[test]]
+name = "upstream_sparse_mp3_t"
+path = "tests/upstream_sparse_mp3_t.rs"
+harness = false

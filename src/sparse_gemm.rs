@@ -198,4 +198,76 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A> where A::Element: Wire {
         self.transform(|key, value| *value = values[dist.local_offset(rank, key)].clone());
         self.redistribute(original);
     }
+
+    /// Dense-by-sparse matrix product with fixed dense and variable sparse panels.
+    pub fn gemm_dense_sparse(&mut self, a: &Self, b: &SparseTensor<'_, '_, A>,
+        grid: [usize; 2], alpha: A::Element, beta: A::Element) {
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
+        let original = self.distribution().clone();
+        self.redistribute(layout.distribution(2));
+        let mut a = a.clone();
+        let mut b = b.clone();
+        a.redistribute(layout.distribution(0));
+        b.redistribute(layout.distribution(1));
+        let rank = self.context().rank();
+        let context = self.context();
+        let row = context.split(Some((rank % grid[0]) as i32), rank as i32).unwrap();
+        let col = context.split(Some((rank / grid[0]) as i32), rank as i32).unwrap();
+        let aa = a.local_pairs();
+        let bb = b.local_pairs();
+        let algebra = self.algebra().clone();
+        let one = algebra.one();
+        let mut values = self.local_storage().to_vec();
+        for step in 0..layout.phase {
+            let mut a_panel = vec![algebra.zero(); layout.local[0] * layout.local[1]];
+            if row.rank() == step % grid[1] {
+                for (key, value) in &aa {
+                    let i = key % layout.shape[0];
+                    let k = key / layout.shape[0];
+                    if k % layout.phase == step {
+                        a_panel[i / grid[0] + (k / layout.phase) * layout.local[0]] = value.clone();
+                    }
+                }
+            }
+            row.broadcast(step % grid[1], &mut a_panel);
+            let be = bb.iter().filter_map(|(key, value)| {
+                let k = key % layout.shape[1];
+                let j = key / layout.shape[1];
+                (k % layout.phase == step).then(|| (k / layout.phase + 1,
+                    j / grid[1] + 1, value.clone()))
+            }).collect();
+            let b_panel = broadcast(&col, step % grid[0], be, layout.local[1], layout.local[2]);
+            if step == 0 && beta != one {
+                for value in &mut values {
+                    *value = algebra.multiply(&beta, value);
+                }
+            }
+            for k in 0..layout.local[1] {
+                let row_start = b_panel.row_offsets()[k] - 1;
+                let row_end = b_panel.row_offsets()[k + 1] - 1;
+                for entry in row_start..row_end {
+                    let j = b_panel.columns()[entry] - 1;
+                    for i in 0..layout.local[0] {
+                        let product = algebra.multiply(
+                            &a_panel[i + k * layout.local[0]],
+                            &b_panel.values()[entry],
+                        );
+                        let product = if alpha != one {
+                            algebra.multiply(&alpha, &product)
+                        } else {
+                            product
+                        };
+                        let index = i + j * layout.local[0];
+                        values[index] = algebra.add(&values[index], &product);
+                    }
+                }
+            }
+        }
+        row.close();
+        col.close();
+        let dist = self.distribution().clone();
+        self.transform(|key, value| *value = values[dist.local_offset(rank, key)].clone());
+        self.redistribute(original);
+    }
 }

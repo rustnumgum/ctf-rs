@@ -12,6 +12,9 @@ mod gemm;
 #[path = "sparse_fold.rs"]
 mod folding;
 
+#[path = "sparse_functions.rs"]
+mod functions;
+
 #[derive(Clone)]
 pub struct SparseTensor<'c, 'r, A: Monoid> {
     context: &'c Context<'r>,

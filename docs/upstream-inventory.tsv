@@ -231,7 +231,7 @@ examples/particle_interaction.cxx	tests/upstream/examples/particle_interaction.r
 examples/qinformatics.cxx	tests/upstream/examples/qinformatics.rs	pending
 examples/recursive_matmul.cxx	tests/upstream/examples/recursive_matmul.rs	pending
 examples/scan.cxx	tests/upstream/examples/scan.rs	pending
-examples/sparse_mp3.cxx	tests/upstream_sparse_mp3.rs	partial: dense-T dense-vs-sparse integral MP3 equations and original energy tolerance; sparse-T custom-function branch and benchmark driver pending
+examples/sparse_mp3.cxx	tests/upstream_sparse_mp3.rs; tests/upstream_sparse_mp3_t.rs	partial: dense-T and sparse-T equation/function chains with original relative-energy tolerance; rank-seeded random fixture and benchmark driver pending
 examples/sparse_permuted_slice.cxx	tests/upstream/examples/sparse_permuted_slice.rs	pending
 examples/spectral_element.cxx	tests/upstream/examples/spectral_element.rs	pending
 examples/spmv.cxx	tests/upstream/examples/spmv.rs	pending
