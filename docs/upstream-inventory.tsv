@@ -149,9 +149,9 @@ src/symmetry/sym_indices.h	src/sym_indices.rs	Rust direct helper APIs; integrati
 src/symmetry/symmetrization.cxx	src/sym_permutations.rs	partial: order/add/get permutations and circular generator; tensor symmetrize/desymmetrize pending
 src/symmetry/symmetrization.h	src/sym_permutations.rs	partial: permutation APIs
 src/summation/Makefile	Cargo/build tooling	replaced
-src/summation/spr_seq_sum.cxx	src/summation	pending
+src/summation/spr_seq_sum.cxx	src/sparse_sum.rs	partial: NS sparse/mixed indexed sum semantics; optimized mapped sequential kernels and custom function paths pending
 src/summation/spr_seq_sum.h	src/summation	pending
-src/summation/spsum_tsr.cxx	src/summation	pending
+src/summation/spsum_tsr.cxx	src/sparse_sum.rs	partial: distributed canonical-key sum routing; optimized sparse summation planner/communication pending
 src/summation/spsum_tsr.h	src/summation	pending
 src/summation/sum_tsr.cxx	src/summation	pending
 src/summation/sum_tsr.h	src/summation	pending

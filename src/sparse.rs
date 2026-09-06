@@ -3,6 +3,9 @@
 //! Distributed sparse tensor storage: sorted keys inside each virtual block.
 use crate::{algebra::{Monoid, Semiring, Wire}, context::Context, mapping::Distribution};
 
+#[path = "sparse_sum.rs"]
+mod summation;
+
 #[derive(Clone)]
 pub struct SparseTensor<'c, 'r, A: Monoid> {
     context: &'c Context<'r>,
@@ -166,6 +169,16 @@ impl<A: Semiring> SparseTensor<'_, '_, A> {
     pub fn scale(&mut self, alpha: &A::Element) {
         for (_, value) in self.blocks.iter_mut().flatten() {
             *value = self.algebra.multiply(alpha, value);
+        }
+    }
+    /// Right-scale stored entries selected by repeated-index constraints,
+    /// matching the sparse summation kernel's value*beta convention.
+    pub fn scale_indexed(&mut self, labels: &str, alpha: &A::Element) {
+        let projection = crate::diagonal::Projection::new(&self.distribution.shape, labels);
+        for (key, value) in self.blocks.iter_mut().flatten() {
+            if projection.project(&self.distribution.decode_key(*key)).is_some() {
+                *value = self.algebra.multiply(value, alpha);
+            }
         }
     }
 }

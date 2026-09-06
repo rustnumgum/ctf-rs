@@ -197,3 +197,8 @@ required-features = ["native-linalg"]
 name = "distributed_sparse_io"
 path = "tests/distributed_sparse_io.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_sum"
+path = "tests/distributed_sparse_sum.rs"
+harness = false

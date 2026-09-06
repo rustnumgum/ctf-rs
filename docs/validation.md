@@ -594,3 +594,19 @@ resolved the source's exact operand order before the first run. All passed,
 DIGIT / PASS with exact comparisons; no reruns or numerical diagnostics.
 This is sparse storage and I/O coverage, not yet distributed sparse/mixed
 contraction, compressed symmetry or the complete upstream sparse CPU suite.
+
+## Distributed sparse and mixed sums (2026-09-07)
+
+distributed_sparse_sum passed with 1/2/4 MPI ranks, including parity contexts.
+The original sptensor_sum key/value fixture produces union keys {1,2,3,4,8},
+key 2 = 66 and sum 76. Exact i64 fixtures cover sparse/sparse and sparse/dense
+permutation, reduced labels, broadcasts, trace, diagonal-only destination
+updates, affine alpha/beta, dense-to-sparse conversion, virtual-2 distribution
+changes and explicit zeros after alpha=beta=0.
+
+Combined source/test integration was reviewed before execution. The first
+1-rank run exposed an arithmetic typo in the test trace oracle: 3*10 +
+2*(2+5+7) is 58, not 62. The oracle was corrected without changing code or
+tolerances; the affected run and first 2/4-rank runs passed. DIGIT / PASS,
+exact comparisons only, no repeated passing tests or precision diagnostics.
+Full sparse contraction and optimized sparse sum execution remain open.

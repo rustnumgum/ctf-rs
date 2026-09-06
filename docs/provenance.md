@@ -414,3 +414,20 @@ The source's key-only std::sort leaves equal-key ordering unspecified. Rust
 uses stable sorting and source-rank/request order for duplicate additions;
 this makes the tie order deterministic rather than claiming it reproduces
 an unspecified C++ ordering for noncommutative monoids.
+
+## Sparse and mixed indexed summation (2026-09-07)
+
+sparse_sum.rs implements NS sparse-to-sparse, sparse-to-dense and dense-to-sparse
+indexed sums, using canonical stored keys, diagonal projection, reindexing,
+reduced-label duplicate accumulation and output-only index expansion. Repeated
+indices are projected before scaling, as high-level summation.cxx:1499-1512
+does; off-diagonal destination values are not overwritten. Sparse beta=zero
+retains explicit structural zero entries, matching spspsum. Dense input is
+sparsified before sparse merging (summation.cxx:1514-1517); the raw
+dnA_spB_seq_sum kernel itself is an upstream assertion, not a usable algorithm.
+
+Sparse merging uses value*alpha/value*beta; sparse-to-dense preserves the raw
+kernel's scalar-input alpha*value exception and dense beta scaling convention.
+This path routes keys using existing distributed writes rather than claiming
+completion of upstream's optimized folding/replication sparse sum planner.
+Custom unary/accumulator functions and compressed-symmetry sums remain pending.
