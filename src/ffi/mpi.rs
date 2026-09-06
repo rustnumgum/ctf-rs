@@ -81,7 +81,9 @@ impl Comm {
     }
     pub(crate) fn broadcast(&self, root: usize, buffer: &mut [u8]) {
         assert!(root < self.size());
-        unsafe { check(sys::MPI_Bcast(buffer.as_mut_ptr().cast(), buffer.len().try_into().unwrap(), sys::RSMPI_UINT8_T, root as i32, self.raw)); }
+        let mut empty = 0u8;
+        let pointer = if buffer.is_empty() {&mut empty as *mut u8} else {buffer.as_mut_ptr()};
+        unsafe { check(sys::MPI_Bcast(pointer.cast(), buffer.len().try_into().unwrap(), sys::RSMPI_UINT8_T, root as i32, self.raw)); }
     }
     /// Rank-bucket exchange: Alltoall counts, then Alltoallv payloads.
     pub(crate) fn exchange(&self, buckets: &[Vec<u8>]) -> Vec<Vec<u8>> {

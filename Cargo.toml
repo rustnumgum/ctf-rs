@@ -44,3 +44,9 @@ harness = false
 name = "ctr_2d"
 path = "tests/ctr_2d.rs"
 harness = false
+
+[[test]]
+name = "tensor_gemm"
+path = "tests/tensor_gemm.rs"
+harness = false
+required-features = ["native-linalg"]

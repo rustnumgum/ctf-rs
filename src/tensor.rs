@@ -3,6 +3,40 @@
 use crate::{algebra::{Monoid, Semiring, Wire}, context::Context, mapping::Distribution};
 
 impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
+    /// Explicit-grid distributed matrix multiplication C = alpha*A*B + beta*C.
+    /// Cyclic k phases are equalized to lcm(grid rows, grid columns), then the
+    /// upstream 2D panel executor drives local BLAS. Original distributions stay.
+    pub fn gemm_2d<K: crate::linalg::LocalKernels>(&mut self, a: &Self,b: &Self,grid: [usize;2],alpha: f64,beta: f64) {
+        use crate::{mapping::{Mapping,Topology},ctr_2d::{Panel,Layers},contraction::Folded,linalg::Transpose};
+        assert!(std::ptr::eq(self.context,a.context) && std::ptr::eq(self.context,b.context));
+        assert_eq!(a.distribution.shape.len(),2); assert_eq!(b.distribution.shape.len(),2); assert_eq!(self.distribution.shape.len(),2);
+        let (m,k,n) = (a.distribution.shape[0],a.distribution.shape[1],b.distribution.shape[1]);
+        assert_eq!(b.distribution.shape[0],k); assert_eq!(self.distribution.shape,vec![m,n]);
+        let topology = Topology::new(grid.to_vec()); assert_eq!(topology.size(),self.context.size());
+        let (mut x,mut y) = (grid[0],grid[1]); while y != 0 {(x,y) = (y,x%y);}
+        let steps = grid[0]/x*grid[1];
+        let mut row = Mapping::Unmapped; row.augment_physical(&topology,0);
+        let mut column = Mapping::Unmapped; column.augment_physical(&topology,1);
+        let mut krow = row.clone(); krow.augment_virtual(steps);
+        let mut kcolumn = column.clone(); kcolumn.augment_virtual(steps);
+        let mut aa = Self {context:a.context,algebra:a.algebra,distribution:a.distribution.clone(),data:a.data.clone()};
+        let mut bb = Self {context:b.context,algebra:b.algebra,distribution:b.distribution.clone(),data:b.data.clone()};
+        let mut cc = Self {context:self.context,algebra:self.algebra,distribution:self.distribution.clone(),data:self.data.clone()};
+        aa.redistribute(Distribution::new(vec![m,k],topology.clone(),vec![row.clone(),kcolumn]));
+        bb.redistribute(Distribution::new(vec![k,n],topology.clone(),vec![krow,column.clone()]));
+        cc.redistribute(Distribution::new(vec![m,n],topology.clone(),vec![row,column]));
+        let ma = m.div_ceil(grid[0]); let nb = n.div_ceil(grid[1]); let kb = k.div_ceil(steps);
+        let across_columns = topology.fiber(self.context,1); let across_rows = topology.fiber(self.context,0);
+        crate::ctr_2d::execute(steps,Layers {count:1,index:0},
+            Panel {comm:Some(&across_columns),outer:1,inner:ma*kb},
+            Panel {comm:Some(&across_rows),outer:1,inner:kb*nb},Panel {comm:None,outer:1,inner:0},
+            &aa.data,&bb.data,&mut cc.data,beta,|a,b,c,beta,_| {
+                crate::contraction::folded_f64::<K>(Folded {m:ma,n:nb,k:kb,batches:1,
+                    trans_a:Transpose::No,trans_b:Transpose::No,transposed_output:false},a,b,c,alpha,beta);
+            });
+        across_columns.close(); across_rows.close();
+        cc.redistribute(self.distribution.clone()); self.data = cc.data;
+    }
     /// Collective sum for unique labels with explicitly aligned distributions.
     /// Shared labels have identical maps; each topology axis maps to the same
     /// label in both operands, or to only one operand. Automatic remapping is

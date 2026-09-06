@@ -167,3 +167,17 @@ beta. Code also carries upstream replication-layer partitioning; that branch
 has not yet been separately accepted. This is one execution level with explicit
 panel metadata and a child kernel, not the complete 2D plan builder or a complete
 Tensor-level distributed contraction. No global tensor gather is performed.
+
+## 2026-09-06: Tensor 2D GEMM integration
+
+`cargo test --test tensor_gemm` with OPENBLAS_NUM_THREADS=1 and MPI runners at
+1,2,4 ranks: PASS. Exact integer-valued cases cover a 5x7 times 7x3 matrix product,
+nonuniform cyclic shards, preserving the output's original distribution and zero
+reduction length. Grids were 1x1, 2x1, 2x2 respectively. Each configuration passed
+once after fixing a zero-count Bcast buffer-address error discovered on the first
+1-rank attempt; no numerical tolerance was changed or diagnostic study run.
+
+`Tensor::gemm_2d` aligns cyclic reduction phases, redistributes local data to the
+explicit grid, executes panel broadcasts plus BLAS, and restores the output
+distribution. No global tensor gather is used. This is explicit-grid f64 matrix
+multiplication, not general indexed contraction or automatic cost-based planning.
