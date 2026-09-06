@@ -303,3 +303,24 @@ DIGIT / PASS: class R, exact layout/cache expectations and integer contraction
 identities, tolerance 0. This is explicit-grid mapping-plan reuse, not acceptance
 of automatic candidate selection, cost prediction, low-memory execution or
 full cc4s plan-cache parity.
+
+## 2026-09-07: distributed performance-model QR/SVD update
+
+`model_training` PASS once at WSL 1/2/4 ranks, including split subcontexts.
+Exact checks cover circular history, clipped linear prediction, diagnostic totals,
+inactive tuning below threshold, and cubic feature order/prediction. Training
+checks cover full-rank fits, rank-deficient fits and all observations on rank 0
+(other ranks contribute zero local reduced systems). Training uses local QR and
+MPI allgather of only R/y before a reduced DGELSD solve on each rank.
+
+The acceptance quantity is the synthetic observation reconstruction norm, using
+the existing upstream QR reconstruction rule m*n*n*1e-6 (n=2). No upstream model
+trainer test was claimed as migrated. Largest observed residual was about
+1.14e-12, within all configuration bounds (2.56e-4 to 1.024e-3). No comparison of
+individual rank-deficient coefficients, precision chasing or diagnostic runs.
+
+DIGIT / PASS: history/features exact, reconstruction within the fixed QR bound.
+Numerical verification closed for these paths. Subsequent-update regularization
+with nonzero prior average, model persistence, initial coefficient tables and
+planner integration remain outside this batch's verified coverage. This is not
+a validated wall-time predictor or completed automatic planner.

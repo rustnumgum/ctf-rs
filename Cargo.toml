@@ -111,3 +111,9 @@ required-features = ["native-linalg"]
 name = "plan_cache"
 path = "tests/plan_cache.rs"
 harness = false
+
+[[test]]
+name = "model_training"
+path = "tests/model_training.rs"
+harness = false
+required-features = ["native-linalg"]

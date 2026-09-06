@@ -18,4 +18,5 @@ pub mod ctr_2d;
 pub mod linalg;
 pub mod sparse_formats;
 pub mod planning;
+pub mod model;
 mod ffi;

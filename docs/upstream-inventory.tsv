@@ -42,8 +42,8 @@ src/shared/Makefile	Cargo/build tooling	replaced
 src/shared/memcontrol.cxx	src/shared	pending
 src/shared/memcontrol.h	src/shared	pending
 src/shared/mkl_symbs.h	src/shared	pending
-src/shared/model.cxx	src/shared	pending
-src/shared/model.h	src/shared	pending
+src/shared/model.cxx	src/model.rs	partial: linear/cubic prediction, rolling observations, distributed QR/SVD update; model I/O and global registry pending
+src/shared/model.h	src/model.rs	partial: owned model interfaces; planner integration pending
 src/shared/offload.cu	excluded: CUDA/offload	excluded
 src/shared/offload.cxx	excluded: CUDA/offload	excluded
 src/shared/offload.h	excluded: CUDA/offload	excluded

@@ -5,6 +5,10 @@ use std::ffi::c_char;
 
 #[link(name = "blas")]
 unsafe extern "C" {
+    fn dormqr_(side:*const c_char,trans:*const c_char,m:*const i32,n:*const i32,k:*const i32,
+        a:*const f64,lda:*const i32,tau:*const f64,c:*mut f64,ldc:*const i32,work:*mut f64,lwork:*const i32,info:*mut i32);
+    fn dgelsd_(m:*const i32,n:*const i32,nrhs:*const i32,a:*mut f64,lda:*const i32,
+        b:*mut f64,ldb:*const i32,s:*mut f64,rcond:*const f64,rank:*mut i32,work:*mut f64,lwork:*const i32,iwork:*mut i32,info:*mut i32);
     fn dgemm_(ta: *const c_char, tb: *const c_char, m: *const i32, n: *const i32, k: *const i32,
         alpha: *const f64, a: *const f64, lda: *const i32, b: *const f64, ldb: *const i32,
         beta: *const f64, c: *mut f64, ldc: *const i32);
@@ -23,6 +27,29 @@ unsafe extern "C" {
         values: *mut f64, work: *mut f64, lwork: *const i32, info: *mut i32);
 }
 fn int(n: usize) -> i32 { n.try_into().unwrap() }
+pub(crate) fn qr_reduce(m:usize,n:usize,a:&[f64],b:&[f64])->Result<(Vec<f64>,Vec<f64>),i32> {
+    assert!(m>=n && n>0);assert_eq!(a.len(),m*n);assert_eq!(b.len(),m);
+    let (mi,ni)=(int(m),int(n));let mut a=a.to_vec();let mut b=b.to_vec();
+    let mut tau=vec![0.;n];let mut query=[0.];let mut info=0;
+    unsafe { dgeqrf_(&mi,&ni,a.as_mut_ptr(),&mi,tau.as_mut_ptr(),query.as_mut_ptr(),&-1,&mut info); }
+    result(info)?;let mut work=vec![0.;query[0] as usize];
+    unsafe { dgeqrf_(&mi,&ni,a.as_mut_ptr(),&mi,tau.as_mut_ptr(),work.as_mut_ptr(),&int(work.len()),&mut info); }
+    result(info)?;
+    let mut r=vec![0.;n*n];for j in 0..n {for i in 0..=j {r[i+j*n]=a[i+j*m];}}
+    unsafe { dormqr_(&(b'L' as c_char),&(b'T' as c_char),&mi,&1,&ni,a.as_ptr(),&mi,tau.as_ptr(),b.as_mut_ptr(),&mi,query.as_mut_ptr(),&-1,&mut info); }
+    result(info)?;work.resize(query[0] as usize,0.);
+    unsafe { dormqr_(&(b'L' as c_char),&(b'T' as c_char),&mi,&1,&ni,a.as_ptr(),&mi,tau.as_ptr(),b.as_mut_ptr(),&mi,work.as_mut_ptr(),&int(work.len()),&mut info); }
+    result(info)?;b.truncate(n);Ok((r,b))
+}
+pub(crate) fn least_squares(m:usize,n:usize,a:&[f64],b:&[f64])->Result<Vec<f64>,i32> {
+    assert!(m>=n && n>0);assert_eq!(a.len(),m*n);assert_eq!(b.len(),m);
+    let (mi,ni)=(int(m),int(n));let mut a=a.to_vec();let mut b=b.to_vec();let mut s=vec![0.;n];
+    let mut query=[0.];let mut iquery=[0];let mut rank=0;let mut info=0;
+    unsafe { dgelsd_(&mi,&ni,&1,a.as_mut_ptr(),&mi,b.as_mut_ptr(),&mi,s.as_mut_ptr(),&-1.,&mut rank,query.as_mut_ptr(),&-1,iquery.as_mut_ptr(),&mut info); }
+    result(info)?;let mut work=vec![0.;query[0] as usize];let mut iwork=vec![0;iquery[0] as usize];
+    unsafe { dgelsd_(&mi,&ni,&1,a.as_mut_ptr(),&mi,b.as_mut_ptr(),&mi,s.as_mut_ptr(),&-1.,&mut rank,work.as_mut_ptr(),&int(work.len()),iwork.as_mut_ptr(),&mut info); }
+    result(info)?;b.truncate(n);Ok(b)
+}
 fn result(info: i32) -> Result<(), i32> { if info == 0 { Ok(()) } else { Err(info) } }
 fn trans(t: Transpose) -> c_char { match t { Transpose::No => b'N' as c_char, Transpose::Yes => b'T' as c_char } }
 fn matrix_len(rows: usize, cols: usize, ld: usize) -> usize {

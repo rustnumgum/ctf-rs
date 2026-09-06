@@ -95,3 +95,21 @@ is additionally keyed because this API exposes an explicit grid choice. This
 is not an upstream hash/serialization ABI. Dense NS/unique-label plans only:
 symmetry/sparse planning, candidate metadata, model costs, diagnostic steps and
 plan packing remain unimplemented, not populated with placeholder estimates.
+
+## Performance model training (2026-09-07)
+
+`src/model.rs` adapts shared/model.cxx LinModel prediction, circular observation
+history, error totals, threshold 16*np*nparam, regularization, local QR/Q^T b,
+allgather of reduced R/y, and DGELSD fit. Cubic feature ordering follows
+cube_params. No full observation gather or normal-equations replacement is used.
+New local kernel methods qr_reduce/least_squares use DGEQRF/DORMQR/DGELSD through
+internal FFI, preserving the compile-time boundary for a future faer backend.
+
+The source's threshold<threshold deactivation predicate is always false;
+should_observe remains true rather than silently correcting this behavior.
+The source names an overprediction under_time and an underprediction over_time;
+diagnostics retain these names and explain them. Caller-owned models replace
+process-global registration. Coefficient file I/O, initial coefficient tables,
+planner call-site integration and automated model instrumentation are still
+pending. Construction takes explicit coefficients and history size; no new
+machine calibration or guessed performance constants were introduced.

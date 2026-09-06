@@ -30,6 +30,10 @@ pub trait LocalKernels {
     fn qr(m: usize, n: usize, a: &[f64]) -> Result<(Vec<f64>, Vec<f64>), i32>;
     fn svd(m: usize, n: usize, a: &[f64]) -> Result<Svd, i32>;
     fn eigh(n: usize, a: &[f64]) -> Result<(Vec<f64>, Vec<f64>), i32>;
+    /// Tall QR reduction to (R, first n entries of Q^T b), without forming Q.
+    fn qr_reduce(m: usize,n: usize,a: &[f64],b: &[f64]) -> Result<(Vec<f64>,Vec<f64>),i32>;
+    /// Tall rank-revealing minimum-norm least squares (LAPACK machine threshold).
+    fn least_squares(m: usize,n: usize,a: &[f64],b: &[f64]) -> Result<Vec<f64>,i32>;
 }
 
 pub struct Svd { pub u: Vec<f64>, pub values: Vec<f64>, pub vt: Vec<f64> }
@@ -50,5 +54,11 @@ impl LocalKernels for Native {
     }
     fn eigh(n: usize, a: &[f64]) -> Result<(Vec<f64>, Vec<f64>), i32> {
         crate::ffi::linalg::eigh(n, a)
+    }
+    fn qr_reduce(m:usize,n:usize,a:&[f64],b:&[f64])->Result<(Vec<f64>,Vec<f64>),i32> {
+        crate::ffi::linalg::qr_reduce(m,n,a,b)
+    }
+    fn least_squares(m:usize,n:usize,a:&[f64],b:&[f64])->Result<Vec<f64>,i32> {
+        crate::ffi::linalg::least_squares(m,n,a,b)
     }
 }

@@ -125,6 +125,14 @@ impl Comm {
                 values.len().try_into().unwrap(),sys::RSMPI_DOUBLE,sys::RSMPI_SUM,self.raw)); }
         }
     }
+    pub(crate) fn all_gather_f64(&self, values:&[f64])->Vec<f64> {
+        let count=values.len().try_into().unwrap();
+        let mut output=vec![0.;(values.len()*self.size()).max(1)];
+        let empty=0.0f64;let input=if values.is_empty() {&empty as *const f64} else {values.as_ptr()};
+        unsafe {check(sys::MPI_Allgather(input.cast(),count,sys::RSMPI_DOUBLE,
+            output.as_mut_ptr().cast(),count,sys::RSMPI_DOUBLE,self.raw));}
+        output.truncate(values.len()*self.size());output
+    }
     pub(crate) fn send_receive(&self, send: &[u8], destination: usize, source: usize, recv: &mut [u8]) {
         assert!(destination < self.size() && source < self.size());
         unsafe { check(sys::MPI_Sendrecv(send.as_ptr().cast(), send.len().try_into().unwrap(), sys::RSMPI_UINT8_T,
