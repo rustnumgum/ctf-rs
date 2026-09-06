@@ -177,3 +177,9 @@ and AS/SH structural zeros. This is not a port of sym_indices alignment or
 symmetrization contraction factors. u128 intermediate products replace signed
 intermediate products. True AS/SH sizes and SY-compatible intermediate sizes are
 separate. Distributed packed tensor ownership and contraction remain pending.
+
+`src/sym_indices.rs` directly adapts Devin Matthews' relativeSign, two-operand
+align_symmetric_indices and both overcounting_factor overloads from
+symmetry/sym_indices.{h,cxx}. Source author attribution is retained. Three-operand
+alignment and integration into symmetry contraction are still pending; factors
+require the source's aligned-index assumptions.

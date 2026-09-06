@@ -381,3 +381,14 @@ expected 64 incorrectly; the analytical offset is 4+6+4*12=58. Corrected that
 reference and reran only the failed test; signed-storage pass was not repeated.
 DIGIT / PASS, class R, tolerance 0. No floating-point runs. Distributed packed
 symmetry, alignment multiplicities and upstream symmetry CPU tests remain open.
+
+## 2026-09-07: symmetry index factors
+
+WSL sym_indices: two exact tests PASS for permutation signs, pair alignment,
+AS/SY sign differences, partially shared groups, contraction factorial factors,
+AS summation cancellation and SH versus SY reduction factors. First run found
+usize intermediate underflow in i-run+1; changing it to i+1-run preserves the
+source signed arithmetic result. Only the failed multiplicity test was rerun
+after that correction; the passing sign test was not repeated. DIGIT / PASS,
+class R, tolerance 0. Three-operand alignment and distributed symmetry execution
+remain unfinished.

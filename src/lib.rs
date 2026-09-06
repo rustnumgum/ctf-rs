@@ -24,4 +24,5 @@ pub mod initial_models;
 pub mod selector;
 pub mod plan_cost;
 pub mod symmetry;
+pub mod sym_indices;
 mod ffi;
