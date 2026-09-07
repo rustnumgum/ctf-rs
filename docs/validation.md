@@ -1,5 +1,36 @@
 # Validation evidence
 
+## D4 shared infrastructure close (2026-09-08)
+
+The low-memory planner now has an explicit process budget derived from the
+pinned `memcap * physical / processes-per-machine - used` rule. Linux uses the
+smaller active cgroup limit and Windows uses the native physical-memory/process
+working-set APIs; resident set replaces the source allocator registry because
+Rust tensor storage is not centrally allocated. Rank-local budgets are reduced
+to the communicator minimum before selection. The existing folded low-memory
+execution remains the production consumer.
+
+Named timers retain inclusive/exclusive/call accumulation and MPI totals with
+explicit registry ownership. Source util recurrences cover packed sizes/index
+decoding, factorization, permutations and strided/ragged copies while fixing
+the pinned `sy_calc_idx_arr` copy-width and `socopy` allocation defects. Four-
+type BLAS SYR is integrated into the existing `linalg` boundary; complex SYR
+uses plain transpose, not HER. A process-global atomic flop total is sampled by
+`FlopCounter`, and the production four-type GEMM center records `2*m*n*k`.
+
+`d4_memcontrol`, `d4_timer_util` and `d4_blas_flops` passed once at WSL 1/2/4
+ranks with world/parity contexts. All arithmetic, layout, copy, SYR and flop
+checks were exact; timer checks were limited to finite nonnegative accumulation
+and nesting invariants. The first timer/util attempt exposed an unsigned index
+translation and the second exposed an incorrect expected ragged-copy fixture;
+the two distinct diagnostics corrected those issues without changing a bound.
+
+`mpi_low_memory_bench` ran once at four ranks with m=128,k=192,n=160 and
+reported 0.002395 s, source memory 397312 bytes and process budget 3094485248
+bytes. This is informational only. The full native Windows GNU test and example
+set compiled/linked once; native runtime remains deferred to D6. DIGIT / PASS;
+D4 verification closed.
+
 ## D3 dense contraction close (2026-09-08)
 
 Dense mapped contractions now derive the source replication fibers from all

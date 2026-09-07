@@ -28,19 +28,19 @@ src/tensor/Makefile	Cargo/build tooling	replaced
 src/tensor/untyped_tensor_tmpl.h	src/tensor	pending
 src/tensor/untyped_tensor.cxx	src/tensor.rs; src/redist_cost.rs; src/fold_layout.rs; src/pair_read.rs; src/binary_io.rs; src/ffi/binary_io.rs; src/permuted_io.rs; src/symmetric_permuted_io.rs; src/sparse_permuted_io.rs	partial: dense storage, all source-supported mixed-storage coordinate permutation paths, explicit all-rank extraction, consecutive-chunk binary MPI-IO, source dense redistribution estimates, tensor::fold local packed-group metadata; remaining optimized reshuffle and full folded storage lifecycle pending
 src/tensor/untyped_tensor.h	src/tensor	pending
-src/shared/blas_symbs.cxx	src/shared	pending
-src/shared/blas_symbs.h	src/shared	pending
+src/shared/blas_symbs.cxx	src/linalg.rs; src/ffi/linalg.rs; src/ffi/factor.rs; src/ffi/scalapack.rs	ported four-type GEMM/SYR and local/distributed solve responsibilities; typed Rust loops replace AXPY/SCAL/COPY/DDOT and optional batch GEMM
+src/shared/blas_symbs.h	src/linalg.rs; src/ffi/linalg.rs	replaced: compile-time typed kernel traits and internal LP64 FFI declarations replace C++ symbol wrappers
 src/shared/fompi_wrapper.h	src/shared	pending
 src/shared/init_models.cxx	src/initial_models.rs	32 CPU coefficient arrays ported; offload excluded; exact roundtrip pass
 src/shared/init_models.h	src/initial_models.rs	Rust static CPU model table replaces declarations
-src/shared/int_timer.cxx	src/shared	pending
-src/shared/int_timer.h	src/shared	pending
+src/shared/int_timer.cxx	src/int_timer.rs	ported named inclusive/exclusive/call accumulation, nested registry and communicator MPI totals with explicit ownership
+src/shared/int_timer.h	src/int_timer.rs	replaced: typed timer records and registry replace fixed buffers, macros and hidden communicator state
 src/shared/iter_tsr.h	src/shared	pending
 src/shared/lapack_symbs.cxx	src/ffi/linalg.rs; src/ffi/scalapack.rs	partial: four-type native GEMM and distributed POTRF/POSV/TRSM/GEQRF/ORGQR/UNGQR/GESVD/SYEVX/HEEVX; local decompositions remain f64; remaining scalar/routine families pending
 src/shared/lapack_symbs.h	src/shared	pending
 src/shared/Makefile	Cargo/build tooling	replaced
-src/shared/memcontrol.cxx	src/shared	pending
-src/shared/memcontrol.h	src/shared	pending
+src/shared/memcontrol.cxx	src/memcontrol.rs; examples/mpi_low_memory_bench.rs	ported cap/process-share/used-memory budgeting and low-memory selection; OS resident set replaces allocator registry and Linux cgroup limit corrects bare-host assumption
+src/shared/memcontrol.h	src/memcontrol.rs	replaced: exact budget value types and RAII allocation replace raw allocation/deallocation/profiler hooks
 src/shared/mkl_symbs.h	src/shared	pending
 src/shared/model.cxx	src/model.rs	partial: linear/cubic prediction, rolling observations, distributed QR/SVD update; model I/O and global registry pending
 src/shared/model.h	src/model.rs	partial: owned model interfaces; planner integration pending
@@ -48,14 +48,14 @@ src/shared/offload.cu	excluded: CUDA/offload	excluded
 src/shared/offload.cxx	excluded: CUDA/offload	excluded
 src/shared/offload.h	excluded: CUDA/offload	excluded
 src/shared/pmpi.h	src/shared	pending
-src/shared/util.cxx	src/shared	pending
-src/shared/util.h	src/shared	pending
+src/shared/util.cxx	src/util.rs; src/symmetry.rs; src/fold_layout.rs; src/mapping_variants.rs; src/topology_candidates.rs	ported packed size/index recurrences, factorization, choice, permutation and strided/ragged copies; pinned copy-width/coalescing/allocation defects not reproduced
+src/shared/util.h	src/util.rs; typed Rust modules	replaced: slices, Vec, assertions and module constants replace raw-pointer helpers, VLA and dispatch/logging macros
 src/interface/back_comp.h	src/interface	pending
-src/interface/common.cxx	src/random.rs	partial: exact MT19937-64 engine and get_rand48 interval conversion; remaining common runtime helpers pending
+src/interface/common.cxx	src/random.rs; src/flop_counter.rs	partial: exact MT19937-64 engine, get_rand48 interval conversion and safe process-global flop count; remaining common runtime helpers pending
 src/interface/common.h	src/interface	pending
 src/interface/decomposition.cxx	src/tensor_svd.rs; src/reshape.rs	incomplete upstream HoSVD class and excluded C++ expression machinery, not a working class API to port; indexed tensor SVD exists; working examples/hosvd.cxx algorithm remains pending separately
 src/interface/decomposition.h	Rust direct tensor/matrix APIs	unfinished upstream HoSVD declaration and excluded expression interface; see docs/coverage.md
-src/interface/flop_counter.cxx	src/interface	pending
+src/interface/flop_counter.cxx	src/flop_counter.rs; src/ffi/linalg.rs	ported process-global accumulation, interval snapshot/zero and communicator MPI_SUM; production GEMM instrumentation has exact D4 coverage
 src/interface/fun_term.cxx	src/interface	replaced: direct Rust operations replace the expression interface
 src/interface/fun_term.h	src/interface	replaced: direct Rust operations replace the expression interface
 src/interface/functions.h	src/sparse_function_kernel.rs; src/sparse_gemm.rs; src/sparse_fold_function.rs	partial: Bivar_Function CSR sparse/dense and sparse/sparse dense/sparse-output kernels with distributed panels and fullyfoldable high-order custom dispatch; remaining function kernels and general dense dispatch pending

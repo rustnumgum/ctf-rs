@@ -2,7 +2,7 @@
 //! Native BLAS/LAPACK LP64 entry points; no CTF compatibility shim.
 use crate::{
     algebra::Complex,
-    linalg::{Gemm, Svd, Transpose},
+    linalg::{Gemm, Syr, Svd, Transpose, Uplo},
 };
 use std::ffi::c_char;
 
@@ -27,6 +27,10 @@ unsafe extern "C" {
         alpha: *const Complex<f64>, a: *const Complex<f64>, lda: *const i32,
         b: *const Complex<f64>, ldb: *const i32, beta: *const Complex<f64>,
         c: *mut Complex<f64>, ldc: *const i32);
+    fn ssyr_(uplo:*const c_char,n:*const i32,alpha:*const f32,x:*const f32,incx:*const i32,a:*mut f32,lda:*const i32);
+    fn dsyr_(uplo:*const c_char,n:*const i32,alpha:*const f64,x:*const f64,incx:*const i32,a:*mut f64,lda:*const i32);
+    fn csyr_(uplo:*const c_char,n:*const i32,alpha:*const Complex<f32>,x:*const Complex<f32>,incx:*const i32,a:*mut Complex<f32>,lda:*const i32);
+    fn zsyr_(uplo:*const c_char,n:*const i32,alpha:*const Complex<f64>,x:*const Complex<f64>,incx:*const i32,a:*mut Complex<f64>,lda:*const i32);
 }
 #[cfg_attr(target_os = "windows", link(name = "openblas"))]
 #[cfg_attr(not(target_os = "windows"), link(name = "lapack"))]
@@ -43,6 +47,7 @@ unsafe extern "C" {
         values: *mut f64, work: *mut f64, lwork: *const i32, info: *mut i32);
 }
 fn int(n: usize) -> i32 { n.try_into().unwrap() }
+fn gemm_flops(m:usize,n:usize,k:usize)->i64 {2*i64::try_from(m).unwrap()*i64::try_from(n).unwrap()*i64::try_from(k).unwrap()}
 pub(crate) fn qr_reduce(m:usize,n:usize,a:&[f64],b:&[f64])->Result<(Vec<f64>,Vec<f64>),i32> {
     assert!(m>=n && n>0);assert_eq!(a.len(),m*n);assert_eq!(b.len(),m);
     let (mi,ni)=(int(m),int(n));let mut a=a.to_vec();let mut b=b.to_vec();
@@ -87,6 +92,7 @@ fn validate_gemm<T>(g: &Gemm<'_, T>) {
 }
 pub(crate) fn gemm(g: Gemm<'_, f64>) {
     validate_gemm(&g);
+    crate::flop_counter::add_computed_flops(gemm_flops(g.m,g.n,g.k));
     unsafe {
         dgemm_(
             &trans(g.trans_a),
@@ -109,6 +115,7 @@ macro_rules! gemm {
     ($function:ident, $native:ident, $scalar:ty) => {
         pub(crate) fn $function(g: Gemm<'_, $scalar>) {
             validate_gemm(&g);
+            crate::flop_counter::add_computed_flops(gemm_flops(g.m,g.n,g.k));
             unsafe {
                 $native(
                     &trans(g.trans_a),
@@ -132,6 +139,10 @@ macro_rules! gemm {
 gemm!(gemm_f32, sgemm_, f32);
 gemm!(gemm_c32, cgemm_, Complex<f32>);
 gemm!(gemm_c64, zgemm_, Complex<f64>);
+fn validate_syr<T>(s:&Syr<'_,T>){assert!(s.incx>0);let x=if s.n==0{0}else{1+(s.n-1)*s.incx as usize};assert!(s.x.len()>=x);assert!(s.a.len()>=matrix_len(s.n,s.n,s.lda));}
+fn uplo(value:Uplo)->c_char{match value{Uplo::Lower=>b'L' as c_char,Uplo::Upper=>b'U' as c_char}}
+macro_rules! syr {($function:ident,$native:ident,$scalar:ty)=>{pub(crate) fn $function(s:Syr<'_,$scalar>){validate_syr(&s);unsafe{$native(&uplo(s.uplo),&int(s.n),&s.alpha,s.x.as_ptr(),&s.incx,s.a.as_mut_ptr(),&int(s.lda));}}};}
+syr!(syr_f32,ssyr_,f32);syr!(syr,dsyr_,f64);syr!(syr_c32,csyr_,Complex<f32>);syr!(syr_c64,zsyr_,Complex<f64>);
 pub(crate) fn cholesky(n: usize, a: &mut [f64], lower: bool) -> Result<(), i32> {
     assert_eq!(a.len(), n*n);
     let mut info = 0;

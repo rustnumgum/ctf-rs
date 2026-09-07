@@ -20,6 +20,7 @@ if ($BuildOnly) {
 
 $mpiTests = @(
     'foundation','dense_views','replicated_sum','tensor_sum','custom_reduce',
+    'd4_memcontrol','d4_timer_util','d4_blas_flops',
     'algebra_sum','complex_scalar','sum_remap','replicated_contraction','ctr_2d',
     'tensor_gemm','algebra_contraction','tensor_contract','contract_remap',
     'dense_semantics','upstream_dense','subcomm_dense','plan_cache','model_training',

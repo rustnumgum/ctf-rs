@@ -26,6 +26,22 @@ name = "scaling"
 path = "tests/scaling.rs"
 
 [[test]]
+name = "d4_memcontrol"
+path = "tests/d4_memcontrol.rs"
+harness = false
+
+[[test]]
+name = "d4_timer_util"
+path = "tests/d4_timer_util.rs"
+harness = false
+
+[[test]]
+name = "d4_blas_flops"
+path = "tests/d4_blas_flops.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
 name = "dgtog_redistribution"
 path = "tests/dgtog_redistribution.rs"
 harness = false

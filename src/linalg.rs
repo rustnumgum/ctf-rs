@@ -28,6 +28,28 @@ pub trait GemmKernel<T> {
     fn gemm(args: Gemm<'_, T>);
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Uplo {
+    Lower,
+    Upper,
+}
+
+pub struct Syr<'a, T> {
+    pub uplo: Uplo,
+    pub n: usize,
+    pub alpha: T,
+    pub x: &'a [T],
+    pub incx: i32,
+    pub a: &'a mut [T],
+    pub lda: usize,
+}
+
+/// Typed BLAS symmetric rank-one update. Complex implementations use plain
+/// transpose (`csyr`/`zsyr`), never conjugating Hermitian updates.
+pub trait SyrKernel<T> {
+    fn syr(args: Syr<'_, T>);
+}
+
 /// A narrow compile-time interface, not a runtime backend registry. Layout is
 /// column-major, and decomposition outputs retain LAPACK's mathematical contract
 /// (not its workspace representation). All failures are returned as native info.
@@ -72,6 +94,30 @@ impl GemmKernel<crate::algebra::Complex<f32>> for Native {
 impl GemmKernel<crate::algebra::Complex<f64>> for Native {
     fn gemm(args: Gemm<'_, crate::algebra::Complex<f64>>) {
         crate::ffi::linalg::gemm_c64(args);
+    }
+}
+#[cfg(feature = "native-linalg")]
+impl SyrKernel<f32> for Native {
+    fn syr(args: Syr<'_, f32>) {
+        crate::ffi::linalg::syr_f32(args);
+    }
+}
+#[cfg(feature = "native-linalg")]
+impl SyrKernel<f64> for Native {
+    fn syr(args: Syr<'_, f64>) {
+        crate::ffi::linalg::syr(args);
+    }
+}
+#[cfg(feature = "native-linalg")]
+impl SyrKernel<crate::algebra::Complex<f32>> for Native {
+    fn syr(args: Syr<'_, crate::algebra::Complex<f32>>) {
+        crate::ffi::linalg::syr_c32(args);
+    }
+}
+#[cfg(feature = "native-linalg")]
+impl SyrKernel<crate::algebra::Complex<f64>> for Native {
+    fn syr(args: Syr<'_, crate::algebra::Complex<f64>>) {
+        crate::ffi::linalg::syr_c64(args);
     }
 }
 #[cfg(feature = "native-linalg")]
