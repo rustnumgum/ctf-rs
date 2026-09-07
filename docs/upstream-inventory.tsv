@@ -155,7 +155,7 @@ src/summation/spsum_tsr.cxx	src/sparse_sum.rs	partial: distributed canonical-key
 src/summation/spsum_tsr.h	src/summation	pending
 src/summation/sum_tsr.cxx	src/summation.rs; src/symmetric_sum_comm.rs	partial: explicit NS/packed virtual blocks and input-broadcast/output-reduce execution; automatic symmetry plan construction pending
 src/summation/sum_tsr.h	src/summation	pending
-src/summation/summation.cxx	src/symmetric_sum_tensor.rs; src/symmetric_hollow_sum.rs; src/symmetric_sy_sum.rs; src/symmetric_diagonal.rs; src/summation.rs	partial: canonical and NS/AS/SH sums, generic SY recursive unfolding and supported diagonals; broken-group diagonals and automatic mapper pending
+src/summation/summation.cxx	src/symmetric_sum_tensor.rs; src/symmetric_hollow_sum.rs; src/symmetric_sy_sum.rs; src/symmetric_diagonal.rs; src/summation.rs	partial: canonical and symmetry-aware sums, generic SY recursion and source run_diag stack; automatic mapper and full upstream coverage pending
 src/summation/summation.h	src/summation	pending
 src/summation/sym_seq_sum.cxx	src/summation.rs; src/symmetric_sum.rs	partial: NS and physical packed scalar reference kernels; optimized folded/custom-function branches pending
 src/summation/sym_seq_sum.h	src/summation	pending
@@ -174,7 +174,7 @@ test/ccsdt_map_test.cxx	tests/upstream/test/ccsdt_map_test.rs	pending
 test/ccsdt_t3_to_t2.cxx	tests/upstream/test/ccsdt_t3_to_t2.rs	pending
 test/dft.cxx	tests/upstream/test/dft.rs	pending
 test/diag_ctr.cxx	tests/upstream_dense.rs	identity ported; WSL 1/2/4 pass
-test/diag_sym.cxx	tests/upstream/test/diag_sym.rs	pending
+test/diag_sym.cxx	tests/upstream_diag_sym.rs	ported paired-SY diagonal identity, original norm<1e-10, deterministic fixture; WSL 1/2/4 ranks pass
 test/endomorphism_cust_sp.cxx	tests/upstream/test/endomorphism_cust_sp.rs	pending
 test/endomorphism_cust.cxx	tests/upstream/test/endomorphism_cust.rs	pending
 test/endomorphism.cxx	tests/upstream/test/endomorphism.rs	pending

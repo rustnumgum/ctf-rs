@@ -2,6 +2,7 @@
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 use crate::{
     algebra::{Group, Semiring, Wire},
+    scalar_conversion::CastFromF64,
     sym_indices::{align_pair, summation_factor},
     sym_permutations,
     symmetric_distribution::SymmetricDistribution,
@@ -94,14 +95,13 @@ fn labels(indices: &[u8]) -> &str {
 
 impl<'c, 'r, A> SymmetricTensor<'c, 'r, A>
 where
-    A: Group + Semiring + Clone,
+    A: Group + Semiring + Clone + CastFromF64,
     A::Element: Wire,
 {
     /// Symmetry-aware indexed sum for the hollow AS/SH domain.
     ///
-    /// NS/AS/SH links, with repeated labels handled by the supported diagonal
-    /// extraction primitive. Cross-group symmetry-breaking diagonals and SY
-    /// coincidence-surface unfolding are not approximated here.
+    /// NS/AS/SH links, with repeated labels handled by the source run_diag
+    /// extraction/reinsertion path. Use sum_from when SY links participate.
     pub fn sum_hollow_from(
         &mut self,
         output_indices: &str,

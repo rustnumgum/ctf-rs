@@ -422,8 +422,7 @@ where
     /// Symmetry-aware contraction
     /// `C[indices_c] = alpha*A[indices_a]*B[indices_b] + beta*C[indices_c]`
     /// on an explicit label-to-grid mapping.
-    /// Repeated labels use the supported diagonal extractor; repetitions that
-    /// break nontrivial symmetry groups remain outside that extractor's contract.
+    /// Repeated labels use the source run_diag extraction/reinsertion path.
     /// This entry point does not choose a topology or physical-label map.
     pub fn contract_from_on(
         &mut self,

@@ -31,7 +31,7 @@ $mpiTests = @(
     'distributed_symmetric_repack','distributed_packed_sum','distributed_packed_contraction',
     'distributed_canonical_sum','distributed_hollow_sum','distributed_symmetric_diagonal',
     'distributed_sy_sum','distributed_sy_scalars','distributed_canonical_contraction',
-    'distributed_symmetric_contraction'
+    'distributed_symmetric_contraction','upstream_diag_sym','distributed_cross_diagonal'
 )
 $arguments = @()
 foreach ($test in $mpiTests) { $arguments += @('--test', $test) }

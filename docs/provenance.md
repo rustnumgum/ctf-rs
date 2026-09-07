@@ -738,3 +738,22 @@ The topology and physical-label map remain caller-supplied; automatic cost-based
 mapping selection and full optimized 2D symmetric planning are not completed.
 General cross-group repeated-index extraction and the full upstream CPU test
 suite remain open. Availability of this operation is not whole-project acceptance.
+
+## General source diagonal stack (2026-09-07)
+
+The diagonal-pattern restriction has been removed. Each extract_diag step now
+deletes exactly one later duplicate axis and transfers data through
+sym_sum_tsr(run_diag=true), with source-generated maps independent of outer
+labels. Replacement reconstructs intermediate output diagonals and reinserts
+them in reverse order. These operations require Group, Semiring and explicit
+CastFromF64 capabilities because SY unfolding may use fractional coefficients.
+Desymmetrization/symmetrization transfers use identity maps, as in the source;
+propagating an outer repeated map into them would cause incorrect recursion.
+
+Preserved source caveat: reverse cross-AS diagonal summation uses beta=0 only
+for the first permutation, then beta=1 (summation.cxx 1375,1402-1404). SCAL_B
+clears only the first task's literal repeated-index selection
+(sym_seq_sum.cxx 233-260,329-347). The other canonical chamber retains its old
+value before adding the replacement term. This is source rw=0 semantics, not
+ordinary assignment to every symmetry-equivalent coordinate. The new regression
+records this behavior rather than silently changing the pinned algorithm.

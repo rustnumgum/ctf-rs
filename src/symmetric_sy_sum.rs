@@ -39,6 +39,11 @@ fn contains_sy(links: &[Symmetry]) -> bool {
     links.contains(&Symmetry::SY)
 }
 
+fn axis_indices(order: usize) -> Vec<u8> {
+    assert!(order <= 128, "symmetric index maps require at most 128 axes");
+    (0..order).map(|axis| axis as u8).collect()
+}
+
 /// `summation::unfold_broken_sym`, including its additional fully reduced SY
 /// case. The returned axis is the link replaced by NS in the unfolded tensor.
 fn broken_link(
@@ -53,10 +58,10 @@ fn broken_link(
         }
         let left = output_indices
             .iter()
-            .position(|&label| label == input_indices[i]);
+            .rposition(|&label| label == input_indices[i]);
         let right = output_indices
             .iter()
-            .position(|&label| label == input_indices[i + 1]);
+            .rposition(|&label| label == input_indices[i + 1]);
         match left {
             Some(j)
                 if output_links[j] == Symmetry::NS
@@ -78,10 +83,10 @@ fn broken_link(
         }
         let left = input_indices
             .iter()
-            .position(|&label| label == output_indices[i]);
+            .rposition(|&label| label == output_indices[i]);
         let right = input_indices
             .iter()
-            .position(|&label| label == output_indices[i + 1]);
+            .rposition(|&label| label == output_indices[i + 1]);
         match left {
             Some(j)
                 if input_links[j] == Symmetry::NS
@@ -119,10 +124,9 @@ where
     /// Symmetry-aware indexed sum `B[indices_b] = alpha*A[indices_a]
     /// + beta*B[indices_b]` for NS/SY/AS/SH tensors.
     ///
-    /// Repeated labels use the existing symmetry-aware diagonal extraction
-    /// path. It supports NS repetitions, an isolated `ii` SY pair, and AS/SH
-    /// structural-zero diagonals; repetitions that break a larger symmetry
-    /// group are deliberately rejected rather than read through signed orbits.
+    /// Repeated labels are extracted one pair at a time through this same
+    /// symmetry-aware path with `run_diag` enabled, then output diagonals are
+    /// restored in reverse order.
     pub fn sum_from(
         &mut self,
         indices_b: &str,
@@ -160,6 +164,25 @@ where
             alpha,
             beta,
         );
+    }
+
+    /// Internal `sym_sum_tsr(run_diag=true)` entry used by one-axis diagonal
+    /// extraction/reinsertion.  It bypasses only automatic diagonal
+    /// preprocessing; symmetry alignment and unfolding remain active.
+    pub(super) fn sum_from_run_diag(
+        &mut self,
+        output_indices: &[u8],
+        input: &Self,
+        input_indices: &[u8],
+        alpha: A::Element,
+        beta: A::Element,
+    ) {
+        assert!(std::ptr::eq(self.context, input.context));
+        assert!(input_indices.is_ascii());
+        assert!(output_indices.is_ascii());
+        assert_eq!(input_indices.len(), input.distribution.links().len());
+        assert_eq!(output_indices.len(), self.distribution.links().len());
+        self.sum_sy_recursive(output_indices, input, input_indices, alpha, beta);
     }
 
     fn sum_sy_recursive(
@@ -308,7 +331,7 @@ where
     pub(super) fn desymmetrized(
         source: &Self,
         target_links: Vec<Symmetry>,
-        indices: &[u8],
+        _indices: &[u8],
         is_output: bool,
     ) -> Self {
         let distribution = SymmetricDistribution::new(
@@ -331,20 +354,24 @@ where
             return result;
         }
 
+        // Source desymmetrization always constructs identity index maps; the
+        // outer operation's possibly repeated map is not propagated here.
+        let indices = axis_indices(source_links.len());
+
         if source_links[is] != Symmetry::SY {
             if !contains_sy(source_links) && !contains_sy(target_links) {
                 result.sum_hollow_from(
-                    labels(indices),
+                    labels(&indices),
                     source,
-                    labels(indices),
+                    labels(&indices),
                     source.algebra.one(),
                     source.algebra.one(),
                 );
             } else {
                 result.sum_sy_recursive(
-                    indices,
+                    &indices,
                     source,
-                    indices,
+                    &indices,
                     source.algebra.one(),
                     source.algebra.one(),
                 );
@@ -383,10 +410,10 @@ where
                 continue;
             }
             let partner = (pivot as isize + relative + 1) as usize;
-            let mut transposed = indices.to_vec();
+            let mut transposed = indices.clone();
             transposed.swap(pivot, partner);
             result.sum_canonical_from(
-                labels(indices),
+                labels(&indices),
                 transpose_source,
                 labels(&transposed),
                 source.algebra.one(),
@@ -394,9 +421,9 @@ where
             );
         }
         result.sum_canonical_from(
-            labels(indices),
+            labels(&indices),
             source,
-            labels(indices),
+            labels(&indices),
             source.algebra.one(),
             source.algebra.one(),
         );
@@ -409,7 +436,7 @@ where
                     continue;
                 }
                 let partner = (pivot as isize + relative + 1) as usize;
-                let mut diagonal = indices.to_vec();
+                let mut diagonal = indices.clone();
                 diagonal[partner] = diagonal[pivot];
                 result.scale_indexed(labels(&diagonal), &coincidence_scale);
             }
@@ -423,6 +450,9 @@ where
     /// fractional-rescaling implementation in the source is intentionally not
     /// reproduced.
     pub(super) fn symmetrize_from(&mut self, nonsymmetric: &Self, indices: &[u8]) {
+        // As in CTF `symmetrize`, these transfers use identity maps rather
+        // than the outer summation's (potentially repeated) map.
+        let indices = axis_indices(indices.len());
         let mut intermediate = Self::new(
             self.context,
             self.distribution.clone(),
@@ -432,31 +462,31 @@ where
             && !contains_sy(nonsymmetric.distribution.links())
         {
             intermediate.sum_hollow_from(
-                labels(indices),
+                labels(&indices),
                 nonsymmetric,
-                labels(indices),
+                labels(&indices),
                 self.algebra.one(),
                 self.algebra.zero(),
             );
             self.sum_hollow_from(
-                labels(indices),
+                labels(&indices),
                 &intermediate,
-                labels(indices),
+                labels(&indices),
                 self.algebra.one(),
                 self.algebra.one(),
             );
         } else {
             intermediate.sum_sy_recursive(
-                indices,
+                &indices,
                 nonsymmetric,
-                indices,
+                &indices,
                 self.algebra.one(),
                 self.algebra.zero(),
             );
             self.sum_sy_recursive(
-                indices,
+                &indices,
                 &intermediate,
-                indices,
+                &indices,
                 self.algebra.one(),
                 self.algebra.one(),
             );

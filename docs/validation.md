@@ -843,3 +843,19 @@ No numerical failures/retries; DIGIT / PASS, verification closed.
 Integration review corrected prescale input selection to mapped packed local
 size before the first run. The new target also compiled and linked once on
 Windows GNU; native MPI runtime acceptance remains pending.
+
+## General run_diag and upstream diagonal identity (2026-09-07)
+
+distributed_cross_diagonal, upstream_diag_sym and the affected
+distributed_symmetric_diagonal passed at 1/2/4 WSL MPI ranks with world/parity
+contexts. The upstream test retains norm<1e-10; its rank-4 paired-SY diagonal
+identity uses deterministic dyadic fixtures. Cross-AS extraction/reinsertion
+uses atol=1e-6; the existing simpler diagonal suite retains exact i64 checks.
+
+The initial cross-AS replacement expectation assumed ordinary assignment and
+failed (-30 versus -20). Source inspection established the first-permutation
+beta-only clearing rule; the oracle was corrected to pinned rw=0 behavior.
+No production change or tolerance adjustment was made for that discrepancy.
+Only the affected/new suites were then executed; all passed. DIGIT / PASS,
+verification closed. All three targets also compiled and linked on Windows GNU.
+Native runtime and complete upstream CPU coverage remain unaccepted.
