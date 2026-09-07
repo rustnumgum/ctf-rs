@@ -2,7 +2,7 @@
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Sparse TTTP and MTTKRP over stored COO keys.
 use crate::{
-    algebra::Arithmetic,
+    algebra::{Semiring, Wire},
     mapping::{Distribution, Mapping},
     sparse::SparseTensor,
     tensor::Tensor,
@@ -10,12 +10,16 @@ use crate::{
 
 use crate::multilinear::factor_alignment::{aligned_factor, physical_mapping};
 
-impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
+impl<'c, 'r, A> SparseTensor<'c, 'r, A>
+where
+    A: Semiring + Clone,
+    A::Element: Wire,
+{
     /// Multiply stored entries by a product of mode vectors. Factors are
     /// ordered by strictly increasing mode; omitted modes contribute no factor.
     pub fn tttp_vectors(
         &mut self,
-        factors: &[(usize, &Tensor<'_, '_, Arithmetic<f64>>)],
+        factors: &[(usize, &Tensor<'_, '_, A>)],
     ) {
         assert!(!factors.is_empty());
         let distribution = self.distribution().clone();
@@ -29,11 +33,15 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
             let (mapped, values) = aligned_factor(&distribution, mode, factor, 0, None, false);
             aligned.push((mode, mapped, values));
         }
+        let algebra = self.algebra().clone();
         self.transform_stored(|key, value| {
             let coordinates = distribution.decode_key(key);
             for (mode, mapped, vector) in &aligned {
                 let factor_key = coordinates[*mode];
-                *value *= vector[mapped.local_offset(rank, factor_key)];
+                *value = algebra.multiply(
+                    value,
+                    &vector[mapped.local_offset(rank, factor_key)],
+                );
             }
         });
     }
@@ -43,7 +51,7 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
     /// selects balanced auxiliary-index blocks without densifying the tensor.
     pub fn tttp_matrices(
         &mut self,
-        factors: &[(usize, &Tensor<'_, '_, Arithmetic<f64>>)],
+        factors: &[(usize, &Tensor<'_, '_, A>)],
         aux_mode_first: bool,
         divisions: usize,
     ) {
@@ -64,8 +72,11 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
         }
 
         let rank = self.context().rank();
+        let algebra = self.algebra().clone();
+        let zero = algebra.zero();
+        let one = algebra.one();
         let mut accumulated = if divisions > 1 {
-            vec![0.; self.local_nnz()]
+            vec![zero.clone(); self.local_nnz()]
         } else {
             Vec::new()
         };
@@ -89,9 +100,9 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
             let mut entry = 0;
             self.transform_stored(|key, value| {
                 let coordinates = distribution.decode_key(key);
-                let mut sum = 0.;
+                let mut sum = zero.clone();
                 for auxiliary in 0..width {
-                    let mut product = 1.;
+                    let mut product = one.clone();
                     for (mode, mapped, matrix) in &aligned {
                         let factor_coordinates = if aux_mode_first {
                             [auxiliary, coordinates[*mode]]
@@ -99,14 +110,17 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
                             [coordinates[*mode], auxiliary]
                         };
                         let factor_key = mapped.encode_key(&factor_coordinates);
-                        product *= matrix[mapped.local_offset(rank, factor_key)];
+                        product = algebra.multiply(
+                            &product,
+                            &matrix[mapped.local_offset(rank, factor_key)],
+                        );
                     }
-                    sum += product;
+                    sum = algebra.add(&sum, &product);
                 }
                 if divisions == 1 {
-                    *value *= sum;
+                    *value = algebra.multiply(value, &sum);
                 } else {
-                    accumulated[entry] += sum;
+                    accumulated[entry] = algebra.add(&accumulated[entry], &sum);
                 }
                 entry += 1;
             });
@@ -115,7 +129,7 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
         if divisions > 1 {
             let mut entry = 0;
             self.transform_stored(|_, value| {
-                *value *= accumulated[entry];
+                *value = algebra.multiply(value, &accumulated[entry]);
                 entry += 1;
             });
         }
@@ -128,9 +142,9 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
     pub fn mttkrp(
         &self,
         output_mode: usize,
-        factors: &[&Tensor<'_, '_, Arithmetic<f64>>],
+        factors: &[&Tensor<'_, '_, A>],
         output_distribution: Distribution,
-    ) -> Tensor<'c, 'r, Arithmetic<f64>> {
+    ) -> Tensor<'c, 'r, A> {
         let distribution = self.distribution();
         let order = distribution.shape.len();
         assert!(order >= 2 && output_mode < order);
@@ -152,7 +166,7 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
         assert_eq!(output_distribution.topology.size(), self.context().size());
 
         let rank = self.context().rank();
-        let mut aligned: Vec<Option<(Distribution, Vec<f64>)>> =
+        let mut aligned: Vec<Option<(Distribution, Vec<A::Element>)>> =
             (0..order).map(|_| None).collect();
         let mut factor_index = 0;
         for mode in 0..order {
@@ -182,18 +196,19 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
             distribution.topology.clone(),
             output_mappings,
         );
-        let mut output_values = vec![0.; mapped_output.local_len()];
+        let zero = self.algebra().zero();
+        let mut output_values = vec![zero; mapped_output.local_len()];
         // Source MTTKRP groups contiguous mode-zero fibers, reusing products
         // of the remaining factor rows. Virtual blocks require global-key order.
         let mut pairs = self.local_pairs();
         pairs.retain(|(key, _)| distribution.owner(*key) == rank);
         pairs.sort_by_key(|&(key, _)| key);
         let phases: Vec<_> = distribution.mappings.iter().map(Mapping::physical_phase).collect();
-        let arrays: Vec<&[f64]> = aligned.iter().map(|factor| match factor {
+        let arrays: Vec<&[A::Element]> = aligned.iter().map(|factor| match factor {
             Some((_, values)) => values.as_slice(),
             None => &[],
         }).collect();
-        crate::multilinear::kernel::mttkrp(&distribution.shape, &phases, width,
+        crate::multilinear::kernel::mttkrp(self.algebra(), &distribution.shape, &phases, width,
             output_mode, &pairs, &arrays, &mut output_values);
 
         let coordinates = distribution.topology.coordinates(rank);
@@ -202,7 +217,7 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
             .context()
             .split(Some(color as i32), rank as i32)
             .unwrap();
-        fiber.reduce_f64(0, &mut output_values);
+        fiber.reduce_monoid(self.algebra(), &mut output_values, false, 0);
         let pairs: Vec<_> = if fiber.rank() == 0 {
             output_values
                 .into_iter()
@@ -216,7 +231,7 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
         };
         fiber.close();
 
-        let mut output = Tensor::new(self.context(), output_distribution, Arithmetic::new());
+        let mut output = Tensor::new(self.context(), output_distribution, self.algebra().clone());
         output.write_add(&pairs);
         output
     }

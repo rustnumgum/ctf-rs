@@ -1,7 +1,11 @@
 // Adapted from cc4s CTF interface/multilinear.cxx.
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Dense TTTP: mode-aligned factors and balanced auxiliary-index blocking.
-use crate::{algebra::Arithmetic, mapping::{Distribution, Mapping}, tensor::Tensor};
+use crate::{
+    algebra::{Semiring, Wire},
+    mapping::{Distribution, Mapping},
+    tensor::Tensor,
+};
 
 #[path = "multilinear_factor.rs"]
 pub(crate) mod factor_alignment;
@@ -20,7 +24,10 @@ pub mod tensor_svd;
 #[path = "solve_factor.rs"]
 mod solve_factor;
 
-impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
+impl<'c, 'r, A: Semiring + Clone> Tensor<'c, 'r, A>
+where
+    A::Element: Wire,
+{
     /// Matricized tensor times Khatri-Rao product, replacing the output factor.
     /// Supply all factors except `output_mode`, in ascending tensor-mode order.
     /// Factors are vectors or auxiliary-first matrices [k, mode_length], as in
@@ -37,6 +44,7 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
             else { vec![width, dist.shape[mode]] };
         assert_eq!(output_distribution.shape, shape_for(output_mode));
         assert_eq!(output_distribution.topology.size(), self.context().size());
+        let algebra = self.algebra().clone();
         let rank = self.context().rank();
         let coordinates = dist.topology.coordinates(rank);
         let phases: Vec<_> = dist.mappings.iter().map(Mapping::physical_phase).collect();
@@ -48,7 +56,7 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
             let color = mapping.physical_rank(&coordinates);
             let mappings = if vector { vec![mapping] } else { vec![Mapping::Unmapped, mapping] };
             let mapped = Distribution::new(shape_for(mode), dist.topology.clone(), mappings);
-            let mut values = vec![0.; mapped.local_len()];
+            let mut values = vec![algebra.zero(); mapped.local_len()];
             if mode == output_mode {
                 output_mapped = Some(mapped);
             } else {
@@ -77,17 +85,26 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         pairs.sort_by_key(|&(key, _)| key);
         let mut values = std::mem::take(&mut arrays[output_mode]);
         let factors: Vec<_> = arrays.iter().map(Vec::as_slice).collect();
-        kernel::mttkrp(&dist.shape, &phases, width, output_mode, &pairs, &factors, &mut values);
+        kernel::mttkrp(
+            &algebra,
+            &dist.shape,
+            &phases,
+            width,
+            output_mode,
+            &pairs,
+            &factors,
+            &mut values,
+        );
         let mapped = output_mapped.unwrap();
         let color = dist.mappings[output_mode].physical_rank(&coordinates);
         let fiber = self.context().split(Some(color as i32), rank as i32).unwrap();
-        fiber.reduce_f64(0, &mut values);
+        fiber.reduce_monoid(&algebra, &mut values, false, 0);
         let output_pairs: Vec<_> = if fiber.rank() == 0 {
             values.into_iter().enumerate().filter_map(|(offset, value)|
                 mapped.global_key(rank, offset).map(|key| (key, value))).collect()
         } else { Vec::new() };
         fiber.close();
-        let mut output = Self::new(self.context(), output_distribution, Arithmetic::new());
+        let mut output = Self::new(self.context(), output_distribution, algebra);
         output.write_add(&output_pairs);
         output
     }
@@ -96,6 +113,7 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
     /// strictly increasing mode; omitted modes contribute no factor.
     pub fn tttp_vectors(&mut self, factors: &[(usize, &Self)]) {
         assert!(!factors.is_empty());
+        let algebra = self.algebra().clone();
         let distribution = self.distribution().clone();
         let rank = self.context().rank();
         let mut mapped = Vec::with_capacity(factors.len());
@@ -112,7 +130,10 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
             let coordinates = distribution.decode_key(key);
             for (mode, factor_distribution, vector) in &mapped {
                 let factor_key = coordinates[*mode];
-                *value *= vector[factor_distribution.local_offset(rank, factor_key)];
+                *value = algebra.multiply(
+                    value,
+                    &vector[factor_distribution.local_offset(rank, factor_key)],
+                );
             }
         });
     }
@@ -125,6 +146,7 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
     pub fn tttp_matrices(&mut self, factors: &[(usize, &Self)],
         aux_mode_first: bool, divisions: usize) {
         assert!(!factors.is_empty());
+        let algebra = self.algebra().clone();
         let distribution = self.distribution().clone();
         let mode_axis = usize::from(aux_mode_first);
         let auxiliary_axis = 1 - mode_axis;
@@ -141,7 +163,7 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         }
         let rank = self.context().rank();
         let mut accumulated = if divisions > 1 {
-            vec![0.; self.local_storage().len()]
+            vec![algebra.zero(); self.local_storage().len()]
         } else { Vec::new() };
         let mut start = 0;
         for block in 0..divisions {
@@ -154,9 +176,9 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
             }
             self.transform(|key, value| {
                 let coordinates = distribution.decode_key(key);
-                let mut sum = 0.;
+                let mut sum = algebra.zero();
                 for auxiliary in 0..width {
-                    let mut product = 1.;
+                    let mut product = algebra.one();
                     for (mode, factor_distribution, matrix) in &mapped {
                         let factor_coordinates = if aux_mode_first {
                             [auxiliary, coordinates[*mode]]
@@ -164,17 +186,29 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
                             [coordinates[*mode], auxiliary]
                         };
                         let factor_key = factor_distribution.encode_key(&factor_coordinates);
-                        product *= matrix[factor_distribution.local_offset(rank, factor_key)];
+                        product = algebra.multiply(
+                            &product,
+                            &matrix[factor_distribution.local_offset(rank, factor_key)],
+                        );
                     }
-                    sum += product;
+                    sum = algebra.add(&sum, &product);
                 }
-                if divisions == 1 { *value *= sum; }
-                else { accumulated[distribution.local_offset(rank, key)] += sum; }
+                if divisions == 1 {
+                    *value = algebra.multiply(value, &sum);
+                } else {
+                    let offset = distribution.local_offset(rank, key);
+                    accumulated[offset] = algebra.add(&accumulated[offset], &sum);
+                }
             });
             start += width;
         }
         if divisions > 1 {
-            self.transform(|key, value| *value *= accumulated[distribution.local_offset(rank, key)]);
+            self.transform(|key, value| {
+                *value = algebra.multiply(
+                    value,
+                    &accumulated[distribution.local_offset(rank, key)],
+                )
+            });
         }
     }
 }

@@ -2,7 +2,7 @@
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Physical-mode factor redistribution and complementary-fiber broadcast.
 use crate::{
-    algebra::Arithmetic,
+    algebra::{Monoid, Wire},
     mapping::{Distribution, Mapping},
     tensor::Tensor,
 };
@@ -32,14 +32,17 @@ pub(crate) fn physical_mapping(mapping: &Mapping) -> Mapping {
 
 /// Read one vector or auxiliary submatrix onto the tensor mode's physical
 /// mapping, then broadcast it along the complementary process fiber.
-pub(crate) fn aligned_factor(
+pub(crate) fn aligned_factor<A: Monoid + Clone>(
     tensor_distribution: &Distribution,
     mode: usize,
-    factor: &Tensor<'_, '_, Arithmetic<f64>>,
+    factor: &Tensor<'_, '_, A>,
     auxiliary_start: usize,
     auxiliary_width: Option<usize>,
     aux_mode_first: bool,
-) -> (Distribution, Vec<f64>) {
+) -> (Distribution, Vec<A::Element>)
+where
+    A::Element: Wire,
+{
     let mapping = physical_mapping(&tensor_distribution.mappings[mode]);
     let (shape, mappings) = if let Some(width) = auxiliary_width {
         if aux_mode_first {
@@ -85,7 +88,7 @@ pub(crate) fn aligned_factor(
     };
     let keys: Vec<_> = requests.iter().map(|&(_, key)| key).collect();
     let read = factor.read(&keys);
-    let mut values = vec![0.; mapped.local_len()];
+    let mut values = vec![factor.algebra().zero(); mapped.local_len()];
     for ((offset, _), value) in requests.into_iter().zip(read) {
         values[offset] = value;
     }

@@ -583,3 +583,8 @@ harness = false
 name = "typed_tensor_svd"
 path = "tests/typed_tensor_svd.rs"
 harness = false
+
+[[test]]
+name = "typed_multilinear"
+path = "tests/typed_multilinear.rs"
+harness = false

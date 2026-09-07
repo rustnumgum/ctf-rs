@@ -1142,6 +1142,26 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## Generic semiring dense/sparse TTTP and MTTKRP (2026-09-07)
+
+typed_multilinear passed once at WSL 1/2/4 ranks, world/parity subcontexts.
+The same dense and sparse production paths cover f32/f64/Complex<f32>/
+Complex<f64>, exact i64 and a non-Copy noncommutative 2x2 integer matrix
+semiring. Floating components are finite with abs<1e-6; discrete results and
+stored sparse keys are exact. Vector TTTP skips a mode; matrix TTTP uses both
+factor orientations and uneven 5-column/2-block auxiliary partitions. MTTKRP
+checks every output mode with vector and matrix factors. Input tensor layouts
+include virtual blocks, uneven physical shards and a replicated layer at four
+ranks. Factor data and TTTP output distributions are preserved.
+
+Arithmetic, factor buffers, mode-fiber broadcasts and final reductions now use
+the supplied algebra/Wire types. Source multiplication order and fiber reuse
+remain unchanged; there is no complex conjugation or global tensor gather.
+Five corresponding/affected targets compiled and linked on Windows GNU once.
+No failures or extra precision checks. DIGIT / PASS; automatic auxiliary memory
+selection, remaining multilinear routines, native MPI runtime and full-port
+acceptance remain incomplete.
+
 ## Four-type distributed eigensolve and indexed tensor SVD (2026-09-07)
 
 typed_distributed_eigh and typed_tensor_svd passed once at WSL 1/2/4 ranks,

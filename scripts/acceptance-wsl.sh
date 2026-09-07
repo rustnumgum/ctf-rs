@@ -55,6 +55,7 @@ mpi_tests+=(randomized_guess)
 mpi_tests+=(distributed_random_fill)
 mpi_tests+=(typed_grid_blas typed_randomized_svd)
 mpi_tests+=(typed_distributed_eigh typed_tensor_svd)
+mpi_tests+=(typed_multilinear)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
