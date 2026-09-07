@@ -1,5 +1,15 @@
 # Validation evidence
 
+## Generic BLAS declarations and fractional node costs (2026-09-08)
+
+The existing four-type local GEMM dispatch now declares the s/c/z BLAS symbols
+that its f32/complex implementations already call. Replicated communication
+cost trees store the source `CommData::comm_nodes` average as `f64`, preserving
+fractional peer-node counts instead of requiring an integer. This repairs the
+compile failures that rejected the B0 WIP; it changes no numerical metric,
+fixture or algorithm. WSL and native Windows GNU compile/link passed once; no
+runtime or numerical driver was executed. DIGIT / PASS for compilation only.
+
 ## B0 sparse WIP disposition and expression inventory (2026-09-08)
 
 After syncing `f22da3a` to the Linux work copy, the single prescribed

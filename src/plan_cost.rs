@@ -7,7 +7,8 @@ use crate::cost::{Models,Communication};
 #[derive(Clone,Debug)]
 pub struct Collective {
     pub ranks:usize,
-    pub nodes:usize,
+    /// Source average peer-node count (`CommData::comm_nodes`), which may be fractional.
+    pub nodes:f64,
     pub bytes:usize,
 }
 #[derive(Clone,Debug)]
@@ -41,11 +42,11 @@ impl Tree {
                 let mut estimate=child.estimate(models,layers);
                 for comm in inputs.iter().flatten() {
                     estimate.seconds+=models.communication(Communication::Broadcast,comm.ranks,comm.bytes);
-                    estimate.internode_volume+=(comm.bytes*comm.nodes) as f64;
+                    estimate.internode_volume+=comm.bytes as f64*comm.nodes;
                 }
                 for comm in output {
                     estimate.seconds+=models.communication(Communication::Reduce{custom:*custom_reduce},comm.ranks,comm.bytes);
-                    estimate.internode_volume+=(comm.bytes*comm.nodes) as f64;
+                    estimate.internode_volume+=comm.bytes as f64*comm.nodes;
                 }
                 estimate
             },
@@ -57,7 +58,7 @@ impl Tree {
                         assert_eq!(comm.bytes,panel_bytes[operand]);
                         let op=if operand==2 {Communication::Reduce{custom:*custom_reduce}} else {Communication::Broadcast};
                         estimate.seconds+=models.communication(op,comm.ranks,comm.bytes);
-                        estimate.internode_volume+=(comm.bytes*comm.nodes) as f64;
+                        estimate.internode_volume+=comm.bytes as f64*comm.nodes;
                         auxiliary=auxiliary.max(comm.bytes);
                     }
                 }

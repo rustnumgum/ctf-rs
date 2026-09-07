@@ -16,6 +16,17 @@ unsafe extern "C" {
     fn dgemm_(ta: *const c_char, tb: *const c_char, m: *const i32, n: *const i32, k: *const i32,
         alpha: *const f64, a: *const f64, lda: *const i32, b: *const f64, ldb: *const i32,
         beta: *const f64, c: *mut f64, ldc: *const i32);
+    fn sgemm_(ta: *const c_char, tb: *const c_char, m: *const i32, n: *const i32, k: *const i32,
+        alpha: *const f32, a: *const f32, lda: *const i32, b: *const f32, ldb: *const i32,
+        beta: *const f32, c: *mut f32, ldc: *const i32);
+    fn cgemm_(ta: *const c_char, tb: *const c_char, m: *const i32, n: *const i32, k: *const i32,
+        alpha: *const Complex<f32>, a: *const Complex<f32>, lda: *const i32,
+        b: *const Complex<f32>, ldb: *const i32, beta: *const Complex<f32>,
+        c: *mut Complex<f32>, ldc: *const i32);
+    fn zgemm_(ta: *const c_char, tb: *const c_char, m: *const i32, n: *const i32, k: *const i32,
+        alpha: *const Complex<f64>, a: *const Complex<f64>, lda: *const i32,
+        b: *const Complex<f64>, ldb: *const i32, beta: *const Complex<f64>,
+        c: *mut Complex<f64>, ldc: *const i32);
 }
 #[cfg_attr(target_os = "windows", link(name = "openblas"))]
 #[cfg_attr(not(target_os = "windows"), link(name = "lapack"))]

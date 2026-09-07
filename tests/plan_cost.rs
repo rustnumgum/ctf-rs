@@ -10,8 +10,8 @@ fn leaf()->Tree {Tree::Local{custom:false,folded:false,operand_bytes:[8,16,24],f
 #[test]
 fn recursion_and_layers() {
     let tree=Tree::Virtual{phases:vec![2,3],orders:[2,2,2],child:Box::new(Tree::Panels{
-        steps:4,panel_bytes:[8,16,24],movement:[Some(Collective{ranks:2,nodes:2,bytes:8}),None,
-            Some(Collective{ranks:4,nodes:3,bytes:24})],custom_reduce:false,child:Box::new(leaf())})};
+        steps:4,panel_bytes:[8,16,24],movement:[Some(Collective{ranks:2,nodes:2.,bytes:8}),None,
+            Some(Collective{ranks:4,nodes:3.,bytes:24})],custom_reduce:false,child:Box::new(leaf())})};
     let m=models();
     for (layers,seconds,volume) in [(1,72.,0.),(2,36.,0.),(8,18.,0.)] {
         let e=tree.estimate(&m,layers);assert_eq!(e.seconds,seconds);assert_eq!(e.internode_volume,volume);
@@ -20,8 +20,8 @@ fn recursion_and_layers() {
 }
 #[test]
 fn replicas_and_nested_panels() {
-    let tree=Tree::Replicated{inputs:[vec![Collective{ranks:2,nodes:2,bytes:8}],vec![]],
-        output:vec![Collective{ranks:4,nodes:3,bytes:16}],custom_reduce:true,child:Box::new(leaf())};
+    let tree=Tree::Replicated{inputs:[vec![Collective{ranks:2,nodes:2.,bytes:8}],vec![]],
+        output:vec![Collective{ranks:4,nodes:3.,bytes:16}],custom_reduce:true,child:Box::new(leaf())};
     let m=models();let e=tree.estimate(&m,4);assert_eq!(e.seconds,3.);assert_eq!(e.working_bytes,0);assert_eq!(e.internode_volume,64.);
     let tree=Tree::Panels{steps:4,panel_bytes:[8,0,0],movement:[None,None,None],custom_reduce:false,
         child:Box::new(Tree::Panels{steps:2,panel_bytes:[8,0,0],movement:[None,None,None],custom_reduce:false,child:Box::new(leaf())})};
