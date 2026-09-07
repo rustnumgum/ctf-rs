@@ -1,8 +1,8 @@
 // Adapted from cc4s contraction/contraction.cxx, normal/exhaustive mapping
 // selection and refinement (lines 2834-3190 and 3280-3342).
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
-//! Collective dense-unfolded mapping search. This module deliberately excludes
-//! folding and the aligned `GridPlan` search space. SearchCache retains selected
+//! Collective dense mapping search. This module deliberately excludes the
+//! aligned `GridPlan` search space. SearchCache retains selected
 //! raw layouts for a fixed context and immutable search configuration.
 
 use crate::{
@@ -26,6 +26,7 @@ pub struct Options {
     pub memory_limit: u64,
     pub weight: f64,
     pub allow_exhaustive: bool,
+    pub enable_folding: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,6 +42,7 @@ pub struct Selected {
     pub seconds: f64,
     pub memory_bytes: u64,
     pub distributions: [Distribution; 3],
+    pub fold: Option<crate::partial_fold::Descriptor>,
 }
 
 /// Context-scoped cache for this search configuration. Models and topology facts
@@ -80,7 +82,7 @@ impl<'context,'runtime> SearchCache<'context,'runtime> {
             },
             std::collections::hash_map::Entry::Vacant(entry)=>{
                 self.stats.misses+=1;
-                let Some(selected)=search_dense_unfolded(self.context,old,old_nodes,indices,self.catalog,self.models,
+                let Some(selected)=search_dense(self.context,old,old_nodes,indices,self.catalog,self.models,
                     self.element_bytes,self.local_custom,self.custom_reduce,self.options)?else{return Ok(None)};
                 Ok(Some(entry.insert(selected)))
             }
@@ -95,6 +97,7 @@ pub enum Error {
     NodeFactRankMismatch,
     ConflictingNodeFacts,
     MissingNodeFacts,
+    Fold(crate::partial_fold::Error),
 }
 
 impl From<ProblemError> for Error {
@@ -106,6 +109,12 @@ impl From<ProblemError> for Error {
 impl From<mapping_variants::Rejected> for Error {
     fn from(value: mapping_variants::Rejected) -> Self {
         Self::Exhaustive(value)
+    }
+}
+
+impl From<crate::partial_fold::Error> for Error {
+    fn from(value: crate::partial_fold::Error) -> Self {
+        Self::Fold(value)
     }
 }
 
@@ -209,6 +218,7 @@ fn consider(
     element_bytes: usize,
     local_custom: bool,
     custom_reduce: bool,
+    enable_folding: bool,
     objective: Objective,
 ) -> Option<(f64, u64)> {
     // Source deliberately uses double here before detailed integer memory work.
@@ -219,17 +229,47 @@ fn consider(
     if mapped_resident_bytes >= objective.memory_limit as f64 {
         return None;
     }
-    let estimate = mapped_cost::estimate_dense_unfolded(
-        old,
-        mapped,
-        indices,
-        models,
-        element_bytes,
-        nodes_per_axis,
-        local_custom,
-        custom_reduce,
-    );
-    if estimate.memory_bytes as u64 >= objective.memory_limit {
+    let (seconds, memory_bytes) = if enable_folding && !local_custom {
+        match crate::folded_cost::estimate_dense_folded(
+            old,
+            mapped,
+            indices,
+            models,
+            element_bytes,
+            nodes_per_axis,
+            custom_reduce,
+        )
+        .expect("folded candidate estimation failed after mapping preflight")
+        {
+            Some(estimate) => (estimate.seconds, estimate.memory_bytes),
+            None => {
+                let estimate = mapped_cost::estimate_dense_unfolded(
+                    old,
+                    mapped,
+                    indices,
+                    models,
+                    element_bytes,
+                    nodes_per_axis,
+                    local_custom,
+                    custom_reduce,
+                );
+                (estimate.seconds, estimate.memory_bytes)
+            }
+        }
+    } else {
+        let estimate = mapped_cost::estimate_dense_unfolded(
+            old,
+            mapped,
+            indices,
+            models,
+            element_bytes,
+            nodes_per_axis,
+            local_custom,
+            custom_reduce,
+        );
+        (estimate.seconds, estimate.memory_bytes)
+    };
+    if memory_bytes as u64 >= objective.memory_limit {
         return None;
     }
     if mapped
@@ -238,8 +278,8 @@ fn consider(
     {
         return None;
     }
-    assert!(estimate.seconds >= 0.);
-    Some((estimate.seconds, estimate.memory_bytes as u64))
+    assert!(seconds >= 0.);
+    Some((seconds, memory_bytes as u64))
 }
 
 fn select_global(
@@ -298,6 +338,7 @@ fn normal_pass(
     element_bytes: usize,
     local_custom: bool,
     custom_reduce: bool,
+    enable_folding: bool,
     objective: Objective,
 ) -> Result<Option<CandidateCost>, Error> {
     let shapes = old.map(|distribution| distribution.shape.as_slice());
@@ -320,6 +361,7 @@ fn normal_pass(
                 element_bytes,
                 local_custom,
                 custom_reduce,
+                enable_folding,
                 objective,
             ) {
                 let score = objective.score(seconds, memory_bytes);
@@ -348,6 +390,7 @@ fn exhaustive_pass(
     element_bytes: usize,
     local_custom: bool,
     custom_reduce: bool,
+    enable_folding: bool,
     objective: Objective,
     baseline: CandidateCost,
 ) -> Result<Option<CandidateCost>, Error> {
@@ -376,6 +419,7 @@ fn exhaustive_pass(
                 element_bytes,
                 local_custom,
                 custom_reduce,
+                enable_folding,
                 objective,
             ) {
                 let score = objective.score(seconds, memory_bytes);
@@ -399,7 +443,7 @@ fn exhaustive_pass(
 /// must agree. An empty result means no normal candidate survived mapping,
 /// preflight, strict memory bounds and the dense-local `INT_MAX` limit.
 #[allow(clippy::too_many_arguments)]
-pub fn search_dense_unfolded(
+pub fn search_dense(
     context: &Context<'_>,
     old: [&Distribution; 3],
     old_nodes: [&[usize]; 3],
@@ -424,6 +468,7 @@ pub fn search_dense_unfolded(
         element_bytes,
         local_custom,
         custom_reduce,
+        options.enable_folding,
         time_objective,
     )? else {
         return Ok(None);
@@ -446,6 +491,7 @@ pub fn search_dense_unfolded(
             element_bytes,
             local_custom,
             custom_reduce,
+            options.enable_folding,
             normal_objective,
         )?
         .expect("time-pass winner must remain a weighted-pass candidate");
@@ -470,6 +516,7 @@ pub fn search_dense_unfolded(
             element_bytes,
             local_custom,
             custom_reduce,
+            options.enable_folding,
             refinement_objective,
             normal,
         )? {
@@ -501,11 +548,37 @@ pub fn search_dense_unfolded(
         .variant
         .distributions,
     };
+    let fold = if options.enable_folding && !local_custom {
+        let block_shapes = distributions.each_ref().map(|distribution| distribution.block_shape());
+        let links: [Vec<crate::symmetry::Symmetry>; 3] = std::array::from_fn(|operand| {
+            vec![crate::symmetry::Symmetry::NS; block_shapes[operand].len()]
+        });
+        let virtual_copies = distributions.each_ref().map(|distribution| {
+            distribution
+                .mappings
+                .iter()
+                .map(|mapping| mapping.phase() / mapping.physical_phase())
+                .product()
+        });
+        match crate::partial_fold::select(
+            block_shapes.each_ref().map(Vec::as_slice),
+            links.each_ref().map(Vec::as_slice),
+            indices,
+            models,
+            virtual_copies,
+        )? {
+            crate::partial_fold::Outcome::Selected(descriptor) => Some(descriptor),
+            crate::partial_fold::Outcome::Ineligible(_) => None,
+        }
+    } else {
+        None
+    };
     Ok(Some(Selected {
         kind,
         source_id: chosen.source_id,
         seconds: chosen.seconds,
         memory_bytes: chosen.memory_bytes,
         distributions,
+        fold,
     }))
 }

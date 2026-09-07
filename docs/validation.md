@@ -1099,6 +1099,18 @@ RSS. Scalar fold ineligibility returns None. No failures, precision studies or
 old test reruns. Windows GNU compilation/linking passed; distributed folded
 execution and native MPI runtime acceptance remain pending.
 
+## Folded cost integration into collective search (2026-09-07)
+
+dense_search passed WSL 1/2/4 ranks, world/parity, after integration. The serial
+reference now verifies folded and unfolded candidate winners for time-only and
+weighted searches, with/without exhaustive refinement, the source 0.01 cutoff,
+strict memory rejection, dense-custom and scalar no-fold cases. Returned fold
+descriptors and cache reuse across index alpha-renaming are checked exactly.
+No failures or precision studies. Windows GNU compiled/linked dense_search and
+the API-updated dense_execution target; unchanged execution tests were not rerun.
+The selected folded descriptor is available, but distributed folded execution is
+not claimed by this selection test.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each

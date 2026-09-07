@@ -4,7 +4,7 @@ Reference: cc4s CTF f69cbb46e23bc2f39cda5722ce096f56301dab4f.
 
 ## Collective raw dense-unfolded search
 
-dense_search::search_dense_unfolded connects source normal and exhaustive
+dense_search::search_dense connects source normal and exhaustive
 candidate generation, raw mapping costs, rank-local selection, global winner
 selection and selected-ID reconstruction. It does not constrain candidates to
 GridPlan's aligned maps. Old topologies and catalog topologies have explicitly
@@ -81,6 +81,16 @@ redistribution temporary storage and fold buffers plus inner workspace. Ineligib
 folds return None, not a substituted estimate. Automatic search still explicitly
 uses its unfolded estimator; selecting/executing folded distributed candidates is
 not yet connected by this cost API alone.
+
+The integrated search now accepts explicit Options.enable_folding. When enabled,
+ordinary eligible candidates use the folded estimator in every normal, weighted
+and exhaustive pass. Source-ineligible folds and dense custom functions use the
+source unfolded branch; estimation failures are not converted into another plan.
+Selected.fold carries the winning descriptor, rebuilt after selected-ID mapping
+reconstruction without repeating its full cost estimate. SearchCache retains it
+under the same immutable configuration. Callers must distinguish this folded
+selection from the existing raw unfolded executor; distributed folded execution
+is still pending. The old search_dense_unfolded name has been removed, not wrapped.
 
 ## Executable inner cost tree now connected
 

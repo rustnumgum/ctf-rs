@@ -72,7 +72,7 @@ fn run(c:&Context<'_>){
     let catalog:Vec<_>=topology_candidates::all_shapes(c.size()).into_iter().map(|topology|
         TopologyFacts{nodes_per_axis:vec![1;topology.dimensions.len()],topology}).collect();
     let models=Models::upstream(1);
-    let mut cache=SearchCache::new(c,&catalog,&models,8,false,false,Options{memory_limit:1_000_000,weight:0.,allow_exhaustive:true});
+    let mut cache=SearchCache::new(c,&catalog,&models,8,false,false,Options{memory_limit:1_000_000,weight:0.,allow_exhaustive:true,enable_folding:false});
     let mut a=make(c,vec![3,3]);let mut b=make(c,vec![3,2]);let mut output=make(c,vec![3,2]);
     a.transform(|key,v|*v=a_value(key));b.transform(|key,v|*v=b_value(key));output.transform(|_,v|*v=3.);
     for(iteration,alpha,beta)in[(0,2.,3.),(1,3.,0.)]{

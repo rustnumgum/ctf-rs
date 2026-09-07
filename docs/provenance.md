@@ -1097,3 +1097,10 @@ formatting temporary. The source leaf model multiplies residual sizes by mn/mk/n
 and residual work by mnk but omits l; this estimator quirk is retained, while
 actual folded BLAS execution continues to process every batch. Floating-point
 work and total-time accumulation follow source order, not an integer work product.
+
+dense_search now follows detail_estimate_mem_and_time's FOLD_TSR/can_fold branch
+while evaluating each normal/exhaustive candidate. The explicit enable_folding
+option models that source policy; dense custom functions remain ineligible.
+Folded memory affects the same strict filters and weighted objectives as unfolded
+memory. The selected fold descriptor is reconstructed from the winning raw map
+after the existing winner-ID communication, not serialized with tensor contents.
