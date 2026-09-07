@@ -79,6 +79,7 @@ cargo test --lib sparse_text
 cargo test --lib schedule
 cargo test --lib cyclic_reshuffle
 cargo test --lib symmetric_reshuffle
+cargo test --lib sparse_virtual
 cargo test --test narrow_algebra
 cargo test --test random_generator --test scalar_blas --test node_peer_counts --test folded_cost --test partial_fold_kernel --test fold_storage --test partial_fold --test fold_indices --test fold_layout --test fold_selection --test mapped_cost --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
   --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction \

@@ -74,4 +74,6 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cargo test --lib cyclic_reshuffle
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cargo test --lib symmetric_reshuffle
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo test --lib sparse_virtual
 exit $LASTEXITCODE

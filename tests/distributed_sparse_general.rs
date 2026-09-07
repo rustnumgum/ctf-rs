@@ -12,12 +12,12 @@ fn run(c: &Context<'_>) {
     let mut plans = vec![(Topology::new(vec![c.size()]),"i"),
         (Topology::new(vec![c.size()]),"j"),(Topology::new(vec![c.size()]),"k")];
     if c.size()==4 { plans.push((Topology::new(vec![2,2]),"ij")); }
-    for (topology,physical) in plans { for empty in [false,true] {
+    for (topology,physical) in plans { for empty in [false,true] { for factors in [&[][..],&[(b'i',2),(b'j',2),(b'k',3),(b'x',2)][..]] {
         let aa = if empty { SparseTensor::new(c,distribution.clone(),Arithmetic::new()) } else {a.clone()};
         let mut output = Tensor::new(c,Distribution::cyclic(vec![2,2,3],c.size()),Arithmetic::new());
         output.transform(|key,value|*value=key as i64+7);
         let saved = output.distribution().clone();
-        output.contract_from_sparse_dense_on("ijx",&aa,"ik",&b,"kj",topology.clone(),physical,2,3,true);
+        output.contract_from_sparse_dense_on("ijx",&aa,"ik",&b,"kj",topology.clone(),physical,factors,2,3,true);
         assert_eq!(output.distribution(),&saved);
         let keys:Vec<_>=(0..12).collect();
         let expected:Vec<_>=keys.iter().map(|&key| {
@@ -26,7 +26,7 @@ fn run(c: &Context<'_>) {
                 .map(|&(ak,av)|2*av*((ak/2+3*j) as i64-2)).sum::<i64>()}
         }).collect();
         assert_eq!(output.read(&keys),expected,"physical={physical} empty={empty}");
-    } }
+    } } }
 }
 fn main(){let runtime=Runtime::initialize();let world=runtime.world();run(&world);
     let child=world.split(Some((world.rank()%2) as i32),world.rank() as i32).unwrap();run(&child);child.close();

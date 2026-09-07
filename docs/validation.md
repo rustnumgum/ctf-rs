@@ -1,5 +1,16 @@
 # Validation evidence
 
+## Sparse virtual execution (2026-09-07)
+
+Four exact `sparse_virtual` unit tests passed once: block order, beta-first
+tracking, repeated output diagonals, scalar and changing sparse output buckets.
+`distributed_sparse_general` and `distributed_sparse_function` passed once at
+1/2/4 WSL ranks, world/parity, with explicit no-virtual and multi-label virtual
+factors. Exact i64 checks include contracted/output-only virtual indices, empty
+sparse blocks, stored zeros and non-distributive custom functions. DIGIT / PASS;
+no numerical diagnostic runs. Windows native MPI execution remains pending.
+The library and both sparse integration targets compiled/linked once on Windows GNU.
+
 ## Value-only subworld streams (2026-09-07)
 
 `subworld_transfer`, `symmetric_subworld`, `typed_distributed_eigh` and `schedule`

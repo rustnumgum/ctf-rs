@@ -67,3 +67,4 @@ mod binary_io;
 pub mod schedule;
 mod cyclic_reshuffle;
 mod symmetric_reshuffle;
+pub mod sparse_virtual;

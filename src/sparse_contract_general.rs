@@ -113,6 +113,7 @@ macro_rules! define_mapped_contraction {
         indices_b: &str,
         topology: Topology,
         physical_labels: &str,
+        virtual_factors: &[(u8, usize)],
         alpha: A::Element,
         beta: A::Element,
         commutative: bool,
@@ -173,6 +174,17 @@ macro_rules! define_mapped_contraction {
             maps[union_axis].augment_physical(&topology, topology_axis);
         }
 
+        let mut virtual_dimensions = vec![1; labels.len()];
+        for &(label, factor) in virtual_factors {
+            assert!(factor > 0);
+            let axis = labels.iter().position(|&candidate| candidate == label).unwrap();
+            assert_eq!(virtual_dimensions[axis], 1);
+            virtual_dimensions[axis] = factor;
+            let total_phase = maps[axis].phase() * factor;
+            maps[axis].augment_virtual(total_phase);
+        }
+        let index_maps: [Vec<usize>; 3] = std::array::from_fn(|operand|
+            operands[operand].0.bytes().map(|label|labels.iter().position(|&x|x==label).unwrap()).collect());
         let mapped: [Distribution; 3] = std::array::from_fn(|operand| {
             let (indices, original) = operands[operand];
             Distribution::new(
@@ -220,21 +232,31 @@ macro_rules! define_mapped_contraction {
             self.algebra().zero()
         };
         let shapes: [Vec<usize>; 3] = std::array::from_fn(|operand| mapped[operand].block_shape());
+        let block_sizes: [usize; 3] = std::array::from_fn(|operand| shapes[operand].iter().product());
+        let count_a: usize = index_maps[0].iter().map(|&axis|virtual_dimensions[axis]).product();
+        let mut sparse_blocks = vec![Vec::new(); count_a];
+        for (offset,value) in sparse_a {
+            sparse_blocks[offset / block_sizes[0]].push((offset % block_sizes[0],value));
+        }
+        let one = self.algebra().one();
+        crate::sparse_virtual::execute(&virtual_dimensions,
+            [&index_maps[0],&index_maps[1],&index_maps[2]],&child_beta,&one,|blocks,leaf_beta| {
         ($kernel)(
             self.algebra(),
             &shapes[0],
             indices_a,
-            &sparse_a,
+            &sparse_blocks[blocks[0]],
             &shapes[1],
             indices_b,
-            &dense_b,
+            &dense_b[blocks[1]*block_sizes[1]..(blocks[1]+1)*block_sizes[1]],
             &shapes[2],
             indices_c,
-            &mut dense_c,
+            &mut dense_c[blocks[2]*block_sizes[2]..(blocks[2]+1)*block_sizes[2]],
             &alpha,
-            &child_beta,
-            $( $function, )?
+            leaf_beta,
+            $( &$function, )?
         );
+        });
         for communicator in &communicators[2] {
             communicator.reduce_monoid(self.algebra(), &mut dense_c, commutative, 0);
         }
