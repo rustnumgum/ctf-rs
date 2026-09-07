@@ -9,7 +9,7 @@ use crate::{
     tensor::Tensor,
 };
 
-fn orient_subworld(
+pub(crate) fn orient_subworld(
     parent: &Context<'_>,
     local_child_rank: Option<usize>,
     child_size: usize,

@@ -11,6 +11,8 @@ use crate::{
 mod operations;
 #[path = "symmetric_unpack.rs"]
 mod unpack;
+#[path = "symmetric_subworld.rs"]
+mod subworld;
 #[path = "symmetric_sum_tensor.rs"]
 mod summation;
 #[path = "symmetric_hollow_sum.rs"]

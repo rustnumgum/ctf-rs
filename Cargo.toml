@@ -662,3 +662,8 @@ harness = false
 name = "symmetric_reshuffle"
 path = "tests/symmetric_reshuffle.rs"
 harness = false
+
+[[test]]
+name = "symmetric_subworld"
+path = "tests/symmetric_subworld.rs"
+harness = false

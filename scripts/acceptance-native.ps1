@@ -47,6 +47,7 @@ $arguments += @('--test', 'schedule')
 $arguments += @('--test', 'cyclic_reshuffle')
 $arguments += @('--test', 'bool_norm')
 $arguments += @('--test', 'symmetric_reshuffle')
+$arguments += @('--test', 'symmetric_subworld')
 foreach ($test in @('typed_grid_blas','typed_randomized_svd','typed_distributed_eigh','typed_tensor_svd','typed_multilinear','tttp_memory','tensor_norms','storage_conversion','sparse_random_fill','subworld_transfer','sparse_text_io','symmetric_norms','symmetric_text_io','pair_read')) { $arguments += @('--test', $test) }
 foreach ($ranks in 1,2,4) {
     $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = "mpiexec -n $ranks"

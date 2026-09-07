@@ -1,5 +1,14 @@
 # Validation evidence
 
+## Compressed subworld accumulation (2026-09-07)
+
+`symmetric_subworld` passed once at 1/2/4 WSL ranks, world/parity, after fixing a
+test-only moved coefficient before execution. Exact integer/complex checks cover
+SY/AS/SH, alpha/beta updates in both directions, unchanged source storage,
+reversed noncontiguous child ranks, physical/virtual/full replicas, empty regions
+and one-element edge lengths. DIGIT / PASS; no numerical diagnostics. Windows
+GNU compiled/linked the target once; native MPI runtime acceptance remains pending.
+
 ## Packed value-only reshuffle (2026-09-07)
 
 Three exact canonical-stream unit tests and `symmetric_reshuffle`,

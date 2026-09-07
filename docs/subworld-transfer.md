@@ -24,3 +24,17 @@ upstream cyclic-reshuffle buffer kernels remain a separate backlog item.
 Child tensors borrow their child context. Finish transfers and drop those
 tensors before explicitly closing the child context. Destructors do not perform
 collective communication.
+
+## Compressed tensors
+
+`SymmetricTensor` provides the same operations with an explicit
+`SymmetricDistribution`, requiring equal shape and symmetry links. Only canonical
+compressed entries are routed; no rectangular unpack or root gather occurs.
+The receive side writes packed offsets directly, preserving padding/structural
+holes and replica ownership. Ring coefficients remain right multipliers:
+incoming*alpha + old*beta. Inactive parent ranks pass None even for reversed or
+noncontiguous child memberships. Source values remain unchanged.
+
+This path currently uses serialized canonical keys like dense subworld transfer;
+integration with value-only subworld reshuffle is still pending. It does not
+claim sparse-pair storage compatibility with the pinned dense-buffer routine.
