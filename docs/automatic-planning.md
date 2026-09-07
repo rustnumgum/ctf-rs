@@ -198,8 +198,8 @@ Each original local virtual block is transposed once before replication and
 nested 2D panels. Virtual leaves operate directly on packed blocks; output is
 inverse-transposed after reduction and restored to its original distribution.
 This supports dense NS partial folds and batch labels without forcing aligned
-maps or globally gathering tensors. Sparse/compressed automatic execution,
-node-aware and low-memory integration remain unfinished. `LocalKernels` retains
+maps or globally gathering tensors. Sparse/compressed automatic execution
+remains unfinished. `LocalKernels` retains
 the compile-time replacement boundary for future faer kernels.
 
 ## Node-aware dense folded execution
@@ -219,3 +219,21 @@ supplied facts' bit patterns. Automatic hardware-node discovery is not yet
 integrated. Sparse and generic
 semiring node-aware execution remain pending. Logical node partitions in
 single-machine tests do not establish multi-node performance.
+
+## Low-memory folded execution
+
+`contract_folded_low_memory` takes distinct mutable A/B/C tensors rather than
+retaining cloned home data. Its shared folded executor redistributes and packs
+the live buffers, then restores C, A and B to their original distributions.
+Node-aware execution also backmaps A/B because the originals must survive.
+This is the ownership counterpart of lowmem_contract, not an alternate
+contraction algorithm. Sparse tensors/custom functions are not accepted by
+this f64 dense API; global zero-length dimensions retain the source rejection.
+Weighted search remains explicit through Options.weight, so callers may reuse
+the selected plan without embedding collective planning in destruction.
+
+The immutable-input folded API retains its private working copies. Low-memory
+execution removes those retained home copies but still allocates redistribution
+and transpose workspace; it is not a zero-allocation or hard-RSS-bound promise.
+The representative mpi_low_memory_bench example measures one contraction with
+search excluded and both redistribution/restoration included.

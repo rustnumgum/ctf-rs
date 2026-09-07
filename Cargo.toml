@@ -515,3 +515,8 @@ harness = false
 [[test]]
 name = "node_peer_counts"
 path = "tests/node_peer_counts.rs"
+
+[[test]]
+name = "dense_low_memory"
+path = "tests/dense_low_memory.rs"
+harness = false

@@ -1130,3 +1130,11 @@ For topology [3,4] and ppn=4 the peer counts are [0.5,2], not [0,2] or [1,2].
 Collective volume multiplies bytes converted to f64 by that average. Raw and
 aligned costs, folded estimates and search facts now share this representation;
 SearchCache uses to_bits for its node-fact key rather than truncating to integer.
+
+Dense folded low-memory ownership follows contraction.cxx:5670-5812:
+the source aliases the three home buffers into temporary tensor metadata,
+runs sym_contract without retaining those home buffers, unfolds/restores C,
+then A and B, and rejects zero-edge, sparse, custom-bivariate and aliased inputs.
+Rust's distinct mutable borrows replace its pointer-identity assertions and
+manual alias flags. This stage connects that policy to the existing NS folded
+raw execution; automatic compressed-symmetry low-memory orchestration is pending.

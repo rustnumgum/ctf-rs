@@ -1009,6 +1009,25 @@ All ten targets compiled and linked once on Windows GNU; MPI native runtime
 acceptance is still outstanding. No failures or extra precision studies.
 DIGIT / PASS for this change; whole-project acceptance remains incomplete.
 
+## Dense folded low-memory execution (2026-09-07)
+
+dense_low_memory, dense_folded_execution and distributed_node_fold passed once
+at WSL 1/2/4 ranks, including world/parity contexts. Low-memory coverage checks
+exact A/B data and A/B/C distribution restoration, six normal raw mappings,
+partial folded residual axes, nonuniform/padded fragments, node rank backmapping
+and weighted SearchCache reuse with fresh values. Output remains finite with
+abs(error)<1e-6. No failures or further numerical verification. All three tests
+and the benchmark compiled/linked on Windows GNU; native MPI runtime is pending.
+
+One requested representative release measurement used mpi_low_memory_bench,
+OpenBLAS threads=1 and four WSL ranks: m=128,k=192,n=160, contraction elapsed
+0.010644 s (planning excluded; redistribution, packing and input/output restore
+included), source estimated memory 397312 bytes. Per-process lifetime peak RSS
+reported by `/usr/bin/time` was 27216,27268,27548,27552 KiB (maximum 27552 KiB).
+RSS includes MPI/runtime and planning, is not tensor workspace alone, and is not
+the source memory estimator. This single sample makes no speedup or memory-ratio
+claim. DIGIT / PASS for the acceptance set; benchmark was not a precision study.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,
