@@ -1,5 +1,14 @@
 # Validation evidence
 
+## Boolean infinity norm (2026-09-07)
+
+`bool_norm` passed once at 1/2/4 WSL ranks, world/parity. Exact checks cover
+dense/sparse true and explicit-false records, replicas, empty local shards and
+empty global tensors. The acceptance values are the pinned same-type MAXABS
+results 0.0/1.0. Source audit distinguishes unsafe bool norm1 from this supported
+operation; see `source-runtime-boundaries.md`. DIGIT / PASS.
+Windows GNU compiled/linked `bool_norm` once; MPI runtime remains pending.
+
 ## Value-only dense cyclic reshuffle (2026-09-07)
 
 Three exact offset-stream unit tests passed once. `cyclic_reshuffle`,

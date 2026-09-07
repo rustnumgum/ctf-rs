@@ -86,7 +86,7 @@ src/interface/set.cxx	src/interface	pending
 src/interface/set.h	src/sparse_formats.rs	partial: seq_coo_to_csr, seq_coo_to_ccsr, seq_csr_to_coo; remaining set responsibilities pending
 src/interface/sparse_tensor.cxx	src/interface	pending
 src/interface/sparse_tensor.h	src/interface	pending
-src/interface/tensor.cxx	src/tensor.rs; src/sparse.rs; src/random.rs; src/norms.rs; src/subworld.rs; src/sparse_text.rs; src/symmetric_unpack.rs; src/pair_read.rs	partial: direct dense operations, ownership dense/sparse conversion, four-type dense random fill, seven-type sparse-pattern random fill, dense/sparse/compressed real norms and complex norm2 plus bool NS norm2, generic dense cross-world accumulation, four-type dense/sparse/compressed text MPI-IO, distributed symmetry unpack and explicit all-rank sorted pair/data extraction; sparse/compressed cross-world paths and bool 1/infinity contracts pending
+src/interface/tensor.cxx	src/tensor.rs; src/sparse.rs; src/random.rs; src/norms.rs; src/subworld.rs; src/sparse_text.rs; src/symmetric_unpack.rs; src/pair_read.rs	partial: direct dense operations, ownership dense/sparse conversion, four-type dense random fill, seven-type sparse-pattern random fill, dense/sparse/compressed real norms and complex norm2 plus bool NS norm2/infinity, generic dense cross-world accumulation, four-type dense/sparse/compressed text MPI-IO, distributed symmetry unpack and explicit all-rank sorted pair/data extraction; compressed cross-world paths pending; pinned bool norm1 and sparse subworld path are type/storage unsafe rather than coherent supported computations (docs/source-runtime-boundaries.md)
 src/interface/tensor.h	src/interface	pending
 src/interface/term.cxx	src/interface	pending
 src/interface/term.h	src/interface	pending

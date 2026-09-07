@@ -291,6 +291,26 @@ macro_rules! norm2_only {
 }
 
 norm2_only!(bool, |value: &bool| if *value { 1.0 } else { 0.0 });
+
+impl Tensor<'_, '_, Arithmetic<bool>> {
+    /// Pinned bool MAXABS reduction: one iff any logical value is true.
+    pub fn norm_infty(&self) -> f64 {
+        let rank = self.context().rank();
+        let local = self.local_pairs().into_iter().any(|(key, value)|
+            self.distribution().owner(key) == rank && value);
+        u8::from(self.context().all_reduce(self.algebra(), &local)) as f64
+    }
+}
+
+impl SparseTensor<'_, '_, Arithmetic<bool>> {
+    /// Stored false values and absent entries both contribute false.
+    pub fn norm_infty(&self) -> f64 {
+        let rank = self.context().rank();
+        let local = self.local_pairs().into_iter().any(|(key, value)|
+            self.distribution().owner(key) == rank && value);
+        u8::from(self.context().all_reduce(self.algebra(), &local)) as f64
+    }
+}
 norm2_only!(Complex<f32>, |value: &Complex<f32>| value.re.hypot(value.im) as f64);
 norm2_only!(Complex<f64>, |value: &Complex<f64>| value.re.hypot(value.im));
 
