@@ -122,25 +122,25 @@ src/contraction/spctr_tsr.cxx	src/sparse_virtual.rs; src/sparse_contract_general
 src/contraction/spctr_tsr.h	src/contraction	pending
 src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar/custom-function reference kernels, packed custom MPI orchestration, typed canonical partial/symmetry folded BLAS residual traversal and four-type distributed integration; custom-function folded branch and automatic compressed integration pending
 src/contraction/sym_seq_ctr.h	src/contraction	pending
-src/redistribution/cyclic_reshuffle.cxx	src/cyclic_reshuffle.rs; src/symmetric_reshuffle.rs; src/subworld.rs; src/symmetric_subworld.rs; src/tensor.rs; src/symmetric_tensor.rs; tests/cyclic_reshuffle.rs; tests/symmetric_reshuffle.rs	partial: NS and symmetry-bounded physical-residue traversal, ordered value-only peer streams, virtual blocks, packed holes/padding, replica restoration and rank-oriented subworld streams; closed-form bucket counts, buffer reuse and offset/permutation arguments pending
-src/redistribution/cyclic_reshuffle.h	src/redistribution	pending
-src/redistribution/dgtog_bucket.h	src/redistribution	pending
-src/redistribution/dgtog_calc_cnt.cxx	src/redistribution	pending
-src/redistribution/dgtog_calc_cnt.h	src/redistribution	pending
-src/redistribution/dgtog_redist_ror.h	src/redistribution	pending
-src/redistribution/dgtog_redist.cxx	src/redistribution	pending
-src/redistribution/dgtog_redist.h	src/redistribution	pending
-src/redistribution/glb_cyclic_reshuffle.cxx	src/redistribution	pending
-src/redistribution/glb_cyclic_reshuffle.h	src/redistribution	pending
+src/redistribution/cyclic_reshuffle.cxx	src/cyclic_reshuffle.rs; src/symmetric_reshuffle.rs; src/subworld.rs; src/symmetric_subworld.rs; src/tensor.rs; src/symmetric_tensor.rs	ported dense high-order legacy and value-only subworld paths; low-order dense dispatches to DGTOG and symmetric arbitrary-phase traffic to global reshuffle
+src/redistribution/cyclic_reshuffle.h	src/cyclic_reshuffle.rs; src/glb_cyclic_reshuffle.rs	replaced: owned exact plans replace raw offset/count buffers
+src/redistribution/dgtog_bucket.h	src/dgtog_bucket.rs	ported source ROR traversal, padding exclusion, virtual placement and value-only pack/unpack
+src/redistribution/dgtog_calc_cnt.cxx	src/dgtog_calc_cnt.rs	ported physical-phase LCM replica buckets, closed-form counts/displacements, peers and root selection
+src/redistribution/dgtog_calc_cnt.h	src/dgtog_calc_cnt.rs	replaced: owned Layout metadata replaces caller-allocated arrays
+src/redistribution/dgtog_redist_ror.h	src/dgtog_redist.rs; src/ffi/mpi.rs	ported default receive-before-send MPI Irecv/Isend/Waitall root-to-root exchange and root unpack
+src/redistribution/dgtog_redist.cxx	src/dgtog_redist.rs; src/tensor.rs	ported dense order<=12 default dispatch with additive-identity new nonroot replicas
+src/redistribution/dgtog_redist.h	src/dgtog_redist.rs	replaced: direct generic Rust reshuffle replaces compile-time switch wrappers
+src/redistribution/glb_cyclic_reshuffle.cxx	src/glb_cyclic_reshuffle.rs	ported intended count/pack/exchange/scaled-unpack algorithm; pinned early return and disabled exchange block recorded as source defect
+src/redistribution/glb_cyclic_reshuffle.h	src/glb_cyclic_reshuffle.rs	replaced: owned GlobalReshufflePlan carries exact peer offsets/counts/displacements
 src/redistribution/Makefile	Cargo/build tooling	replaced
-src/redistribution/nosym_transp.cxx	src/redistribution	pending
-src/redistribution/nosym_transp.h	src/redistribution	pending
-src/redistribution/pad.cxx	src/symmetric_distribution.rs; src/symmetric_tensor.rs	partial: compressed physical padding and global canonical-hole filtering; optimized source padding kernels pending
-src/redistribution/pad.h	src/redistribution	pending
-src/redistribution/redist.cxx	src/redistribution	pending
-src/redistribution/redist.h	src/redistribution	pending
-src/redistribution/slice.cxx	src/redistribution	pending
-src/redistribution/slice.h	src/redistribution	pending
+src/redistribution/nosym_transp.cxx	src/nosym_transp.rs; src/tensor.rs	ported source-order contiguous-prefix forward/backward dense transpose including virtual blocks and padding cleanup
+src/redistribution/nosym_transp.h	src/nosym_transp.rs	replaced: TransposePlan owns shape, permutation, strides and contiguous run length
+src/redistribution/pad.cxx	src/pad.rs; src/symmetric_distribution.rs; src/symmetric_tensor.rs	ported canonical packed pad/depad/zeroing across every virtual block; disabled and double-increment source defects are not preserved
+src/redistribution/pad.h	src/pad.rs	replaced: CanonicalPadding owns canonical and padding offsets
+src/redistribution/redist.cxx	src/redist.rs; src/tensor.rs	ported equal-phase primary-layer whole-block reshuffle with exact counts/displacements and additive-identity replica layers
+src/redistribution/redist.h	src/redist.rs	replaced: BlockReshufflePlan replaces raw buffer/displacement ownership
+src/redistribution/slice.cxx	src/slice.rs; src/tensor.rs	ported dense NS local intersection, cyclic physical rank shift and local alpha/beta insertion
+src/redistribution/slice.h	src/slice.rs	replaced: SlicePlan and typed accumulation replace C++ raw pointer API
 src/redistribution/sparse_rw.cxx	src/sparse.rs	partial: sorted virtual-block storage, indexed additive/scaled writes, absent-key reads and owner routing; optimized sparse communication kernels pending
 src/redistribution/sparse_rw.h	src/redistribution	pending
 src/symmetry/Makefile	Cargo/build tooling	replaced

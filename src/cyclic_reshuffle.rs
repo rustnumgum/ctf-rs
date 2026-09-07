@@ -6,6 +6,16 @@
 
 use crate::mapping::Distribution;
 
+#[path = "dgtog_bucket.rs"]
+mod dgtog_bucket;
+#[path = "dgtog_calc_cnt.rs"]
+mod dgtog_calc_cnt;
+#[path = "dgtog_redist.rs"]
+pub(crate) mod dgtog_redist;
+
+/// Pinned CTF's default selects the ordinary ROR DGTOG implementation.
+pub(crate) const DGTOG_SWITCH: usize = 1;
+
 pub(crate) struct Plan {
     pub send: Vec<Vec<usize>>,
     pub receive: Vec<Vec<usize>>,

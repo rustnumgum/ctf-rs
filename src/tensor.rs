@@ -634,36 +634,9 @@ impl<'c, 'r, A: Monoid + Clone> Tensor<'c, 'r, A> where A::Element: Wire {
     /// local sub-block, then shift its owner by offsets modulo physical phases,
     /// as in upstream redistribution/slice.cxx. No global tensor is gathered.
     pub fn slice(&self, ranges: &[std::ops::Range<usize>]) -> Self {
-        assert_eq!(ranges.len(), self.distribution.shape.len());
-        for (range, &n) in ranges.iter().zip(&self.distribution.shape) {
-            assert!(range.start <= range.end && range.end <= n);
-        }
-        let offsets: Vec<_> = ranges.iter().map(|r|r.start).collect();
-        let mut distribution = self.distribution.clone();
-        distribution.shape = ranges.iter().map(|r|r.end-r.start).collect();
-        let destination = self.distribution.shifted_rank(self.context.rank(), &offsets, false);
-        let source = self.distribution.shifted_rank(self.context.rank(), &offsets, true);
-        let mut result = Self::new(self.context, distribution, self.algebra.clone());
-        for (key, value) in self.local_pairs() {
-            let coordinates = self.distribution.decode_key(key);
-            if coordinates.iter().zip(ranges).all(|(&c,r)|r.contains(&c)) {
-                let sliced: Vec<_> = coordinates.iter().zip(&offsets).map(|(&c,&o)|c-o).collect();
-                let new_key = result.distribution.encode_key(&sliced);
-                let offset = result.distribution.local_offset(destination, new_key);
-                result.data[offset] = value;
-            }
-        }
-        if destination != self.context.rank() {
-            let mut bytes = Vec::with_capacity(result.data.len()*A::Element::WIDTH);
-            for value in &result.data { value.encode(&mut bytes); }
-            let mut received = vec![0u8; bytes.len()];
-            // For a globally empty slice no rank needs a data exchange.
-            if !bytes.is_empty() { self.context.inner.send_receive(&bytes,destination,source,&mut received); }
-            for (value, bytes) in result.data.iter_mut().zip(received.chunks_exact(A::Element::WIDTH)) {
-                *value = A::Element::decode(bytes);
-            }
-        }
-        result
+        let plan=crate::slice::SlicePlan::new(&self.distribution,self.context.rank(),ranges);
+        let data=plan.execute(self.context,&self.algebra,&self.data);
+        Self {context:self.context,algebra:self.algebra.clone(),distribution:plan.output_distribution,data}
     }
     /// Reorder tensor axes and their mappings together. Physical ownership is
     /// unchanged, so this transpose is local and has no implicit MPI collective.
@@ -674,15 +647,21 @@ impl<'c, 'r, A: Monoid + Clone> Tensor<'c, 'r, A> where A::Element: Wire {
         for &axis in axes { assert!(axis < order && !seen[axis]); seen[axis] = true; }
         let distribution = Distribution::new(axes.iter().map(|&i|self.distribution.shape[i]).collect(),
             self.distribution.topology.clone(), axes.iter().map(|&i|self.distribution.mappings[i].clone()).collect());
-        let mut result = Self::new(self.context,distribution,self.algebra.clone());
-        for (key,value) in self.local_pairs() {
-            let coordinates = self.distribution.decode_key(key);
-            let permuted: Vec<_> = axes.iter().map(|&i|coordinates[i]).collect();
-            let key = result.distribution.encode_key(&permuted);
-            let offset = result.distribution.local_offset(self.context.rank(),key);
-            result.data[offset] = value;
+        let block=self.distribution.block_shape();
+        let virtuals:Vec<_>=self.distribution.mappings.iter()
+            .map(|mapping|mapping.phase()/mapping.physical_phase()).collect();
+        let mut storage_shape=block;
+        storage_shape.extend_from_slice(&virtuals);
+        let storage_order:Vec<_>=axes.iter().copied()
+            .chain(axes.iter().map(|&axis|axis+order)).collect();
+        let plan=crate::nosym_transp::TransposePlan::new(&storage_shape,&storage_order);
+        let mut data=plan.execute(&self.data,crate::nosym_transp::Direction::Forward);
+        for (offset,value) in data.iter_mut().enumerate() {
+            if distribution.global_key(self.context.rank(),offset).is_none() {
+                *value=self.algebra.zero();
+            }
         }
-        result
+        Self {context:self.context,algebra:self.algebra.clone(),distribution,data}
     }
 }
 
@@ -756,11 +735,33 @@ impl<A: Monoid> Tensor<'_, '_, A> where A::Element: Wire {
             }
         }
     }
-    /// Collective distribution switch, sending each unique entry once per new
-    /// replica. Only local data and communication buckets are allocated.
+    /// Collective distribution switch. Orders through twelve use the pinned
+    /// source's default root-only DGTOG ROR path; higher orders retain the
+    /// legacy cyclic value exchange.
     pub fn redistribute(&mut self, distribution: Distribution) {
         assert_eq!(distribution.shape, self.distribution.shape);
         assert_eq!(distribution.topology.size(), self.context.size());
+        if self.distribution.mappings.iter().zip(&distribution.mappings)
+            .all(|(old,new)|old.phase()==new.phase()) {
+            let plan=crate::redist::BlockReshufflePlan::new(
+                &self.distribution,&distribution,self.context.rank());
+            self.data=plan.execute(self.context,&self.algebra,&self.data);
+            self.distribution=distribution;
+            return;
+        }
+        if self.distribution.shape.len() <= 12 {
+            assert_eq!(crate::cyclic_reshuffle::DGTOG_SWITCH, 1);
+            let data = crate::cyclic_reshuffle::dgtog_redist::reshuffle(
+                &self.context.inner,
+                &self.algebra,
+                &self.distribution,
+                &distribution,
+                &self.data,
+            );
+            self.distribution = distribution;
+            self.data = data;
+            return;
+        }
         let plan = crate::cyclic_reshuffle::Plan::new(&self.distribution, &distribution, self.context.rank());
         let mut buckets = vec![Vec::new(); self.context.size()];
         for (offsets, bucket) in plan.send.iter().zip(&mut buckets) {

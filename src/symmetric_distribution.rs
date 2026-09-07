@@ -4,6 +4,7 @@
 
 use crate::{
     mapping::Distribution,
+    pad::CanonicalPadding,
     symmetry::{Layout, Symmetry},
 };
 
@@ -57,6 +58,19 @@ impl SymmetricDistribution {
 
     pub fn local_len(&self) -> usize {
         self.virtual_blocks() * self.block_layout.len()
+    }
+
+    /// Exact packed-storage padding plan for one rank.  Canonical slots retain
+    /// physical packed order; local rectangular padding, AS/SH diagonals, and
+    /// noncanonical virtual-block holes are all padding.
+    pub fn padding(&self, rank: usize) -> CanonicalPadding {
+        CanonicalPadding::new(
+            self.local_len(),
+            self.local_pairs(rank)
+                .into_iter()
+                .map(|(offset, _)| offset)
+                .collect(),
+        )
     }
 
     /// Normalize a rectangular global key into symmetry-canonical order.
@@ -161,4 +175,42 @@ fn column_major_rank(coordinates: &[usize], shape: &[usize]) -> usize {
         stride *= extent;
     }
     rank
+}
+
+#[cfg(test)]
+mod padding_tests {
+    use super::SymmetricDistribution;
+    use crate::{
+        mapping::{Distribution, Mapping, Topology},
+        symmetry::Symmetry::{AS, NS, SY},
+    };
+
+    #[test]
+    fn canonical_padding_marks_rectangular_and_strict_diagonal_holes() {
+        let topology = Topology::new(vec![2]);
+        let mut row = Mapping::Unmapped;
+        row.augment_physical(&topology, 0);
+        row.augment_virtual(4);
+        let mut column = Mapping::Unmapped;
+        column.augment_virtual(4);
+        for links in [vec![SY, NS], vec![AS, NS]] {
+            let distribution = SymmetricDistribution::new(
+                Distribution::new(vec![5, 5], topology.clone(), vec![row.clone(), column.clone()]),
+                links,
+            );
+            for rank in 0..2 {
+                let padding = distribution.padding(rank);
+                let offsets: Vec<_> = distribution
+                    .local_pairs(rank)
+                    .into_iter()
+                    .map(|(offset, _)| offset)
+                    .collect();
+                assert_eq!(padding.canonical_offsets(), offsets);
+                assert_eq!(
+                    padding.canonical_len() + padding.padding_offsets().count(),
+                    distribution.local_len()
+                );
+            }
+        }
+    }
 }

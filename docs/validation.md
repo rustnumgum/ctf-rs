@@ -1,5 +1,34 @@
 # Validation evidence
 
+## D2 optimized dense redistribution close (2026-09-08)
+
+Dense orders through twelve now use the pinned default DGTOG ROR path: closed-
+form physical-phase LCM buckets, exact counts/displacements and value offsets,
+old/new replica-root selection, receive-before-send nonblocking MPI traffic,
+root unpack and additive-identity new nonroot replicas. Equal-phase layouts use
+whole virtual-block reshuffling first; higher orders retain the legacy cyclic
+path. The dense slice rank shift, contiguous-prefix nonsymmetric transpose,
+canonical packed pad/depad/zeroing and arbitrary-phase global reshuffle are
+direct Rust operations with no global tensor gather.
+
+`upstream_readwrite`, `upstream_readall`, `distributed_symmetric_repack`, the
+NS `upstream_permute_multiworld`, `upstream_reduce_bcast` and
+`upstream_subworld_gemm` passed once at WSL 1/2/4 ranks with their existing
+world/parity contexts. Exact integer/layout checks and the original 1e-10,
+1e-9 and 1e-6 driver bounds all passed. No numerical failure, diagnostic,
+tolerance change or repeated passing driver run occurred.
+
+The release `bench_redistribution` and `bench_nosym_transp` drivers each ran
+once at four ranks after exact probes. Their single informational timings were
+0.000077 s for a 48x40 redistribution and 0.000656 s for a 192x160 transpose;
+no speedup or statistical claim is made. The full native Windows GNU test and
+example set compiled/linked once; runtime remains deferred to D6.
+
+The disabled post-pack block in pinned `glb_cyclic_reshuffle` and the disabled/
+double-increment padding code are recorded source defects, not preserved as
+executable semantics; the Rust paths complete exchange/unpack and visit every
+allocated virtual block. DIGIT / PASS; D2 numerical verification closed.
+
 ## D1 dense scaling and strip close (2026-09-08)
 
 The `scaling` target passed four exact local checks once in WSL. It preserves

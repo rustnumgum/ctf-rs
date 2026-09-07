@@ -55,6 +55,13 @@ pub(crate) struct Comm {
     _single_thread: PhantomData<Rc<()>>,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct Transfer {
+    pub peer: usize,
+    pub displacement: usize,
+    pub count: usize,
+}
+
 fn check(code: i32) {
     assert_eq!(code, 0, "MPI error {code}");
 }
@@ -86,6 +93,72 @@ impl Runtime {
 }
 
 impl Comm {
+    /// DGTOG root-to-root exchange: post every receive, post every send, then
+    /// wait for all requests. Displacements and counts are measured in bytes.
+    pub(crate) fn redistribute_ror(
+        &self,
+        send_buffer: &[u8],
+        sends: &[Transfer],
+        receive_buffer: &mut [u8],
+        receives: &[Transfer],
+    ) {
+        for transfer in sends.iter().chain(receives) {
+            assert!(transfer.peer < self.size());
+        }
+        for transfer in sends {
+            assert!(transfer.displacement + transfer.count <= send_buffer.len());
+        }
+        for transfer in receives.iter() {
+            assert!(transfer.displacement + transfer.count <= receive_buffer.len());
+        }
+
+        let request_count = sends.iter().filter(|transfer| transfer.count != 0).count()
+            + receives.iter().filter(|transfer| transfer.count != 0).count();
+        let mut requests = Vec::with_capacity(request_count);
+        for transfer in receives.iter().filter(|transfer| transfer.count != 0) {
+            let mut request = unsafe { sys::RSMPI_REQUEST_NULL };
+            unsafe {
+                check(sys::MPI_Irecv(
+                    receive_buffer.as_mut_ptr().add(transfer.displacement).cast(),
+                    transfer.count.try_into().unwrap(),
+                    sys::RSMPI_UINT8_T,
+                    transfer.peer as i32,
+                    777,
+                    self.raw,
+                    &mut request,
+                ));
+            }
+            requests.push(request);
+        }
+        for transfer in sends.iter().filter(|transfer| transfer.count != 0) {
+            let mut request = unsafe { sys::RSMPI_REQUEST_NULL };
+            unsafe {
+                check(sys::MPI_Isend(
+                    send_buffer.as_ptr().add(transfer.displacement).cast(),
+                    transfer.count.try_into().unwrap(),
+                    sys::RSMPI_UINT8_T,
+                    transfer.peer as i32,
+                    777,
+                    self.raw,
+                    &mut request,
+                ));
+            }
+            requests.push(request);
+        }
+        if !requests.is_empty() {
+            let mut statuses: Vec<sys::MPI_Status> = (0..requests.len())
+                .map(|_| unsafe { std::mem::zeroed() })
+                .collect();
+            unsafe {
+                check(sys::MPI_Waitall(
+                    requests.len().try_into().unwrap(),
+                    requests.as_mut_ptr(),
+                    statuses.as_mut_ptr(),
+                ));
+            }
+        }
+    }
+
     pub(crate) fn all_reduce_monoid<A: Monoid>(
         &self,
         algebra: &A,

@@ -13,6 +13,8 @@ $env:CARGO_TARGET_DIR = $TargetDir
 $env:OPENBLAS_NUM_THREADS = '1'
 if ($BuildOnly) {
     cargo test --tests --no-run
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    cargo build --examples
     exit $LASTEXITCODE
 }
 

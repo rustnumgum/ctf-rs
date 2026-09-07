@@ -116,6 +116,28 @@ impl<'c, 'r, A: Group> SymmetricTensor<'c, 'r, A> {
         &self.data
     }
 
+    /// Compact rank-local canonical storage with all allocated holes removed.
+    pub fn local_canonical_storage(&self) -> Vec<A::Element> {
+        self.distribution
+            .padding(self.context.rank())
+            .depad(&self.data)
+    }
+
+    /// Replace canonical rank-local values and reset every packed hole to the
+    /// additive identity.
+    pub fn set_local_canonical_storage(&mut self, compact: &[A::Element]) {
+        self.data = self
+            .distribution
+            .padding(self.context.rank())
+            .pad(&self.algebra, compact);
+    }
+
+    pub fn zero_padding(&mut self) {
+        self.distribution
+            .padding(self.context.rank())
+            .zero_padding(&self.algebra, &mut self.data);
+    }
+
     /// Canonical local entries in physical packed-offset order.
     pub fn local_pairs(&self) -> Vec<(usize, A::Element)> {
         self.distribution
@@ -238,20 +260,18 @@ where
         assert_eq!(target.links(), self.distribution.links());
         assert_eq!(target.distribution().topology.size(), self.context.size());
 
-        let plan = crate::symmetric_reshuffle::plan(&self.distribution, &target, self.context.rank());
-        let mut buckets = vec![Vec::new(); self.context.size()];
-        for (offsets, bucket) in plan.send.iter().zip(&mut buckets) {
-            bucket.reserve(offsets.len() * A::Element::WIDTH);
-            for &offset in offsets { self.data[offset].encode(bucket); }
-        }
-        let received = self.context.inner.exchange(&buckets);
+        let plan = crate::glb_cyclic_reshuffle::GlobalReshufflePlan::symmetric(
+            &self.distribution,
+            &target,
+            self.context.rank(),
+        );
         let mut result = Self::new(self.context, target, self.algebra.clone());
-        for (bytes, offsets) in received.iter().zip(&plan.receive) {
-            assert_eq!(bytes.len(), offsets.len() * A::Element::WIDTH);
-            for (value, &offset) in bytes.chunks_exact(A::Element::WIDTH).zip(offsets) {
-                result.data[offset] = A::Element::decode(value);
-            }
-        }
+        plan.execute(
+            self.context,
+            &self.algebra,
+            &self.data,
+            &mut result.data,
+        );
         result
     }
 }

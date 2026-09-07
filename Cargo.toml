@@ -26,6 +26,11 @@ name = "scaling"
 path = "tests/scaling.rs"
 
 [[test]]
+name = "dgtog_redistribution"
+path = "tests/dgtog_redistribution.rs"
+harness = false
+
+[[test]]
 name = "dense_views"
 path = "tests/dense_views.rs"
 harness = false
