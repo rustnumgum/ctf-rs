@@ -112,7 +112,7 @@ src/contraction/ctr_tsr.h	src/contraction	pending
 src/contraction/Makefile	Cargo/build tooling	replaced
 src/contraction/sp_seq_ctr.cxx	src/sparse_sequential.rs; src/sparse_fold.rs; src/sparse_diagonal.rs; src/sparse_gemm.rs; src/sparse_formats.rs	partial: general NS sparse-A/dense-B/dense-C recursion including pinned limited custom-function branch; folded sparse/mixed children and input pre-reduction; folded custom functions and other general sparse combinations pending
 src/contraction/sp_seq_ctr.h	src/contraction	pending
-src/contraction/spctr_2d_general.cxx	src/sparse_gemm.rs	partial: stationary-output sparse matrix panel broadcasts with LCM virtual k phases; output-moving and general recursive levels pending
+src/contraction/spctr_2d_general.cxx	src/sparse_gemm.rs; src/sparse_2d.rs	partial: stationary-output matrix LCM panels plus explicit CSR/CSR/CSR and CCSR/dense/CCSR moving A/B/C, strip packing, cyclic output reduction/reassembly, literal beta and layer scheduling, recursive children; mixed dense-output/raw variants and automatic plan assembly pending
 src/contraction/spctr_2d_general.h	src/contraction	pending
 src/contraction/spctr_comm.cxx	src/sparse_contract_general.rs; src/sparse_contraction_comm.rs	partial: mapped sparse-A/dense-B/dense-C broadcasts/root beta/reduction and owner restore; explicit CSR/CSR/CSR and CCSR/dense/CCSR replicated virtual blocks, sparse output-fiber reductions and input cleanup; nested moving-output panels and automatic plan assembly pending
 src/contraction/spctr_comm.h	src/contraction	pending
@@ -237,7 +237,7 @@ examples/spectral_element.cxx	tests/upstream/examples/spectral_element.rs	pendin
 examples/spmv.cxx	tests/upstream_spmv.rs	ported active sparse-A/dense-vector equations with dense and sparse output, both operand orders; bounded n=5 and source sparsity 0.5/n, explicit MT seed adaptation; original initial norm>=1e-6 and residual<=1e-6; PASS WSL 1/2/4 world/parity, native compile/link
 examples/sssp.cxx	tests/upstream/examples/sssp.rs	pending
 examples/strassen.cxx	tests/upstream/examples/strassen.rs	pending
-examples/trace.cxx	tests/upstream/examples/trace.rs	pending
+examples/trace.cxx	tests/upstream_trace.rs	ported four cyclic NS ABCD products, diagonal extraction and sum; bounded n=3, source drand48 recurrence and relative<=1e-10 criteria; PASS WSL 1/2/4 world/parity, native compile/link
 scalapack_tests/conj.h	tests/upstream/scalapack_tests/conj.h	pending
 scalapack_tests/eigh.cxx	tests/distributed_eigh.rs; tests/typed_distributed_eigh.rs	partial: four-type symmetric/Hermitian reconstruction and orthogonality at original n*n*1e-6 bounds PASS WSL 1/2/4; degenerate spectra and square subworld covered; full upstream driver pending
 scalapack_tests/Makefile	Cargo/build tooling	replaced

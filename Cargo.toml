@@ -782,3 +782,13 @@ harness = false
 name = "upstream_scan"
 path = "tests/upstream_scan.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_2d"
+path = "tests/distributed_sparse_2d.rs"
+harness = false
+
+[[test]]
+name = "upstream_trace"
+path = "tests/upstream_trace.rs"
+harness = false

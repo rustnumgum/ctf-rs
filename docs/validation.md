@@ -1,5 +1,22 @@
 # Validation evidence
 
+## Sparse 2D levels and upstream cyclic trace (2026-09-07)
+
+distributed_sparse_2d and upstream_trace passed once at WSL 1/2/4 ranks,
+world/parity. Exact i64 checks cover moving A/B/C, variable sparse payloads,
+fixed dense broadcasts, CSR/CCSR cyclic output reductions, contiguous/strided
+scatter, all layer-scheduling branches and an actual recursive child level.
+Raw sparse beta expectations were fixed from the source before execution:
+moving C adds unscaled old C; strided fresh output replaces it; stationary
+whole output applies beta only on the first executed step.
+
+The bounded n=3 f64 trace driver retains four NS ABCD cyclic orderings,
+rank-seeded drand48 recurrence, diagonal extraction and reduction. Adjacent
+trace relative errors retain the source <=1e-10 bound and denominator choice,
+with finite results. Both targets compiled/linked once on native Windows GNU.
+DIGIT / PASS; no failures, extra precision checks or repeated passing runs.
+Native MPI runtime acceptance remains pending.
+
 ## Upstream recursive scan (2026-09-07)
 
 upstream_scan passed once at WSL 1/2/4 ranks, world/parity, with bounded logn=3

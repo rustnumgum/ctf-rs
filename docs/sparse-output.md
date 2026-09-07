@@ -44,6 +44,7 @@ swaps operand labels. Noncommutative elements consequently multiply as B*A,
 not A*B. This behavior is preserved and tested, not silently corrected.
 
 These source boundaries do not establish full Rust automatic dispatch:
-automatic sparse plan assembly and nested moving-output communication remain
-unfinished. Sparse virtual/replicated communication in the source wraps these
+automatic sparse plan assembly and complete mixed/raw moving-output integration
+remain unfinished. Explicit CSR/CCSR recursive levels are in sparse-2d.md.
+Sparse virtual/replicated communication in the source wraps these
 inner CSR/CCSR leaves rather than supplying a new general scalar sparse output.

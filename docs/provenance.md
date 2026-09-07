@@ -1,5 +1,11 @@
 # Source provenance
 
+src/sparse_2d.rs ports spctr_2d_general.cxx panel ownership, broadcasts,
+sparse moving-output reduction/reassembly and layer scheduling, including
+its distinct raw sparse beta conventions (sparse-2d.md). The child callback
+represents the original next contraction level. tests/upstream_trace.rs ports
+examples/trace.cxx's cyclic products and original relative trace criteria.
+
 tests/upstream_scan.rs follows examples/scan.cxx's recursive scan and wrapper
 transfers. The 2x2 AS matrix is repacked canonically through SH to NS, not
 unpacked as a symmetric full matrix. Dimensions/MT seed are explicit bounded

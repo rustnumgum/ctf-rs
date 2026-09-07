@@ -25,4 +25,5 @@ sparse blocks and the pinned local custom-function branch. The mapped interface
 retains its unique-label and A-only-label restrictions. Variable sparse output
 bucket traversal is also used by the explicit CSR/CCSR replicated sparse-output
 layer (sparse-replicate.md), including variable output block reductions.
-Nested moving-output sparse panels and automatic plan assembly remain unfinished.
+Explicit CSR/CCSR moving-output levels can now recurse (sparse-2d.md);
+automatic plan assembly and the remaining mixed/raw variants remain unfinished.
