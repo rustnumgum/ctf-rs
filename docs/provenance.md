@@ -990,3 +990,14 @@ global IDs; only global_id % world_size == rank is decoded. Canonicalization and
 preflight rejection leave holes, not renumbered survivors. Enumeration is local
 and streaming; no candidate-array allgather or aligned-only replacement is used.
 Memory/size filtering and selected-plan reconstruction remain separate stages.
+
+## Normal mapping and rank-local normal enumeration
+
+normal_mapping.rs directly adapts contraction.cxx:1586-2007 and 2392-2553:
+common-index mapping, paired contracted dimensions, singleton restrictions,
+A-fill/C-nonfill copying, and the repeated mapping/symmetry pass. NS tables are
+explicit; compressed symmetry mapping is not claimed here. normal_search.rs
+adapts 2834-2913 through mapping preflight: six source permutations, seven retained
+old-layout subsets, fresh catalog choices, rank partitioning and original IDs.
+The source permits invalid intermediate maps; preflight, rather than a validated
+Distribution constructor, rejects these before candidate emission.

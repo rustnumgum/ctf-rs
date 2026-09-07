@@ -67,7 +67,19 @@ Variant::canonicalize now applies source folded-pair topology permutation and
 first matching catalog lookup. visit_local_exhaustive streams decode -> canonicalize
 -> preflight per rank. Raw global IDs include skipped candidates and partition by
 ID modulo communicator size; no survivor renumbering occurs. Remaining integration
-includes size/memory filters, normal-search alternatives and costed execution.
+includes size/memory filters and costed execution.
+
+normal_mapping::Problem now ports the NS unique-label category helpers and both
+mapping passes in map_to_topology. The source six operand permutations retain
+different physical maps for paired contraction dimensions. Initial mappings
+determine padding; physically mapped common/singleton labels are rejected as in
+the source. Returned distributions are raw candidates and require preflight
+before tensor use, since intermediate copying can duplicate physical axes.
+normal_search::visit_local implements the seven old-layout subsets followed by
+catalog topologies, partitioned by (template-1) modulo communicator size. It
+preserves source ID 6*template+permutation and rejects failed mappings/preflight
+without renumbering. This enumeration does not yet perform cost/memory selection
+or replace GridPlan's aligned-only preparation.
 
 Total candidate evaluation must additionally port folding and sparse redistribution
 costs (2632-2810), then connect existing collective Selector and context cache. Sparse,

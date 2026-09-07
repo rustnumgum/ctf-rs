@@ -47,3 +47,5 @@ pub mod grid_plan_cost;
 pub mod redist_cost;
 pub mod mapping_preflight;
 pub mod mapping_variants;
+pub mod normal_mapping;
+pub mod normal_search;

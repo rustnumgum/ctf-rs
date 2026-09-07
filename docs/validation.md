@@ -967,6 +967,19 @@ scales and merges old entries. Output distribution is unchanged. DIGIT / PASS,
 no failures or extra numerical runs. Both targets compiled/linked on Windows GNU;
 native runtime remains unaccepted.
 
+## Normal mapping search (2026-09-07)
+
+normal_mapping: two exact local tests passed for explicit 2D paired maps,
+retained layouts, all six common-index permutations and source physical-map
+rejections. distributed_normal_mapping passed WSL ranks 1/2/4 with world/parity
+communicators: old-layout subsets, fresh choices, source traversal/IDs and unique
+rank ownership. The initial rank-1 run exposed premature Distribution validation
+of a raw rejected candidate (duplicate physical axis). Raw construction now
+preserves source preflight ordering; only this failed target was rerun, followed
+by previously unrun ranks 2/4. No floating-point tolerance study was involved.
+Both targets compiled/linked on Windows GNU; MPI runtime execution remains
+pending the missing MS-MPI runtime, not a claimed native pass.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each

@@ -440,3 +440,12 @@ path = "tests/topology_canonicalization.rs"
 name = "distributed_exhaustive_mapping"
 path = "tests/distributed_exhaustive_mapping.rs"
 harness = false
+
+[[test]]
+name = "normal_mapping"
+path = "tests/normal_mapping.rs"
+
+[[test]]
+name = "distributed_normal_mapping"
+path = "tests/distributed_normal_mapping.rs"
+harness = false
