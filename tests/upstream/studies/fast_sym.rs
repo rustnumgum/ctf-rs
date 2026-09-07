@@ -1,4 +1,4 @@
-//! Port of pinned CTF `studies/fast_sym.cxx`.
+// Port of pinned CTF `studies/fast_sym.cxx`.
 
 use ctf::{
     algebra::Arithmetic,

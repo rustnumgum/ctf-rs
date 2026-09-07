@@ -1,7 +1,8 @@
 param(
     [string]$MingwRoot = 'C:\msys64\mingw64',
     [string]$TargetDir = 'D:\ctf-rs-native-target',
-    [switch]$BuildOnly
+    [switch]$BuildOnly,
+    [switch]$D6Only
 )
 $ErrorActionPreference = 'Stop'
 $env:PATH = "$HOME\.cargo\bin;$MingwRoot\bin;C:\Program Files\Microsoft MPI\Bin;" + $env:PATH
@@ -18,11 +19,46 @@ if ($BuildOnly) {
     exit $LASTEXITCODE
 }
 
+if ($D6Only) {
+    $denseTests = @(
+        'upstream_scalar','upstream_diag_sym','upstream_weigh4d','upstream_dft',
+        'upstream_readwrite','upstream_readall','distributed_symmetric_repack',
+        'upstream_permute_multiworld','upstream_reduce_bcast','upstream_subworld_gemm',
+        'upstream_gemm4d','upstream_sy_times_ns','upstream_ccsdt_t3_to_t2',
+        'upstream_ccsdt_map','upstream_multi_tsr_sym','upstream_fast_3mm',
+        'upstream_fast_diagram','upstream_fast_sym_4d','upstream_fast_sym',
+        'upstream_fast_as_as_sy_tensor_ctr','upstream_fast_sy_as_as_tensor_ctr',
+        'upstream_fast_tensor_ctr','d4_memcontrol','d4_timer_util','d4_blas_flops',
+        'dense_low_memory','d5_common','d5_value_interfaces','d5_algebra_interfaces',
+        'upstream_fft_with_idx_partition','upstream_fft','upstream_dft_3d',
+        'upstream_endomorphism','upstream_endomorphism_cust','upstream_endomorphism_cust_sp',
+        'upstream_univar_function','upstream_bivar_function','upstream_bivar_transform',
+        'upstream_test_suite_dense','upstream_matmul','upstream_recursive_matmul',
+        'upstream_ccsd','upstream_ao_mo_transf','upstream_neural_network',
+        'upstream_bitonic_sort','upstream_checkpoint','upstream_force_integration',
+        'upstream_particle_interaction','upstream_qinformatics','upstream_mttkrp'
+    )
+    $denseArguments = @()
+    foreach ($test in $denseTests) { $denseArguments += @('--test', $test) }
+    foreach ($ranks in 1,2,4) {
+        $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = "mpiexec -n $ranks"
+        cargo test @denseArguments
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    Remove-Item Env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER
+    cargo test --test scaling
+    exit $LASTEXITCODE
+}
+
 $mpiTests = @(
     'foundation','dense_views','replicated_sum','tensor_sum','custom_reduce',
     'd4_memcontrol','d4_timer_util','d4_blas_flops',
     'd5_common','d5_value_interfaces','d5_algebra_interfaces',
     'upstream_fft_with_idx_partition','upstream_fft','upstream_dft_3d',
+    'upstream_test_suite_dense','upstream_matmul','upstream_recursive_matmul',
+    'upstream_ccsd','upstream_ao_mo_transf','upstream_neural_network',
+    'upstream_bitonic_sort','upstream_checkpoint','upstream_force_integration',
+    'upstream_particle_interaction','upstream_qinformatics','upstream_mttkrp',
     'algebra_sum','complex_scalar','sum_remap','replicated_contraction','ctr_2d',
     'tensor_gemm','algebra_contraction','tensor_contract','contract_remap',
     'dense_semantics','upstream_dense','subcomm_dense','plan_cache','model_training',

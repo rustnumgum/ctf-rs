@@ -1,4 +1,4 @@
-//! Deterministic port of pinned CTF test/endomorphism.cxx.
+// Deterministic port of pinned CTF test/endomorphism.cxx.
 use ctf::{
     algebra::Arithmetic,
     context::{Context, Runtime},

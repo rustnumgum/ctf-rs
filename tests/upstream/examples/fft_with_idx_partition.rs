@@ -1,4 +1,4 @@
-//! Pinned examples/fft_with_idx_partition.cxx: fiber FFT on a user partition.
+// Pinned examples/fft_with_idx_partition.cxx: fiber FFT on a user partition.
 
 use ctf::{
     algebra::{Arithmetic, Complex},

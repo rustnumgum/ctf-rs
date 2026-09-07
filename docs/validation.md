@@ -1,5 +1,44 @@
 # Validation evidence
 
+## D6 dense drivers and native runtime handoff (2026-09-08)
+
+The pinned dense `test_suite.cxx` subset now asserts every active dense
+criterion directly instead of trusting the source program's unconditional
+zero exit status. Its intended `n*n` dimensions replace the C++ `n^2` XOR,
+while the already bounded readwrite/readall fixtures remain n=3 and n=2/3.
+The driver covers dense NS/SY/AS/SH products, CCSDT, scalar/trace/diagonal,
+fast symmetric paths, subworld and recursive multiplication, one-level
+Strassen, repack, transforms, FFT/DFT, force/particle operations and the
+source double-precision QR/SVD/eigh criteria. Sparse cases are excluded.
+
+The source examples `matmul`, `recursive_matmul`, `ccsd`, `ao_mo_transf`,
+`neural_network`, `bitonic_sort`, `checkpoint`, `force_integration`,
+`particle_interaction`, `qinformatics` and four-type `mttkrp` have direct Rust
+drivers. Their source sizes and criteria were retained: matmul norm <=1e-6,
+recursive norm <1e-9, nonzero neural output, exact bitonic order, both
+checkpoint norms <=1e-9*n, force modification/restoration at 1e-6, particle
+norm <1e-6 and each MTTKRP norm/size <1e-5. CCSD, AO-MO and qinformatics have
+no source numerical gate, so acceptance is normal completion. Particle
+replication uses owner broadcasts, and recursive multiplication serializes
+parent/child transfers by subworld; neither path gathers a distributed
+operand.
+
+All twelve D6 drivers plus `dense_low_memory` passed once at WSL 1/2/4 ranks
+with world/parity contexts. One AO-MO diagnostic replaced an invalid group-only
+relabel with the source NS-to-AS summation; one test-suite diagnostic restored
+the fixed n=3 and n=2/3 read fixtures; the rank-two force layout and recursive
+subworld failures were corrected from their explicit phase/orientation
+assertions. No fixture size, metric or tolerance changed. At four ranks,
+`bench_contraction` reported 0.00014722066666666666 s/iteration and the dense
+`model_trainer` subset reported 29.087425941 s; each timing ran once.
+
+The full native Windows GNU test/example set compiled and linked once. The
+single native dense runtime attempt stopped before executing its first target,
+`d4_blas_flops`, because `mpiexec` was not found. No native numerical value was
+produced and no fallback was used. DIGIT / HANDOFF; open question: can the
+Microsoft MPI runtime/launcher be installed on this host so the D6 native
+1/2/4-rank dense runtime can execute?
+
 ## D5 native interface and FFT close (2026-09-08)
 
 The remaining pinned interface surface is represented by native Rust types and

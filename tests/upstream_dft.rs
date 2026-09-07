@@ -1,5 +1,5 @@
-//! Pinned test/dft.cxx: symmetric complex DFT product and custom scalar reduction.
-//! Rust uses native usize coordinates, not the excluded int/int64 C++ ABI overloads.
+// Pinned test/dft.cxx: symmetric complex DFT product and custom scalar reduction.
+// Rust uses native usize coordinates, not the excluded int/int64 C++ ABI overloads.
 use ctf::{
     algebra::{Arithmetic, Complex},
     context::{Context, Runtime},

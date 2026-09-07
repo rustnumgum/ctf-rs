@@ -75,6 +75,90 @@ harness = false
 required-features = ["native-linalg"]
 
 [[test]]
+name = "upstream_test_suite_dense"
+path = "tests/upstream/test/test_suite.rs"
+harness = false
+required-features = ["native-linalg", "native-scalapack"]
+
+[[test]]
+name = "upstream_matmul"
+path = "tests/upstream/examples/matmul.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_recursive_matmul"
+path = "tests/upstream/examples/recursive_matmul.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_ccsd"
+path = "tests/upstream/examples/ccsd.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_ao_mo_transf"
+path = "tests/upstream/examples/ao_mo_transf.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_neural_network"
+path = "tests/upstream/examples/neural_network.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_bitonic_sort"
+path = "tests/upstream/examples/bitonic_sort.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_checkpoint"
+path = "tests/upstream/examples/checkpoint.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_force_integration"
+path = "tests/upstream/examples/force_integration.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_particle_interaction"
+path = "tests/upstream/examples/particle_interaction.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_qinformatics"
+path = "tests/upstream/examples/qinformatics.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_mttkrp"
+path = "tests/upstream/examples/mttkrp.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_bench_contraction"
+path = "tests/upstream/bench/bench_contraction.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_model_trainer"
+path = "tests/upstream/bench/model_trainer.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
 name = "dgtog_redistribution"
 path = "tests/dgtog_redistribution.rs"
 harness = false

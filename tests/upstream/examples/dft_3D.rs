@@ -1,4 +1,4 @@
-//! Pinned examples/dft_3D.cxx: three-dimensional DFT by contractions.
+// Pinned examples/dft_3D.cxx: three-dimensional DFT by contractions.
 
 use ctf::{
     algebra::{Arithmetic, Complex, CustomMonoid},

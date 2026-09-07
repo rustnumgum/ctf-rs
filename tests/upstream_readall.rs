@@ -1,8 +1,8 @@
-//! Port of the pinned `test/readall_test.cxx` fixture.
-//!
-//! The source fills a rank-zero MPI_SELF tensor with `drand48` values before
-//! `add_from_subworld` and checks `read_all`. The POSIX 48-bit recurrence is
-//! evaluated directly in Rust, retaining the source's seed-zero sequence.
+// Port of the pinned `test/readall_test.cxx` fixture.
+//
+// The source fills a rank-zero MPI_SELF tensor with `drand48` values before
+// `add_from_subworld` and checks `read_all`. The POSIX 48-bit recurrence is
+// evaluated directly in Rust, retaining the source's seed-zero sequence.
 
 use ctf::{
     algebra::{Arithmetic, Monoid, Semiring},

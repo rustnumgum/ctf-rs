@@ -1,9 +1,9 @@
-//! Port of the active cases in the pinned `test/scalar.cxx` fixture.
-//!
-//! Rust represents the source `Scalar<>` through a zero-order dense tensor;
-//! canonical all-pairs reads expose the single source scalar entry. The
-//! source's `#if 0` antisymmetric-matrix block is disabled and is therefore
-//! not an executed test case here.
+// Port of the active cases in the pinned `test/scalar.cxx` fixture.
+//
+// Rust represents the source `Scalar<>` through a zero-order dense tensor;
+// canonical all-pairs reads expose the single source scalar entry. The
+// source's `#if 0` antisymmetric-matrix block is disabled and is therefore
+// not an executed test case here.
 
 use ctf::{
     algebra::{Arithmetic, Monoid, Semiring},

@@ -1,4 +1,4 @@
-//! Deterministic port of pinned CTF test/endomorphism_cust.cxx.
+// Deterministic port of pinned CTF test/endomorphism_cust.cxx.
 use ctf::{
     algebra::{CustomMonoid, Wire},
     context::{Context, Runtime},

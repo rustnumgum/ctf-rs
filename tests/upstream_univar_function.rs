@@ -1,4 +1,4 @@
-//! Deterministic port of pinned CTF test/univar_function.cxx.
+// Deterministic port of pinned CTF test/univar_function.cxx.
 use ctf::{
     algebra::Arithmetic,
     context::{Context, Runtime},

@@ -1,4 +1,4 @@
-//! Bounded port of pinned `studies/fast_sym_4D.cxx`.
+// Bounded port of pinned `studies/fast_sym_4D.cxx`.
 
 use ctf::{
     algebra::Arithmetic,

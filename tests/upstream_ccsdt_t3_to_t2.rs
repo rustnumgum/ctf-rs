@@ -1,9 +1,9 @@
-//! Bounded port of the active path in pinned `test/ccsdt_t3_to_t2.cxx`.
-//!
-//! The source compares a symmetry-aware CCSDT T3-to-T2 contraction with the
-//! explicitly expanded nonsymmetric form.  The Rust path preserves the
-//! source's partial-AS reference storage and uses the symmetry-aware indexed
-//! sum/contraction APIs for both execution paths.
+// Bounded port of the active path in pinned `test/ccsdt_t3_to_t2.cxx`.
+//
+// The source compares a symmetry-aware CCSDT T3-to-T2 contraction with the
+// explicitly expanded nonsymmetric form.  The Rust path preserves the
+// source's partial-AS reference storage and uses the symmetry-aware indexed
+// sum/contraction APIs for both execution paths.
 
 use ctf::{
     algebra::Arithmetic,

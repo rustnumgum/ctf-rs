@@ -1,9 +1,9 @@
-//! Port of the pinned `test/readwrite_test.cxx` diagonal-write fixture.
-//!
-//! Indexed CTF expressions are represented by the Rust key-based write/read
-//! APIs. The source's NS/SY/SH/AS diagonal equations and `1.E-10` checks are
-//! kept unchanged; the source literal named `shape_AS4` is also SH, so that
-//! literal is preserved below.
+// Port of the pinned `test/readwrite_test.cxx` diagonal-write fixture.
+//
+// Indexed CTF expressions are represented by the Rust key-based write/read
+// APIs. The source's NS/SY/SH/AS diagonal equations and `1.E-10` checks are
+// kept unchanged; the source literal named `shape_AS4` is also SH, so that
+// literal is preserved below.
 
 use ctf::{
     algebra::{Arithmetic, Monoid, Semiring},
