@@ -3,7 +3,7 @@
 //! Distributed native matrix operations, following interface/matrix.cxx's
 //! read_mat -> ScaLAPACK -> tensor/get_tri sequence. No global tensor gather.
 use crate::{
-    algebra::{Arithmetic, Complex, Group, Monoid, Semiring, Wire},
+    algebra::{Arithmetic, Complex, Group, Monoid, Semiring},
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -34,18 +34,7 @@ macro_rules! matrix_eigh_methods {
                 }
                 let active = side * side;
                 let mapped = distribution(&[n, n], [side, side]);
-                // add_to_subworld: only canonical source owners send, directly to the
-                // rank that owns each entry in the child grid. No root tensor assembly.
-                let mut buckets = vec![Vec::new(); context.size()];
-                for (key, value) in self.local_pairs() {
-                    if self.distribution().owner(key) != context.rank() {
-                        continue;
-                    }
-                    let destination = mapped.owner(key);
-                    (key as u64).encode(&mut buckets[destination]);
-                    value.encode(&mut buckets[destination]);
-                }
-                let incoming = context.inner.exchange(&buckets);
+                let mapped_values = Distribution::cyclic(vec![n], active);
                 let child = context.split(
                     if context.rank() < active {
                         Some(1)
@@ -54,58 +43,75 @@ macro_rules! matrix_eigh_methods {
                     },
                     context.rank() as i32,
                 );
-                let mut vector_pairs = Vec::new();
-                let mut value_pairs = Vec::new();
+                let algebra = Arithmetic::<$scalar>::new();
+                let zero = algebra.zero();
+                let one = algebra.one();
+                let mut input = child
+                    .as_ref()
+                    .map(|child| Tensor::new(child, mapped.clone(), algebra));
+                self.add_to_subworld(input.as_mut(), &mapped, one, zero);
+
+                let mut child_vectors = None;
+                let mut child_values = None;
                 let mut info = 0;
-                if let Some(child) = child {
-                    let zero = Arithmetic::<$scalar>::new().zero();
-                    let mut input = vec![zero; mapped.local_len().max(1)];
-                    let pair_width = 8 + <$scalar as Wire>::WIDTH;
-                    for bytes in incoming {
-                        for pair in bytes.chunks_exact(pair_width) {
-                            let key = u64::decode(&pair[..8]) as usize;
-                            input[mapped.local_offset(child.rank(), key)] =
-                                <$scalar as Wire>::decode(&pair[8..]);
-                        }
-                    }
+                if let Some(child) = child.as_ref() {
                     let grid = child.inner.scalapack_grid(side, side);
                     let result = (|| {
+                        let mut native_input = input.take().unwrap().data;
+                        native_input.resize(mapped.local_len().max(1), zero);
                         let desc =
                             grid.descriptor(n, n, 1, 1, n.div_ceil(side).max(1))?;
-                        let mut vectors = vec![zero; input.len()];
-                        let values: Vec<$real> = grid.$eigh(n, &input, &desc, &mut vectors)?;
-                        for (offset, &value) in vectors.iter().enumerate() {
-                            if let Some(key) = mapped.global_key(child.rank(), offset) {
-                                vector_pairs.push((key, value));
+                        let mut native_vectors = vec![zero; native_input.len()];
+                        let native_values: Vec<$real> =
+                            grid.$eigh(n, &native_input, &desc, &mut native_vectors)?;
+
+                        let mut vectors = Tensor::new(child, mapped.clone(), algebra);
+                        vectors
+                            .data
+                            .clone_from_slice(&native_vectors[..mapped.local_len()]);
+                        let mut values = Tensor::new(child, mapped_values.clone(), algebra);
+                        for (offset, value) in values.data.iter_mut().enumerate() {
+                            if let Some(key) = mapped_values.global_key(child.rank(), offset) {
+                                *value = ($lift)(native_values[key]);
                             }
                         }
-                        if child.rank() == 0 {
-                            for (key, value) in values.into_iter().enumerate() {
-                                value_pairs.push((key, ($lift)(value)));
-                            }
-                        }
-                        Ok::<(), i32>(())
+                        Ok::<_, i32>((vectors, values))
                     })();
                     grid.close();
-                    if let Err(error) = result {
-                        info = error;
+                    match result {
+                        Ok((vectors, values)) => {
+                            child_vectors = Some(vectors);
+                            child_values = Some(values);
+                        }
+                        Err(error) => info = error,
                     }
-                    child.close();
                 }
                 let statuses = context.inner.all_gather_i32(info);
                 if let Some(error) = statuses.into_iter().find(|&value| value != 0) {
+                    drop(input);
+                    drop(child_vectors);
+                    drop(child_values);
+                    if let Some(child) = child {
+                        child.close();
+                    }
                     return Err(error);
                 }
-                // add_from_subworld: all parent ranks participate, including ranks that
-                // did not enter ScaLAPACK; writes restore each output's distribution.
+
                 let mut vectors = Self::new(context, self.distribution().clone(), Arithmetic::new());
-                vectors.write_add(&vector_pairs);
                 let mut values = Self::new(
                     context,
                     Distribution::cyclic(vec![n], context.size()),
                     Arithmetic::new(),
                 );
-                values.write_add(&value_pairs);
+                vectors.add_from_subworld(child_vectors.as_ref(), &mapped, one, zero);
+                values.add_from_subworld(child_values.as_ref(), &mapped_values, one, zero);
+
+                drop(input);
+                drop(child_vectors);
+                drop(child_values);
+                if let Some(child) = child {
+                    child.close();
+                }
                 Ok((vectors, values))
             }
         }

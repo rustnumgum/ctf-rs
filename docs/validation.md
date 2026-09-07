@@ -1142,6 +1142,25 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## Generic cross-world accumulation and eigensolver integration (2026-09-07)
+
+subworld_transfer passed once at WSL 1/2/4 ranks, world/parity. Both directions
+preserve incoming*alpha + old*beta with exact i64/noncommutative matrix results
+and finite complex componentwise abs<1e-6. Tests cover reversed odd/even child
+membership, inactive parent participants, cyclic/virtual/replicated distributions,
+empty local shards, unchanged inputs and explicit child-context closure.
+
+The four-type eigensolver now uses the reusable transfer APIs for input and both
+outputs instead of separate hand-written exchanges. typed_distributed_eigh
+passed once at WSL 1/2/4 with unchanged n*n*1e-6 reconstruction/orthogonality
+criteria, including degenerate spectra. Child tensors are released before
+explicit context closure on success and native errors. An unused Wire import
+reported by compilation was removed; passing numerical checks were not repeated.
+Three corresponding/affected targets compiled and linked on Windows GNU once.
+The current host still lacks C:/Windows/System32/msmpi.dll, so native execution
+remains unaccepted. DIGIT / PASS for this stage; optimized cyclic-reshuffle
+buffers, sparse/compressed cross-world paths and full-port completion remain open.
+
 ## Ownership storage conversion and sparse random fill (2026-09-07)
 
 storage_conversion and sparse_random_fill passed once at WSL 1/2/4 ranks,

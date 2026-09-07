@@ -612,3 +612,8 @@ harness = false
 name = "sparse_random_fill"
 path = "tests/sparse_random_fill.rs"
 harness = false
+
+[[test]]
+name = "subworld_transfer"
+path = "tests/subworld_transfer.rs"
+harness = false

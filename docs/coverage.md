@@ -33,8 +33,10 @@ CUDA/offload code and Python/C++ API compatibility are excluded, not CPU paths.
   SparseTensor::sparsify separately filters existing sparse storage.
 - Sparse text I/O: tensor.cxx:945-1015 and graph_io_aux.cxx:45-248; MPI-IO
   line partitioning and coordinate codecs are not yet ported.
-- Generic cross-world accumulation: tensor.cxx:1019-1062; the restricted
-  square-subworld eigensolver path is not a reusable add_to/from_subworld API.
+- Generic dense cross-world accumulation: tensor.cxx:1019-1062; reusable
+  add_to/from_subworld APIs now support explicit child distributions and arbitrary
+  child-rank orientation, and are used by the square-subworld eigensolver.
+  Optimized cyclic-reshuffle buffers and sparse/compressed variants remain open.
 - Explicit all-pair/all-data extraction: tensor.cxx:275-426,823-835;
   indexed reads and local_pairs do not provide those collective operations.
 - Sparse random fill: tensor.cxx:1623-1707; fill_random_sparse implements both
