@@ -111,6 +111,186 @@ where
     values
 }
 
+struct LabelMetadata {
+    labels: Vec<u8>,
+    dimensions: Vec<usize>,
+    index_maps: [Vec<usize>; 3],
+    occurrences: Vec<usize>,
+}
+
+impl LabelMetadata {
+    fn new(distributions: [&Distribution; 3], indices: [&str; 3]) -> Self {
+        let mut labels = Vec::new();
+        let mut dimensions = Vec::new();
+        let index_maps: [Vec<usize>; 3] = std::array::from_fn(|operand| {
+            assert!(indices[operand].is_ascii());
+            assert_eq!(indices[operand].len(), distributions[operand].shape.len());
+            indices[operand].bytes().enumerate().map(|(axis, label)| {
+                assert!(
+                    !indices[operand].as_bytes()[..axis].contains(&label),
+                    "sparse contraction requires unique labels per operand"
+                );
+                if let Some(union_axis) = labels.iter().position(|&old| old == label) {
+                    assert_eq!(dimensions[union_axis], distributions[operand].shape[axis]);
+                    union_axis
+                } else {
+                    labels.push(label);
+                    dimensions.push(distributions[operand].shape[axis]);
+                    labels.len() - 1
+                }
+            }).collect()
+        });
+        for &label in &index_maps[0] {
+            assert!(
+                index_maps[1].contains(&label) || index_maps[2].contains(&label),
+                "sparse contraction does not accept A-only labels"
+            );
+        }
+        let occurrences = (0..labels.len())
+            .map(|label| index_maps.iter().filter(|indices| indices.contains(&label)).count())
+            .collect();
+        Self { labels, dimensions, index_maps, occurrences }
+    }
+}
+
+fn mapping_uses_axis(mapping: &Mapping, axis: usize) -> bool {
+    match mapping {
+        Mapping::Unmapped => false,
+        Mapping::Physical { axis: mapped, child, .. } => {
+            *mapped == axis || mapping_uses_axis(child, axis)
+        }
+        Mapping::Virtual { child, .. } => mapping_uses_axis(child, axis),
+    }
+}
+
+fn execute_mapped<A, F>(
+    output: &mut Tensor<'_, '_, A>,
+    a: &SparseTensor<'_, '_, A>,
+    b: &Tensor<'_, '_, A>,
+    mapped: &[Distribution; 3],
+    metadata: &LabelMetadata,
+    beta: A::Element,
+    commutative: bool,
+    mut leaf: F,
+) where
+    A: Semiring + Clone,
+    A::Element: Wire,
+    F: FnMut(
+        &A,
+        &[usize],
+        &[(usize, A::Element)],
+        &[usize],
+        &[A::Element],
+        &[usize],
+        &mut [A::Element],
+        &A::Element,
+    ),
+{
+    assert!(mapped.iter().all(|distribution| distribution.topology == mapped[0].topology));
+    assert_eq!(mapped[0].topology.size(), output.context().size());
+    for operand in 0..3 {
+        assert_eq!(mapped[operand].shape.len(), metadata.index_maps[operand].len());
+        for (axis, &label) in metadata.index_maps[operand].iter().enumerate() {
+            assert_eq!(mapped[operand].shape[axis], metadata.dimensions[label]);
+        }
+    }
+
+    let mut label_maps: Vec<Option<&Mapping>> = vec![None; metadata.labels.len()];
+    for operand in 0..3 {
+        for (axis, &label) in metadata.index_maps[operand].iter().enumerate() {
+            if let Some(existing) = label_maps[label] {
+                assert_eq!(existing, &mapped[operand].mappings[axis]);
+            } else {
+                label_maps[label] = Some(&mapped[operand].mappings[axis]);
+            }
+        }
+    }
+    let virtual_dimensions: Vec<_> = label_maps.iter().map(|mapping| {
+        let mapping = mapping.unwrap();
+        mapping.phase() / mapping.physical_phase()
+    }).collect();
+
+    let mut communicators: [Vec<Context<'_>>; 3] = std::array::from_fn(|_| Vec::new());
+    for topology_axis in 0..mapped[0].topology.dimensions.len() {
+        let mut axis_label = None;
+        for operand in 0..3 {
+            for (axis, &label) in metadata.index_maps[operand].iter().enumerate() {
+                if mapping_uses_axis(&mapped[operand].mappings[axis], topology_axis) {
+                    if let Some(existing) = axis_label {
+                        assert_eq!(existing, label);
+                    } else {
+                        axis_label = Some(label);
+                    }
+                }
+            }
+        }
+        let label = axis_label.expect("each topology axis must map a union label");
+        assert!(
+            metadata.occurrences[label] >= 2,
+            "one-operand-only labels cannot be physically mapped"
+        );
+        for operand in 0..3 {
+            let contains = metadata.index_maps[operand].contains(&label);
+            let uses = mapped[operand].mappings.iter()
+                .any(|mapping| mapping_uses_axis(mapping, topology_axis));
+            assert_eq!(uses, contains, "shared labels must have aligned mappings");
+            if !contains {
+                communicators[operand].push(mapped[0].topology.fiber(output.context(), topology_axis));
+            }
+        }
+    }
+
+    let rank = output.context().rank();
+    let mut sparse_blocks = sparse_on_roots(a, &mapped[0]);
+    for communicator in &communicators[0] {
+        broadcast_sparse(communicator, &mut sparse_blocks);
+    }
+    let mut dense_b = dense_on_roots(b, &mapped[1]);
+    for communicator in &communicators[1] {
+        communicator.broadcast(0, &mut dense_b);
+    }
+    let mut dense_c = dense_on_roots(output, &mapped[2]);
+    let output_root = communicators[2].iter().all(|communicator| communicator.rank() == 0);
+    let child_beta = if output_root { beta } else { output.algebra().zero() };
+    let shapes: [Vec<usize>; 3] = std::array::from_fn(|operand| mapped[operand].block_shape());
+    let block_sizes: [usize; 3] = std::array::from_fn(|operand| shapes[operand].iter().product());
+    let one = output.algebra().one();
+    crate::sparse_virtual::execute(
+        &virtual_dimensions,
+        [&metadata.index_maps[0], &metadata.index_maps[1], &metadata.index_maps[2]],
+        &child_beta,
+        &one,
+        |blocks, leaf_beta| {
+            leaf(
+                output.algebra(),
+                &shapes[0],
+                &sparse_blocks[blocks[0]],
+                &shapes[1],
+                &dense_b[blocks[1] * block_sizes[1]..(blocks[1] + 1) * block_sizes[1]],
+                &shapes[2],
+                &mut dense_c[blocks[2] * block_sizes[2]..(blocks[2] + 1) * block_sizes[2]],
+                leaf_beta,
+            );
+        },
+    );
+    for communicator in &communicators[2] {
+        communicator.reduce_monoid(output.algebra(), &mut dense_c, commutative, 0);
+    }
+    let contributions: Vec<_> = dense_c.into_iter().enumerate().filter_map(|(offset, value)| {
+        mapped[2].global_key(rank, offset)
+            .filter(|&key| mapped[2].owner(key) == rank)
+            .map(|key| (key, value))
+    }).collect();
+    for group in communicators {
+        for communicator in group {
+            communicator.close();
+        }
+    }
+    let zero = output.algebra().zero();
+    output.transform(|_, value| *value = zero.clone());
+    output.write_add(&contributions);
+}
+
 macro_rules! define_mapped_contraction {
     ($(#[$attribute:meta])* $name:ident, $kernel:path
         $(, $function:ident : $function_type:ty)?) => {
@@ -135,157 +315,38 @@ macro_rules! define_mapped_contraction {
         assert_eq!(topology.size(), self.context().size());
         assert!(physical_labels.is_ascii());
         assert_eq!(physical_labels.len(), topology.dimensions.len());
-
-        let operands = [
-            (indices_a, a.distribution()),
-            (indices_b, b.distribution()),
-            (indices_c, self.distribution()),
-        ];
-        let mut labels = Vec::new();
-        let mut dimensions = Vec::new();
-        for &(indices, distribution) in &operands {
-            assert!(indices.is_ascii());
-            assert_eq!(indices.len(), distribution.shape.len());
-            for (axis, label) in indices.bytes().enumerate() {
-                assert!(
-                    !indices.as_bytes()[..axis].contains(&label),
-                    "sparse contraction requires unique labels per operand"
-                );
-                let dimension = distribution.shape[axis];
-                if let Some(union_axis) = labels.iter().position(|&old| old == label) {
-                    assert_eq!(dimensions[union_axis], dimension);
-                } else {
-                    labels.push(label);
-                    dimensions.push(dimension);
-                }
-            }
-        }
-        for label in indices_a.bytes() {
-            assert!(
-                indices_b.as_bytes().contains(&label)
-                    || indices_c.as_bytes().contains(&label),
-                "sparse contraction does not accept A-only labels"
-            );
-        }
-
-        let mut maps = vec![Mapping::Unmapped; labels.len()];
+        let distributions = [a.distribution(), b.distribution(), self.distribution()];
+        let metadata = LabelMetadata::new(distributions, [indices_a, indices_b, indices_c]);
+        let mut maps = vec![Mapping::Unmapped; metadata.labels.len()];
         for (topology_axis, label) in physical_labels.bytes().enumerate() {
-            let union_axis = labels
-                .iter()
-                .position(|&candidate| candidate == label)
+            let union_axis = metadata.labels.iter().position(|&candidate| candidate == label)
                 .expect("each physical topology axis must name a union label");
-            let occurrences = operands
-                .iter()
-                .filter(|(indices, _)| indices.as_bytes().contains(&label))
-                .count();
-            assert!(
-                occurrences >= 2,
-                "one-operand-only labels cannot be physically mapped"
-            );
+            assert!(metadata.occurrences[union_axis] >= 2,
+                "one-operand-only labels cannot be physically mapped");
             maps[union_axis].augment_physical(&topology, topology_axis);
         }
-
-        let mut virtual_dimensions = vec![1; labels.len()];
+        let mut assigned_virtual = vec![false; metadata.labels.len()];
         for &(label, factor) in virtual_factors {
             assert!(factor > 0);
-            let axis = labels.iter().position(|&candidate| candidate == label).unwrap();
-            assert_eq!(virtual_dimensions[axis], 1);
-            virtual_dimensions[axis] = factor;
+            let axis = metadata.labels.iter().position(|&candidate| candidate == label).unwrap();
+            assert!(!assigned_virtual[axis]);
+            assigned_virtual[axis] = true;
             let total_phase = maps[axis].phase() * factor;
             maps[axis].augment_virtual(total_phase);
         }
-        let index_maps: [Vec<usize>; 3] = std::array::from_fn(|operand|
-            operands[operand].0.bytes().map(|label|labels.iter().position(|&x|x==label).unwrap()).collect());
-        let mapped: [Distribution; 3] = std::array::from_fn(|operand| {
-            let (indices, original) = operands[operand];
-            Distribution::new(
-                original.shape.clone(),
-                topology.clone(),
-                indices
-                    .bytes()
-                    .map(|label| {
-                        maps[labels
-                            .iter()
-                            .position(|&candidate| candidate == label)
-                            .unwrap()]
-                        .clone()
-                    })
-                    .collect(),
-            )
-        });
-
-        let mut communicators: [Vec<Context<'_>>; 3] = std::array::from_fn(|_| Vec::new());
-        for (axis, label) in physical_labels.bytes().enumerate() {
-            for operand in 0..3 {
-                if !operands[operand].0.as_bytes().contains(&label) {
-                    communicators[operand].push(topology.fiber(self.context(), axis));
-                }
-            }
-        }
-
-        let rank = self.context().rank();
-        let mut sparse_blocks = sparse_on_roots(a, &mapped[0]);
-        for communicator in &communicators[0] {
-            broadcast_sparse(communicator, &mut sparse_blocks);
-        }
-
-        let mut dense_b = dense_on_roots(b, &mapped[1]);
-        for communicator in &communicators[1] {
-            communicator.broadcast(0, &mut dense_b);
-        }
-        let mut dense_c = dense_on_roots(self, &mapped[2]);
-        let output_root = communicators[2]
-            .iter()
-            .all(|communicator| communicator.rank() == 0);
-        let child_beta = if output_root {
-            beta
-        } else {
-            self.algebra().zero()
-        };
-        let shapes: [Vec<usize>; 3] = std::array::from_fn(|operand| mapped[operand].block_shape());
-        let block_sizes: [usize; 3] = std::array::from_fn(|operand| shapes[operand].iter().product());
-        let one = self.algebra().one();
-        crate::sparse_virtual::execute(&virtual_dimensions,
-            [&index_maps[0],&index_maps[1],&index_maps[2]],&child_beta,&one,|blocks,leaf_beta| {
-        ($kernel)(
-            self.algebra(),
-            &shapes[0],
-            indices_a,
-            &sparse_blocks[blocks[0]],
-            &shapes[1],
-            indices_b,
-            &dense_b[blocks[1]*block_sizes[1]..(blocks[1]+1)*block_sizes[1]],
-            &shapes[2],
-            indices_c,
-            &mut dense_c[blocks[2]*block_sizes[2]..(blocks[2]+1)*block_sizes[2]],
-            &alpha,
-            leaf_beta,
-            $( &$function, )?
-        );
-        });
-        for communicator in &communicators[2] {
-            communicator.reduce_monoid(self.algebra(), &mut dense_c, commutative, 0);
-        }
-
-        let contributions: Vec<_> = dense_c
-            .into_iter()
-            .enumerate()
-            .filter_map(|(offset, value)| {
-                mapped[2]
-                    .global_key(rank, offset)
-                    .filter(|&key| mapped[2].owner(key) == rank)
-                    .map(|key| (key, value))
-            })
-            .collect();
-        for group in communicators {
-            for communicator in group {
-                communicator.close();
-            }
-        }
-
-        let zero = self.algebra().zero();
-        self.transform(|_, value| *value = zero.clone());
-        self.write_add(&contributions);
+        let mapped: [Distribution; 3] = std::array::from_fn(|operand| Distribution::new(
+            distributions[operand].shape.clone(),
+            topology.clone(),
+            metadata.index_maps[operand].iter().map(|&label| maps[label].clone()).collect(),
+        ));
+        execute_mapped(self, a, b, &mapped, &metadata, beta, commutative,
+            |algebra, shape_a, sparse_a, shape_b, dense_b, shape_c, dense_c, leaf_beta| {
+                ($kernel)(
+                    algebra, shape_a, indices_a, sparse_a, shape_b, indices_b, dense_b,
+                    shape_c, indices_c, dense_c, &alpha, leaf_beta,
+                    $( &$function, )?
+                );
+            });
     }
     };
 }
@@ -294,6 +355,60 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A>
 where
     A::Element: Wire,
 {
+    /// Execute sparse-A/dense-B contraction with a reusable aligned grid plan.
+    /// The plan contains mappings only; current tensor values, coefficients and
+    /// reduction commutativity are supplied for every execution.
+    pub fn contract_sparse_with_plan(
+        &mut self,
+        indices_c: &str,
+        a: &SparseTensor<'_, '_, A>,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        plan: &crate::planning::GridPlan,
+        alpha: A::Element,
+        beta: A::Element,
+        commutative: bool,
+    ) {
+        assert!(std::ptr::eq(self.context(), a.context()));
+        assert!(std::ptr::eq(self.context(), b.context()));
+        assert_eq!(plan.signature().topology().size(), self.context().size());
+        assert!(plan.matches(
+            [a.distribution(), b.distribution(), self.distribution()],
+            [indices_a, indices_b, indices_c],
+        ));
+        let metadata = LabelMetadata::new(
+            [a.distribution(), b.distribution(), self.distribution()],
+            [indices_a, indices_b, indices_c],
+        );
+        assert_eq!(&metadata.index_maps, plan.signature().indices());
+        execute_mapped(
+            self,
+            a,
+            b,
+            plan.mapped_distributions(),
+            &metadata,
+            beta,
+            commutative,
+            |algebra, shape_a, sparse_a, shape_b, dense_b, shape_c, dense_c, leaf_beta| {
+                crate::sparse_sequential::sequential(
+                    algebra,
+                    shape_a,
+                    indices_a,
+                    sparse_a,
+                    shape_b,
+                    indices_b,
+                    dense_b,
+                    shape_c,
+                    indices_c,
+                    dense_c,
+                    &alpha,
+                    leaf_beta,
+                );
+            },
+        );
+    }
+
     define_mapped_contraction!(
         /// Contract sparse `A` and dense `B` into dense `self` on an explicit
         /// label-to-topology-axis mapping. Labels are unique within each operand.

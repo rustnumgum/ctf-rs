@@ -822,3 +822,13 @@ harness = false
 name = "upstream_strassen"
 path = "tests/upstream_strassen.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_plan"
+path = "tests/distributed_sparse_plan.rs"
+harness = false
+
+[[test]]
+name = "upstream_spectral_element"
+path = "tests/upstream_spectral_element.rs"
+harness = false

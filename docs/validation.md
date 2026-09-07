@@ -1,5 +1,18 @@
 # Validation evidence
 
+## Sparse plan reuse and spectral element (2026-09-08)
+
+distributed_sparse_plan, upstream_spectral_element, distributed_sparse_general
+and distributed_sparse_function passed once at WSL 1/2/4 ranks, world/parity.
+An initial compilation required an explicit `[Vec<usize>; 3]` annotation;
+no numerical diagnostic runs were needed. Sparse results, distribution restore
+and cache statistics use exact integer equality. The spectral-element source
+sequence retains its finite norm2 >= 1e-6 criterion, not a residual-accuracy
+oracle; bounded N=3 and an explicit rank-local MT stream replace source N=16
+and its global RNG lifetime. DIGIT / PASS; numerical verification closed.
+All four targets compiled and linked on Windows GNU. Native MPI runtime
+acceptance is still outstanding; compilation is not execution evidence.
+
 ## Custom sparse GEMM integration and representative measurement (2026-09-08)
 
 distributed_sparse_gemm_function, distributed_sparse_function_output and
