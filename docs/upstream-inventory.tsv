@@ -173,24 +173,24 @@ test/bivar_transform.cxx	tests/upstream/test/bivar_transform.rs	pending
 test/ccsdt_map_test.cxx	tests/upstream/test/ccsdt_map_test.rs	pending
 test/ccsdt_t3_to_t2.cxx	tests/upstream/test/ccsdt_t3_to_t2.rs	pending
 test/dft.cxx	tests/upstream/test/dft.rs	pending
-test/diag_ctr.cxx	tests/upstream_dense.rs	identity ported; WSL 1/2/4 pass
+test/diag_ctr.cxx	tests/upstream_dense.rs; tests/upstream_diag_ctr.rs	identity ported through dense and compressed tensor APIs; original 1e-10 checks, WSL 1/2/4 pass
 test/diag_sym.cxx	tests/upstream_diag_sym.rs	ported paired-SY diagonal identity, original norm<1e-10, deterministic fixture; WSL 1/2/4 ranks pass
 test/endomorphism_cust_sp.cxx	tests/upstream/test/endomorphism_cust_sp.rs	pending
 test/endomorphism_cust.cxx	tests/upstream/test/endomorphism_cust.rs	pending
 test/endomorphism.cxx	tests/upstream/test/endomorphism.rs	pending
 test/gemm_4D.cxx	tests/upstream_gemm4d.rs	NS associativity port PASS WSL 1/2/4; SY/AS branches pending
 test/Makefile	Cargo/build tooling	replaced
-test/multi_tsr_sym.cxx	tests/upstream/test/multi_tsr_sym.rs	pending
+test/multi_tsr_sym.cxx	tests/upstream_multi_tsr_sym.rs	ported NS/SY Gram equality, original norm<1e-6; WSL 1/2/4 pass
 test/permute_multiworld.cxx	tests/upstream/test/permute_multiworld.rs	pending
 test/readall_test.cxx	tests/upstream/test/readall_test.rs	pending
 test/readwrite_test.cxx	tests/upstream/test/readwrite_test.rs	pending
-test/reduce_bcast.cxx	tests/upstream_dense.rs	both identities ported; WSL 1/2/4 pass
+test/reduce_bcast.cxx	tests/upstream_dense.rs; tests/upstream_reduce_bcast.rs	both identities through dense and compressed tensor APIs; original norm<=1e-6, WSL 1/2/4 pass
 test/repack.cxx	tests/distributed_symmetric_repack.rs	canonical-only source repack semantics ported; exact SY/AS/SH and partial-group WSL checks at 1/2/4 ranks; original random driver pending
 test/scalar.cxx	tests/upstream/test/scalar.rs	pending
 test/speye.cxx	tests/upstream/test/speye.rs	pending
 test/sptensor_sum.cxx	tests/upstream/test/sptensor_sum.rs	pending
 test/subworld_gemm.cxx	tests/upstream/test/subworld_gemm.rs	pending
-test/sy_times_ns.cxx	tests/upstream/test/sy_times_ns.rs	pending
+test/sy_times_ns.cxx	tests/upstream_sy_times_ns.rs	ported literal zero-input source and separately adapted nonzero fixture, original norm<1e-10; WSL 1/2/4 pass
 test/test_suite.cxx	tests/upstream/test/test_suite.rs	pending
 test/univar_function.cxx	tests/upstream/test/univar_function.rs	pending
 test/weigh_4D.cxx	tests/upstream/test/weigh_4D.rs	pending

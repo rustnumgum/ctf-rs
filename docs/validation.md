@@ -859,3 +859,15 @@ No production change or tolerance adjustment was made for that discrepancy.
 Only the affected/new suites were then executed; all passed. DIGIT / PASS,
 verification closed. All three targets also compiled and linked on Windows GNU.
 Native runtime and complete upstream CPU coverage remain unaccepted.
+
+## Four upstream identities through compressed tensor APIs (2026-09-07)
+
+upstream_diag_ctr, upstream_reduce_bcast, upstream_multi_tsr_sym and
+upstream_sy_times_ns passed once each at 1/2/4 WSL MPI ranks, world/parity
+contexts. diag_ctr retains its nonzero initial trace and 1e-10 residual checks;
+reduce_bcast retains norm<=1e-6; multi_tsr_sym retains norm<1e-6;
+sy_times_ns retains norm<1e-10 for both literal-source and adapted nonzero cases.
+The adapted SY-times-NS maximum observed norm was 2.2591401799415137e-16;
+the NS/SY Gram differences were zero. No failures or additional precision runs.
+DIGIT / PASS, verification closed. All four new targets compiled and linked
+once on Windows GNU; execution still awaits native MPI runtime acceptance.

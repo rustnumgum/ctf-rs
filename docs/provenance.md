@@ -757,3 +757,18 @@ clears only the first task's literal repeated-index selection
 value before adding the replacement term. This is source rw=0 semantics, not
 ordinary assignment to every symmetry-equivalent coordinate. The new regression
 records this behavior rather than silently changing the pinned algorithm.
+
+## Upstream symmetry and diagonal test batch (2026-09-07)
+
+The dedicated upstream_diag_ctr and upstream_reduce_bcast tests exercise their
+original identities through the newer compressed tensor APIs, complementing the
+earlier dense-port coverage. upstream_multi_tsr_sym preserves identical-input
+A[ik]*A[jk] contractions into NS and SY output and compares their difference.
+This explicitly exercises the source same-input symmetry-preservation branch.
+
+In pinned sy_times_ns, A.write and B.write are commented out, while C.write is
+active. upstream_sy_times_ns therefore distinguishes literal zero-A/B behavior
+from a separately labeled nonzero deterministic fixture using the same indexed
+equations. The nonzero case is not presented as literal upstream initialization.
+All original residual inequalities remain intact; rank-dependent random values
+are replaced by global-key fixtures for reproducible MPI-rank comparisons.

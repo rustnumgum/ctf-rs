@@ -307,3 +307,23 @@ harness = false
 name = "distributed_cross_diagonal"
 path = "tests/distributed_cross_diagonal.rs"
 harness = false
+
+[[test]]
+name = "upstream_diag_ctr"
+path = "tests/upstream_diag_ctr.rs"
+harness = false
+
+[[test]]
+name = "upstream_sy_times_ns"
+path = "tests/upstream_sy_times_ns.rs"
+harness = false
+
+[[test]]
+name = "upstream_multi_tsr_sym"
+path = "tests/upstream_multi_tsr_sym.rs"
+harness = false
+
+[[test]]
+name = "upstream_reduce_bcast"
+path = "tests/upstream_reduce_bcast.rs"
+harness = false
