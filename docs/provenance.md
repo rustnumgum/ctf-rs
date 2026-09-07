@@ -7,6 +7,11 @@ Reference commit: f69cbb46e23bc2f39cda5722ce096f56301dab4f
 not a declaration that Edgar Solomonik authored the new Rust implementation.
 Do not stamp independently written files with the upstream author's copyright.
 
+* `src/schedule.rs`, `src/schedule_graph.rs`, `src/schedule_partition.rs`:
+  dependency release, cost-window partitioning and subworld execution phases
+  adapted from `interface/schedule.{h,cxx}`. Rust closures replace C++ recorded
+  expressions. `schedule.md` lists explicit fixes to broken source paths.
+
 * `src/binary_io.rs`, `src/ffi/binary_io.rs`: consecutive-rank chunks and native
   independent-offset file I/O follow `tensor/untyped_tensor.cxx:3819-3909`.
   Rust Wire encoding, explicit path/offset APIs and ownership replace raw pair

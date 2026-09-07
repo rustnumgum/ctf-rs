@@ -64,6 +64,7 @@ mpi_tests+=(sparse_text_io)
 mpi_tests+=(symmetric_norms symmetric_text_io)
 mpi_tests+=(pair_read)
 mpi_tests+=(binary_io)
+mpi_tests+=(schedule)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
@@ -71,6 +72,7 @@ for ranks in 1 2 4; do
 done
 cargo test --lib tttp_blocking
 cargo test --lib sparse_text
+cargo test --lib schedule
 cargo test --test narrow_algebra
 cargo test --test random_generator --test scalar_blas --test node_peer_counts --test folded_cost --test partial_fold_kernel --test fold_storage --test partial_fold --test fold_indices --test fold_layout --test fold_selection --test mapped_cost --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
   --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction \

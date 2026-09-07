@@ -642,3 +642,8 @@ harness = false
 name = "binary_io"
 path = "tests/binary_io.rs"
 harness = false
+
+[[test]]
+name = "schedule"
+path = "tests/schedule.rs"
+harness = false

@@ -78,8 +78,8 @@ src/interface/ring.cxx	src/interface	pending
 src/interface/ring.h	src/interface	pending
 src/interface/scalar.cxx	src/interface	pending
 src/interface/scalar.h	src/interface	pending
-src/interface/schedule.cxx	src/interface	pending
-src/interface/schedule.h	src/interface	pending
+src/interface/schedule.cxx	src/schedule.rs; src/schedule_graph.rs; src/schedule_partition.rs; tests/schedule.rs	partial: explicit replayable dense task DAG, RAW/WAR/WAW hazards, source cost-window partitioning and child-context execution/timing; source integer-cost/null-clone/root/overwrite defects corrected; automatic operation cost attachment and optimized reshuffle pending
+src/interface/schedule.h	src/schedule.rs	replaced: direct Rust closures, explicit input/output IDs, context and estimated costs; no global recorder or C++ AST compatibility
 src/interface/semiring.cxx	src/algebra.rs; src/linalg.rs; src/ffi/linalg.rs; src/contraction.rs	partial: generic scalar semiring and native four-type GEMM/batched folded kernels; complete sparse/native specialized dispatch pending
 src/interface/semiring.h	src/algebra.rs; src/sparse_formats.rs	partial: algebra, gen_csrmm, gen_csrmultcsr, gen_ccsrmm; remaining kernels pending
 src/interface/set.cxx	src/interface	pending

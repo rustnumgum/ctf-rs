@@ -1,5 +1,16 @@
 # Validation evidence
 
+## Distributed schedule execution (2026-09-07)
+
+Seven schedule graph/partition unit tests passed once. `schedule` passed once
+at 1/2/4 WSL ranks, world/parity, with exact i64 sums and contractions. Coverage
+includes proper child communicator execution, RAW/WAR/WAW and in-place updates,
+no-input roots, subsecond cost allocation, deterministic replay, restoration of
+parent distributions and finite nonnegative timing fields. DIGIT / PASS; no
+diagnostic runs. Windows GNU compiled/linked the library and schedule target once;
+native MPI runtime execution remains pending. This does not close the full port
+or automatic operation-cost integration backlog.
+
 ## Binary tensor MPI-IO (2026-09-07)
 
 `binary_io` passed once at 1/2/4 WSL ranks on world/parity contexts. Exact byte
