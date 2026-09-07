@@ -657,3 +657,8 @@ harness = false
 name = "bool_norm"
 path = "tests/bool_norm.rs"
 harness = false
+
+[[test]]
+name = "symmetric_reshuffle"
+path = "tests/symmetric_reshuffle.rs"
+harness = false

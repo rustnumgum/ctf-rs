@@ -7,6 +7,10 @@ Reference commit: f69cbb46e23bc2f39cda5722ce096f56301dab4f
 not a declaration that Edgar Solomonik authored the new Rust implementation.
 Do not stamp independently written files with the upstream author's copyright.
 
+* `src/symmetric_reshuffle.rs`: symmetry-bounded global-order traversal from
+  `pad_cyclic_pup_virt_buff` in `redistribution/cyclic_reshuffle.cxx`; canonical
+  offsets use the existing Rust packed distribution, with no dense expansion.
+
 * `src/cyclic_reshuffle.rs` and dense `Tensor::redistribute`: NS physical-residue
   traversal and ordered value-stream packing/unpacking follow
   `redistribution/cyclic_reshuffle.cxx`. Rust local offsets encode virtual blocks;

@@ -233,15 +233,20 @@ where
         assert_eq!(target.links(), self.distribution.links());
         assert_eq!(target.distribution().topology.size(), self.context.size());
 
-        let pairs: Vec<_> = self
-            .local_pairs()
-            .into_iter()
-            .filter(|(key, _)| {
-                self.distribution.distribution().owner(*key) == self.context.rank()
-            })
-            .collect();
+        let plan = crate::symmetric_reshuffle::plan(&self.distribution, &target, self.context.rank());
+        let mut buckets = vec![Vec::new(); self.context.size()];
+        for (offsets, bucket) in plan.send.iter().zip(&mut buckets) {
+            bucket.reserve(offsets.len() * A::Element::WIDTH);
+            for &offset in offsets { self.data[offset].encode(bucket); }
+        }
+        let received = self.context.inner.exchange(&buckets);
         let mut result = Self::new(self.context, target, self.algebra.clone());
-        result.write_add(&pairs);
+        for (bytes, offsets) in received.iter().zip(&plan.receive) {
+            assert_eq!(bytes.len(), offsets.len() * A::Element::WIDTH);
+            for (value, &offset) in bytes.chunks_exact(A::Element::WIDTH).zip(offsets) {
+                result.data[offset] = A::Element::decode(value);
+            }
+        }
         result
     }
 }

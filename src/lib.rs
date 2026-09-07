@@ -66,3 +66,4 @@ mod pair_read;
 mod binary_io;
 pub mod schedule;
 mod cyclic_reshuffle;
+mod symmetric_reshuffle;

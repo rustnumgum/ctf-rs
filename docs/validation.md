@@ -1,5 +1,16 @@
 # Validation evidence
 
+## Packed value-only reshuffle (2026-09-07)
+
+Three exact canonical-stream unit tests and `symmetric_reshuffle`,
+`distributed_symmetric_contraction`, `distributed_symmetric_repack` passed once
+at 1/2/4 WSL ranks, world/parity. Exact integer/complex fixtures cover SY/AS/SH,
+higher-order and mixed groups, physical/virtual/full/mixed-replica switches,
+padding, packed holes, empty/scalar domains and unchanged source storage.
+Contraction retained its existing 1e-6 absolute bound. DIGIT / PASS; no numerical
+diagnostics or precision reruns. Windows native runtime acceptance is pending.
+The library and all three integration targets compiled/linked once on Windows GNU.
+
 ## Boolean infinity norm (2026-09-07)
 
 `bool_norm` passed once at 1/2/4 WSL ranks, world/parity. Exact checks cover

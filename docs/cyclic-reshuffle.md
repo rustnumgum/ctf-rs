@@ -18,8 +18,15 @@ the existing communicator-scoped variable-size exchange. There is no speedup
 claim: transmitted payload shrinks by eight key bytes per transferred element,
 while offset tables consume local memory.
 
-This closes the NS value-stream path, not every optimized source reshuffle case.
-Closed-form bucket counts, buffer reuse, compressed symmetry, nonzero offsets,
+`SymmetricTensor::redistribute` also uses value-only streams. Its traversal clips
+each compressed axis to the following coordinate (strictly for AS/SH), so only
+the canonical region is visited. It does not scan/filter the rectangular domain
+or allocate a dense expansion. Packed offsets retain SY-capacity holes for AS/SH;
+holes, structural zeros and padding never enter messages. Multiple independent
+groups and higher-order groups use the same bounds. Source tensors remain intact.
+
+This closes the NS and packed value-stream paths, not every optimized source case.
+Closed-form bucket counts, buffer reuse, nonzero offsets,
 permutation arguments and subworld integration remain to be ported. The source's
 scalar rank-zero storage convention is represented by the existing Rust explicit
 replica rules instead of silently discarding other stored replicas.
