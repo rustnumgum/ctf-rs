@@ -1,12 +1,14 @@
 // Adapted from cc4s CTF interface/multilinear.cxx.
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Dense TTTP: mode-aligned factors and balanced auxiliary-index blocking.
-//! Factor redistribution currently uses the tensor all-to-all implementation;
-//! the source's specialized redistribution-plus-fiber-broadcast is pending.
 use crate::{algebra::Arithmetic, mapping::{Distribution, Mapping}, tensor::Tensor};
 
+#[path = "multilinear_factor.rs"]
+pub(crate) mod factor_alignment;
+use factor_alignment::{aligned_factor, physical_mapping};
+
 #[path = "multilinear_kernel.rs"]
-mod kernel;
+pub(crate) mod kernel;
 
 #[path = "reshape.rs"]
 mod reshape;
@@ -17,18 +19,6 @@ pub mod tensor_svd;
 #[cfg(feature = "native-linalg")]
 #[path = "solve_factor.rs"]
 mod solve_factor;
-
-// TTTP factors follow the tensor's physical mode, not its virtual blocks.
-fn physical_mapping(mapping: &Mapping) -> Mapping {
-    match mapping {
-        Mapping::Unmapped | Mapping::Virtual { .. } => Mapping::Unmapped,
-        Mapping::Physical { axis, processes, child } => {
-            assert_eq!(child.physical_phase(), 1, "TTTP requires one physical axis per mode");
-            Mapping::Physical { axis: *axis, processes: *processes,
-                child: Box::new(Mapping::Unmapped) }
-        }
-    }
-}
 
 impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
     /// Matricized tensor times Khatri-Rao product, replacing the output factor.
@@ -114,17 +104,15 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
             assert!(mode < distribution.shape.len());
             assert!(index == 0 || factors[index - 1].0 < mode);
             assert_eq!(factor.distribution().shape, vec![distribution.shape[mode]]);
-            let stride: usize = distribution.shape[..mode].iter().product();
-            let mut vector = factor.clone();
-            vector.redistribute(Distribution::new(factor.distribution().shape.clone(),
-                distribution.topology.clone(), vec![physical_mapping(&distribution.mappings[mode])]));
-            mapped.push((mode, stride, vector));
+            let (factor_distribution, values) =
+                aligned_factor(&distribution, mode, factor, 0, None, false);
+            mapped.push((mode, factor_distribution, values));
         }
         self.transform(|key, value| {
-            for (mode, stride, vector) in &mapped {
-                let coordinate = key / stride % distribution.shape[*mode];
-                let offset = vector.distribution().local_offset(rank, coordinate);
-                *value *= vector.local_storage()[offset];
+            let coordinates = distribution.decode_key(key);
+            for (mode, factor_distribution, vector) in &mapped {
+                let factor_key = coordinates[*mode];
+                *value *= vector[factor_distribution.local_offset(rank, factor_key)];
             }
         });
     }
@@ -160,25 +148,23 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
             let width = k / divisions + usize::from(block < k % divisions);
             let mut mapped = Vec::with_capacity(factors.len());
             for &(mode, factor) in factors {
-                let mut ranges: Vec<_> = factor.distribution().shape.iter().map(|&n| 0..n).collect();
-                ranges[auxiliary_axis] = start..start + width;
-                let mut matrix = if divisions == 1 { factor.clone() } else { factor.slice(&ranges) };
-                let mut mappings = vec![Mapping::Unmapped; 2];
-                mappings[mode_axis] = physical_mapping(&distribution.mappings[mode]);
-                matrix.redistribute(Distribution::new(matrix.distribution().shape.clone(),
-                    distribution.topology.clone(), mappings));
-                let stride: usize = distribution.shape[..mode].iter().product();
-                mapped.push((mode, stride, matrix));
+                let (factor_distribution, values) = aligned_factor(
+                    &distribution, mode, factor, start, Some(width), aux_mode_first);
+                mapped.push((mode, factor_distribution, values));
             }
             self.transform(|key, value| {
+                let coordinates = distribution.decode_key(key);
                 let mut sum = 0.;
                 for auxiliary in 0..width {
                     let mut product = 1.;
-                    for (mode, stride, matrix) in &mapped {
-                        let coordinate = key / stride % distribution.shape[*mode];
-                        let matrix_key = if aux_mode_first { auxiliary + width * coordinate }
-                            else { coordinate + distribution.shape[*mode] * auxiliary };
-                        product *= matrix.local_storage()[matrix.distribution().local_offset(rank, matrix_key)];
+                    for (mode, factor_distribution, matrix) in &mapped {
+                        let factor_coordinates = if aux_mode_first {
+                            [auxiliary, coordinates[*mode]]
+                        } else {
+                            [coordinates[*mode], auxiliary]
+                        };
+                        let factor_key = factor_distribution.encode_key(&factor_coordinates);
+                        product *= matrix[factor_distribution.local_offset(rank, factor_key)];
                     }
                     sum += product;
                 }

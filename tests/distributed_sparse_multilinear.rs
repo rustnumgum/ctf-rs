@@ -34,15 +34,25 @@ fn run(c:&Context<'_>){
         close(t.read(&keys),expected);
     }
     let t=source(c);
-    let result=t.mttkrp(1,&[&f0,&f2],Distribution::cyclic(vec![2],c.size()));
-    let expected:Vec<_>=(0..2).map(|j|entries.iter().filter(|(key,_)|key/3%2==j)
-        .map(|&(key,v)|v*vector(0,key%3)*vector(2,key/6)).sum()).collect();
-    close(result.read(&[0,1]),expected);
-    let f0=factor(c,0,3,Some(5),true);let f2=factor(c,2,4,Some(5),true);
-    let result=t.mttkrp(1,&[&f0,&f2],Distribution::cyclic(vec![5,2],c.size()));
-    let expected:Vec<_>=(0..10).map(|key|{let r=key%5;let j=key/5;
-        entries.iter().filter(|(key,_)|key/3%2==j).map(|&(key,v)|v*matrix(0,key%3,r)*matrix(2,key/6,r)).sum()}).collect();
-    close(result.read(&(0..10).collect::<Vec<_>>()),expected);
+    let coordinate=|key:usize,mode:usize|[key%3,key/3%2,key/6][mode];
+    for output_mode in 0..3 {
+        let modes:Vec<_>=(0..3).filter(|&mode|mode!=output_mode).collect();
+        for width in [None,Some(5)] {
+            let factors:Vec<_>=modes.iter().map(|&mode|factor(c,mode,[3,2,4][mode],width,true)).collect();
+            let references:Vec<_>=factors.iter().collect();
+            let shape=match width{None=>vec![[3,2,4][output_mode]],Some(k)=>vec![k,[3,2,4][output_mode]]};
+            let count=shape.iter().product::<usize>();
+            let result=t.mttkrp(output_mode,&references,Distribution::cyclic(shape,c.size()));
+            let expected:Vec<_>=(0..count).map(|key|{
+                let(row,r)=match width{None=>(key,0),Some(k)=>(key/k,key%k)};
+                entries.iter().filter(|(key,_)|coordinate(*key,output_mode)==row).map(|&(key,v)|{
+                    v*modes.iter().map(|&mode|match width{None=>vector(mode,coordinate(key,mode)),
+                        Some(_)=>matrix(mode,coordinate(key,mode),r)}).product::<f64>()
+                }).sum()
+            }).collect();
+            close(result.read(&(0..count).collect::<Vec<_>>()),expected);
+        }
+    }
     let d=Distribution::cyclic(vec![1_000_000_000,2],c.size());
     let pairs:Vec<_>=[(0,2.),(1_999_999_999,3.)].into_iter().filter(|(key,_)|d.owner(*key)==c.rank()).collect();
     let mut huge=Sparse::new(c,d,Arithmetic::new());huge.write_add(&pairs);

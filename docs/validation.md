@@ -896,3 +896,14 @@ explicit stored zero and empty/singular normal systems are covered. Singular
 systems return POSV INFO=1 on all ranks. No failures or extra precision runs.
 DIGIT / PASS, verification closed. Both changed targets compiled and linked once
 on Windows GNU; native runtime acceptance remains outstanding.
+
+## TTTP factor broadcasts and source sparse MTTKRP kernel (2026-09-07)
+
+Affected distributed_tttp and distributed_sparse_multilinear targets passed once
+at 1/2/4 WSL MPI ranks, world/parity subcommunicators. Dense vector TTTP remains
+exact, dense matrix TTTP retains global L1<=1e-5, and sparse operations retain
+finite values with absolute error<=1e-6. Sparse MTTKRP now exercises every output
+mode with both vector and matrix factors through the source fiber-grouped kernel.
+Existing empty-shard, virtual-block and auxiliary-division checks remain active.
+DIGIT / PASS, no diagnostic or tighter-precision runs. Both targets compiled and
+linked once on Windows GNU; this does not constitute native runtime acceptance.

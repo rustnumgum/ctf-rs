@@ -8,92 +8,7 @@ use crate::{
     tensor::Tensor,
 };
 
-// Multilinear factors follow the tensor's physical mode, not its virtual blocks.
-fn physical_mapping(mapping: &Mapping) -> Mapping {
-    match mapping {
-        Mapping::Unmapped | Mapping::Virtual { .. } => Mapping::Unmapped,
-        Mapping::Physical {
-            axis,
-            processes,
-            child,
-        } => {
-            assert_eq!(
-                child.physical_phase(),
-                1,
-                "multilinear operations require one physical axis per mode"
-            );
-            Mapping::Physical {
-                axis: *axis,
-                processes: *processes,
-                child: Box::new(Mapping::Unmapped),
-            }
-        }
-    }
-}
-
-/// Read one vector or auxiliary submatrix onto the tensor mode's physical
-/// mapping, then broadcast it along the complementary process fiber.
-fn aligned_factor(
-    tensor_distribution: &Distribution,
-    mode: usize,
-    factor: &Tensor<'_, '_, Arithmetic<f64>>,
-    auxiliary_start: usize,
-    auxiliary_width: Option<usize>,
-    aux_mode_first: bool,
-) -> (Distribution, Vec<f64>) {
-    let mapping = physical_mapping(&tensor_distribution.mappings[mode]);
-    let (shape, mappings) = if let Some(width) = auxiliary_width {
-        if aux_mode_first {
-            (
-                vec![width, tensor_distribution.shape[mode]],
-                vec![Mapping::Unmapped, mapping],
-            )
-        } else {
-            (
-                vec![tensor_distribution.shape[mode], width],
-                vec![mapping, Mapping::Unmapped],
-            )
-        }
-    } else {
-        (
-            vec![tensor_distribution.shape[mode]],
-            vec![mapping],
-        )
-    };
-    let mapped = Distribution::new(shape, tensor_distribution.topology.clone(), mappings);
-    let rank = factor.context().rank();
-    let coordinates = tensor_distribution.topology.coordinates(rank);
-    let color = tensor_distribution.mappings[mode].physical_rank(&coordinates);
-    let fiber = factor
-        .context()
-        .split(Some(color as i32), rank as i32)
-        .unwrap();
-    let requests: Vec<_> = if fiber.rank() == 0 {
-        (0..mapped.local_len())
-            .filter_map(|offset| {
-                mapped.global_key(rank, offset).map(|key| {
-                    let mut coordinates = mapped.decode_key(key);
-                    if auxiliary_width.is_some() {
-                        let auxiliary_axis = usize::from(!aux_mode_first);
-                        coordinates[auxiliary_axis] += auxiliary_start;
-                    }
-                    (offset, factor.distribution().encode_key(&coordinates))
-                })
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
-    let keys: Vec<_> = requests.iter().map(|&(_, key)| key).collect();
-    let read = factor.read(&keys);
-    let mut values = vec![0.; mapped.local_len()];
-    for ((offset, _), value) in requests.into_iter().zip(read) {
-        values[offset] = value;
-    }
-    fiber.broadcast(0, &mut values);
-    fiber.close();
-    (mapped, values)
-}
+use crate::multilinear::factor_alignment::{aligned_factor, physical_mapping};
 
 impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
     /// Multiply stored entries by a product of mode vectors. Factors are
@@ -268,33 +183,18 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<f64>> {
             output_mappings,
         );
         let mut output_values = vec![0.; mapped_output.local_len()];
-        for (key, value) in self.local_pairs() {
-            if distribution.owner(key) != rank {
-                continue;
-            }
-            let coordinates = distribution.decode_key(key);
-            for auxiliary in 0..width {
-                let mut contribution = value;
-                for mode in 0..order {
-                    if mode == output_mode {
-                        continue;
-                    }
-                    let (mapped, factor) = aligned[mode].as_ref().unwrap();
-                    let factor_key = if vector {
-                        coordinates[mode]
-                    } else {
-                        auxiliary + width * coordinates[mode]
-                    };
-                    contribution *= factor[mapped.local_offset(rank, factor_key)];
-                }
-                let output_key = if vector {
-                    coordinates[output_mode]
-                } else {
-                    auxiliary + width * coordinates[output_mode]
-                };
-                output_values[mapped_output.local_offset(rank, output_key)] += contribution;
-            }
-        }
+        // Source MTTKRP groups contiguous mode-zero fibers, reusing products
+        // of the remaining factor rows. Virtual blocks require global-key order.
+        let mut pairs = self.local_pairs();
+        pairs.retain(|(key, _)| distribution.owner(*key) == rank);
+        pairs.sort_by_key(|&(key, _)| key);
+        let phases: Vec<_> = distribution.mappings.iter().map(Mapping::physical_phase).collect();
+        let arrays: Vec<&[f64]> = aligned.iter().map(|factor| match factor {
+            Some((_, values)) => values.as_slice(),
+            None => &[],
+        }).collect();
+        crate::multilinear::kernel::mttkrp(&distribution.shape, &phases, width,
+            output_mode, &pairs, &arrays, &mut output_values);
 
         let coordinates = distribution.topology.coordinates(rank);
         let color = distribution.mappings[output_mode].physical_rank(&coordinates);

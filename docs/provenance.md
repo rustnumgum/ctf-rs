@@ -797,3 +797,18 @@ Sparse absence contributes zero without allocating the logical tensor domain.
 The existing Rust padding, canonical-owner and collective INFO rules also apply
 to this path. A module-local macro emits the algorithm for both concrete receiver
 types; no runtime storage or native-library backend abstraction is introduced.
+
+## Shared TTTP factor staging and sparse fiber-grouped MTTKRP
+
+Dense TTTP now uses the same source mode-physical shard and complementary-fiber
+broadcast as sparse TTTP, implemented in multilinear_factor.rs. Each root reads
+only its valid factor shard/block, broadcasts its padded local buffer, and closes
+the communicator explicitly. This replaces clone/slice plus replicated factor
+redistribution; the underlying root read remains the current key-routed I/O path.
+Both orientations and balanced auxiliary blocks retain the same scalar operation
+order. Automatic memory-based division selection remains a separate pending item.
+
+Sparse MTTKRP now calls the existing multilinear_kernel.rs source fiber-grouped
+kernel instead of independently multiplying every sparse entry's factor rows.
+Canonical local stored pairs are key-sorted across virtual blocks; mode-zero
+fibers reuse the product of remaining factor rows, matching interface/semiring.h.
