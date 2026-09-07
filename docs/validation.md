@@ -1,5 +1,17 @@
 # Validation evidence
 
+## Coordinate multiworld permutation and indexed-write order (2026-09-07)
+
+`upstream_permute_multiworld`, `indexed_write_order`, `dense_semantics`,
+`distributed_symmetric_operations`, `binary_io` and `upstream_readwrite` passed
+once at 1/2/4 WSL ranks. The new multiworld NS driver uses exact reads and source
+abs<1e-9 writes, nonuniform/empty blocks, skipped maps and dense-zero scatter
+omission. Exact noncommutative matrix fixtures prove the corrected left-sided
+indexed-write coefficients, duplicate beta-once and AS signs. Existing affected
+numeric checks retain their original bounds. DIGIT / PASS; no diagnostic runs.
+Windows MPI runtime acceptance remains pending.
+All six affected integration targets compiled and linked once on Windows GNU.
+
 ## Upstream read/write, sparse sum and subworld GEMM drivers (2026-09-07)
 
 `upstream_readall`, `upstream_readwrite`, `upstream_sptensor_sum` and

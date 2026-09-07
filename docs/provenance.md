@@ -7,6 +7,11 @@ Reference commit: f69cbb46e23bc2f39cda5722ce096f56301dab4f
 not a declaration that Edgar Solomonik authored the new Rust implementation.
 Do not stamp independently written files with the upstream author's copyright.
 
+* `src/permuted_io.rs`: `tensor/untyped_tensor.cxx:928-992` coordinate permutation
+  read/write phases, with Option maps replacing -1 coordinates and explicit
+  optional children replacing dummy scalars. Dense/packed indexed write order
+  follows `redistribution/sparse_rw.cxx:795-839`, including signed duplicate writes.
+
 * `tests/upstream_{readall,readwrite,sptensor_sum,subworld_gemm}.rs`:
   migrate the matching pinned `test/{readall_test,readwrite_test,sptensor_sum,
   subworld_gemm}.cxx` driver equations and acceptance rules. Source RNG uses its

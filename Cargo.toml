@@ -687,3 +687,13 @@ harness = false
 name = "upstream_sptensor_sum"
 path = "tests/upstream_sptensor_sum.rs"
 harness = false
+
+[[test]]
+name = "upstream_permute_multiworld"
+path = "tests/upstream_permute_multiworld.rs"
+harness = false
+
+[[test]]
+name = "indexed_write_order"
+path = "tests/indexed_write_order.rs"
+harness = false

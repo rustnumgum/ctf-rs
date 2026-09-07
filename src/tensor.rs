@@ -350,22 +350,44 @@ impl<A: Semiring> Tensor<'_, '_, A> where A::Element: Wire {
         cc.contract_from_on_grid(&ic,&aa,&ia,&bb,&ib,topology,alpha,beta)?;
         self.replace_diagonal(indices_c,&cc);Ok(())
     }
-    /// Collective affine key write. Duplicate incoming keys are summed before
-    /// alpha/beta are applied once; keys absent from the request are unchanged.
-    pub fn write_scaled(&mut self,pairs:&[(usize,A::Element)],alpha:&A::Element,beta:&A::Element) {
-        let mut buckets=vec![Vec::new();self.context.size()];
-        for (key,value) in pairs {for (rank,bucket) in buckets.iter_mut().enumerate() {
-            if self.distribution.owns(rank,*key) {(*key as u64).encode(bucket);value.encode(bucket);}
-        }}
-        let mut incoming=std::collections::BTreeMap::new();
-        for bytes in self.context.inner.exchange(&buckets) {for pair in bytes.chunks_exact(8+A::Element::WIDTH) {
-            let key=u64::decode(&pair[..8]) as usize;let value=A::Element::decode(&pair[8..]);
-            incoming.entry(key).and_modify(|old|*old=self.algebra.add(old,&value)).or_insert(value);
-        }}
-        for (key,value) in incoming {
-            let offset=self.distribution.local_offset(self.context.rank(),key);
-            let previous=if *beta==self.algebra.zero() {self.algebra.zero()} else {self.algebra.multiply(&self.data[offset],beta)};
-            self.data[offset]=self.algebra.add(&self.algebra.multiply(&value,alpha),&previous);
+    /// Collective affine key write. First contribution is beta*old + alpha*input;
+    /// later duplicates prepend alpha*input. Untouched keys are unchanged.
+    pub fn write_scaled(
+        &mut self,
+        pairs: &[(usize, A::Element)],
+        alpha: &A::Element,
+        beta: &A::Element,
+    ) {
+        let mut buckets = vec![Vec::new(); self.context.size()];
+        for (key, value) in pairs {
+            for (rank, bucket) in buckets.iter_mut().enumerate() {
+                if self.distribution.owns(rank, *key) {
+                    (*key as u64).encode(bucket);
+                    value.encode(bucket);
+                }
+            }
+        }
+        let mut incoming = Vec::new();
+        for bytes in self.context.inner.exchange(&buckets) {
+            for pair in bytes.chunks_exact(8 + A::Element::WIDTH) {
+                let key = u64::decode(&pair[..8]) as usize;
+                let value = A::Element::decode(&pair[8..]);
+                incoming.push((key,value));
+            }
+        }
+        incoming.sort_by_key(|pair|pair.0);
+        let mut position = 0;
+        while position < incoming.len() {
+            let key = incoming[position].0;
+            let offset = self.distribution.local_offset(self.context.rank(), key);
+            let mut value = self.algebra.add(&self.algebra.multiply(beta,&self.data[offset]),
+                &self.algebra.multiply(alpha,&incoming[position].1));
+            position += 1;
+            while position < incoming.len() && incoming[position].0 == key {
+                value = self.algebra.add(&self.algebra.multiply(alpha,&incoming[position].1),&value);
+                position += 1;
+            }
+            self.data[offset] = value;
         }
     }
     /// Map unique-label operands to a supplied topology, execute the generic

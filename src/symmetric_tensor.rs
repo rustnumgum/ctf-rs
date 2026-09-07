@@ -28,7 +28,8 @@ mod symmetric_contraction;
 
 impl<'c, 'r, A: Group + crate::algebra::Semiring> SymmetricTensor<'c, 'r, A>
 where A::Element: Wire {
-    /// Collective indexed write: incoming*alpha + old*beta. Beta applies once
+    /// Collective indexed write: beta*old + alpha*first incoming; later
+    /// contributions are prepended as alpha*incoming + current. Beta applies once
     /// per touched canonical key; untouched entries are unchanged.
     pub fn write_scaled(&mut self, pairs: &[(usize, A::Element)],
                         alpha: &A::Element, beta: &A::Element) {
@@ -55,11 +56,11 @@ where A::Element: Wire {
             let key = incoming[position].0;
             let offset = self.distribution.local_offset(self.context.rank(), key);
             let mut value = self.algebra.add(
-                &self.algebra.multiply(&incoming[position].1, alpha),
-                &self.algebra.multiply(&self.data[offset], beta));
+                &self.algebra.multiply(beta, &self.data[offset]),
+                &self.algebra.multiply(alpha, &incoming[position].1));
             position += 1;
             while position < incoming.len() && incoming[position].0 == key {
-                value = self.algebra.add(&value, &self.algebra.multiply(&incoming[position].1, alpha));
+                value = self.algebra.add(&self.algebra.multiply(alpha, &incoming[position].1), &value);
                 position += 1;
             }
             self.data[offset] = value;

@@ -181,7 +181,7 @@ test/endomorphism.cxx	tests/upstream_endomorphism.rs	ported: original indexed cu
 test/gemm_4D.cxx	tests/upstream_gemm4d.rs	NS associativity port PASS WSL 1/2/4; SY/AS branches pending
 test/Makefile	Cargo/build tooling	replaced
 test/multi_tsr_sym.cxx	tests/upstream_multi_tsr_sym.rs	ported NS/SY Gram equality, original norm<1e-6; WSL 1/2/4 pass
-test/permute_multiworld.cxx	tests/upstream/test/permute_multiworld.rs	pending
+test/permute_multiworld.cxx	tests/upstream_permute_multiworld.rs	partial: NS blocked coordinate gather/scatter ported at n5/n1 with exact reads and abs<1e-9 writes, WSL1/2/4 world/parity; compressed branches pending
 test/readall_test.cxx	tests/upstream_readall.rs	ported bounded 2x3x2x3: source seed-zero drand48, root-only child transfer, explicit all-data read; abs<=1e-10 PASS WSL1/2/4 world/parity
 test/readwrite_test.cxx	tests/upstream_readwrite.rs	ported bounded n3: NS/SY/SH and source-literal AS=SH diagonal writes, distributed reductions and NS/SY self contractions; abs<=1e-10 PASS WSL1/2/4 world/parity
 test/reduce_bcast.cxx	tests/upstream_dense.rs; tests/upstream_reduce_bcast.rs	both identities through dense and compressed tensor APIs; original norm<=1e-6, WSL 1/2/4 pass
