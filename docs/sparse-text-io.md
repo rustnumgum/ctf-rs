@@ -8,7 +8,9 @@ Records are zero-based coordinates followed optionally by a value, separated
 by whitespace and terminated by a newline. `reverse_order` reverses coordinate
 order; `with_values=false` omits values when writing and reads each record as
 the multiplicative identity. Reads add records to existing data and combine
-duplicate keys. Writers emit only canonical nonzero pairs, in rank/local order.
+duplicate keys. Writers emit canonical pairs in rank/local order: dense and
+compressed storage omit zeros, while sparse storage retains explicitly stored
+zeros, matching the pinned `read_local_nnz` behavior.
 Real values use the source's fixed six fractional digits, not lossless encoding.
 Compressed tensors write canonical packed entries, not expanded symmetry orbits.
 Symmetric reads canonicalize input permutations and their signs. Shape and

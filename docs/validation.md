@@ -1,5 +1,16 @@
 # Validation evidence
 
+## Explicit all-rank extraction (2026-09-07)
+
+`pair_read` passed once at 1/2/4 WSL ranks, world and parity subcommunicators.
+Exact i64/Complex64 fixtures cover sorted dense pairs/data, virtual and replicated
+layouts, sparse stored zeros versus implicit zeros, SY/AS/SH packed and expanded
+results, nonzero-only ignoring symmetry unpack, empty local shards, empty global
+dimensions and all-empty Allgatherv payloads. Sparse text roundtrip preserves
+explicit zero records. DIGIT / PASS; no numerical diagnostic runs.
+Windows GNU compiled and linked this target once. `msmpi.dll` and `mpiexec`
+remain unavailable, so native MPI runtime acceptance remains pending.
+
 ## 2026-09-06: foundations and local numerical boundary
 
 Environment: WSL Ubuntu-26.04, Rust 1.93.1, Open MPI 5.0.10.

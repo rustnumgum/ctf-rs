@@ -632,3 +632,8 @@ harness = false
 name = "symmetric_text_io"
 path = "tests/symmetric_text_io.rs"
 harness = false
+
+[[test]]
+name = "pair_read"
+path = "tests/pair_read.rs"
+harness = false

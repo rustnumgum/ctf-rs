@@ -167,14 +167,11 @@ macro_rules! sparse_text_apis {
                 with_values: bool,
                 reverse_order: bool,
             ) {
-                let algebra = Arithmetic::<$scalar>::new();
                 let rank = self.context().rank();
                 let pairs: Vec<_> = self
                     .local_pairs()
                     .into_iter()
-                    .filter(|(key, value)| {
-                        self.distribution().owner(*key) == rank && value != &algebra.zero()
-                    })
+                    .filter(|(key, _)| self.distribution().owner(*key) == rank)
                     .collect();
                 let bytes = serialize_sparse_text(
                     self.distribution(),

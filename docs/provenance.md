@@ -7,6 +7,12 @@ Reference commit: f69cbb46e23bc2f39cda5722ce096f56301dab4f
 not a declaration that Edgar Solomonik authored the new Rust implementation.
 Do not stamp independently written files with the upstream author's copyright.
 
+* `src/pair_read.rs`, `src/ffi/allgather.rs`: explicit all-rank pair/data
+  extraction follows `tensor/untyped_tensor.cxx:2443-2557`; stored sparse zeros
+  and packed nonzero-only semantics follow `read_local_nnz:1880-1894` and
+  `interface/tensor.cxx:383-420`. MPI bindings and Wire serialization are Rust
+  implementations, not upstream authorship or C++ ABI compatibility layers.
+
 * `src/mapping.rs`: map-chain phase/rank and topology reorder/inverse routines
   adapted from `src/mapping/{mapping,topology,distribution}.cxx`.
 * `src/map_tensor.rs`: physical-axis assignment and symmetry-phase coordination
