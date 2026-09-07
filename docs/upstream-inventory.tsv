@@ -9,15 +9,15 @@ src/sparse_formats/csr.h	src/sparse_formats	pending
 src/sparse_formats/Makefile	Cargo/build tooling	replaced
 src/sparse_formats/sparse_matrix.cxx	src/sparse_formats.rs	replaced: assertion-only abstract methods are not executable CPU algorithms; concrete CSR/CCSR implementations ported
 src/sparse_formats/sparse_matrix.h	src/sparse_formats.rs	replaced: C++ virtual base and packed-buffer ABI replaced by concrete owned Rust sparse types
-src/mapping/distribution.cxx	src/mapping	pending
-src/mapping/distribution.h	src/mapping	pending
+src/mapping/distribution.cxx	src/mapping.rs	ported generic layout responsibilities: ownership, phases, padding-aware local offsets/global keys and source calc_dim integer metadata walk; C++ raw snapshot serialization replaced
+src/mapping/distribution.h	src/mapping.rs	replaced: owned shape/topology/map description plus explicit calc_dim metadata replace C++ ABI descriptor
 src/mapping/Makefile	Cargo/build tooling	replaced
-src/mapping/mapping.cxx	src/mapping	pending
-src/mapping/mapping.h	src/mapping	pending
+src/mapping/mapping.cxx	src/mapping.rs; src/map_tensor.rs; src/normal_mapping.rs; src/self_mapping.rs	partial: mapping chains, phase/rank, physical/virtual augmentation, tensor/symmetry assignment, repeated-index self-map/check; source self-check integrated into preflight, repeated-label candidate generation pending; deep copying uses Rust Clone
+src/mapping/mapping.h	src/mapping.rs; src/map_tensor.rs; src/self_mapping.rs	partial: source map-chain and assignment responsibilities represented by concrete Rust types/functions; C++ layout/ABI not retained
 src/mapping/node_aware_dist.cxx	src/node_aware.rs; src/node_reordering.rs; src/dense_execution.rs	partial: source candidate order, strict fractional-peer volume selection and generic/folded rank-reordered execution; direct sparse node-aware branch disabled upstream, see source-node-aware-boundary.md
 src/mapping/node_aware_dist.h	src/mapping	pending
 src/mapping/topology.cxx	src/mapping.rs; src/node_reordering.rs	partial: explicit topology fibers, forward/inverse node rank permutations and fractional communicator peer averages; source CPU topology uses explicit ppn (default 1 / CTF_PPN override), not automatic hardware discovery; full responsibility audit pending
-src/mapping/topology.h	src/mapping	pending
+src/mapping/topology.h	src/mapping.rs; src/context.rs; src/topology_candidates.rs	partial: explicit topology dimensions/rank/fibers and candidate catalogs; communicator lifecycle is explicit Context ownership rather than the C++ topology ABI
 src/scripts/expand_includes.sh	Cargo/build tooling	replaced
 src/scripts/license.sh	Cargo/build tooling	replaced
 src/scripts/manual_readlink.sh	Cargo/build tooling	replaced

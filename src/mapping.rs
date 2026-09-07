@@ -223,3 +223,40 @@ impl Distribution {
         Some(self.encode_key(&coordinates))
     }
 }
+
+/// Source distribution.cxx::calc_dim results, computed from caller-supplied
+/// edge lengths and storage size, not inferred from logical tensor padding.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Dimensions {
+    pub virtual_size: usize,
+    pub virtual_edges: Vec<usize>,
+    pub block_edges: Vec<usize>,
+}
+
+/// Divide along mapping nodes in source order. Physical maps divide both edge
+/// arrays; virtual maps divide virtual edges and virtual_size. These are integer
+/// floor divisions, deliberately not Distribution::block_shape's ceiling rule.
+pub fn calc_dim(size: usize, edge_lengths: &[usize], mappings: &[Mapping]) -> Dimensions {
+    assert_eq!(edge_lengths.len(), mappings.len());
+    let mut result = Dimensions { virtual_size: size,
+        virtual_edges: edge_lengths.to_vec(), block_edges: edge_lengths.to_vec() };
+    for (axis, map) in mappings.iter().enumerate() {
+        let mut current = map;
+        loop {
+            match current {
+                Mapping::Physical { processes, child, .. } => {
+                    result.block_edges[axis] /= processes;
+                    result.virtual_edges[axis] /= processes;
+                    current = child;
+                },
+                Mapping::Virtual { copies, child } => {
+                    result.virtual_edges[axis] /= copies;
+                    result.virtual_size /= copies;
+                    current = child;
+                },
+                Mapping::Unmapped => break,
+            }
+        }
+    }
+    result
+}

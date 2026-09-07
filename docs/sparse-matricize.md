@@ -17,5 +17,8 @@ phase residues, encode full tensor keys, then sort by key. Unlike depin it
 does not filter phase padding. The source marks folded symmetric reverse
 conversion FIXME, so no invented folded reverse API is exposed.
 
-These are local layout algorithms for subsequent sparse plan assembly;
-automatic selection and wiring of every tensor-folding route remain pending.
+The four ordinary sparse-left GEMM paths now matricize redistributed virtual
+blocks through these algorithms and execute the existing sparse_2d layers.
+Sparse output retains the coordinate-wise padding filter before reverse
+conversion. Automatic selection and wiring of every tensor-folding route
+remain pending.

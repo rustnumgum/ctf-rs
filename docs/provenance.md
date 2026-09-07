@@ -1,5 +1,13 @@
 # Source provenance
 
+sparse_gemm.rs now connects four ordinary sparse-left GEMM storage cases
+to source matricization and the corresponding recursive sparse_2d executor,
+using the existing redistributed virtual-block arrays and LCM ownership.
+Sparse C's per-coordinate padding filter precedes source dematricization.
+src/self_mapping.rs ports mapping.cxx repeated-index virtual marking and
+self checks; mapping_preflight now uses the shared source self-check.
+mapping::calc_dim ports distribution.cxx's integer metadata divisions.
+
 tests/upstream_strassen.rs ports the one-level seven-product example,
 not a recursive Strassen algorithm. Both parent and divisible-by-seven child
 branches are included. Compressed NS/AS/SY/SH input is explicitly expanded

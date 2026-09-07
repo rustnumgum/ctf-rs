@@ -2,7 +2,10 @@
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 use crate::{algebra::{Semiring, Wire}, context::Context,
     mapping::{Distribution, Mapping, Topology}, sparse::SparseTensor,
-    sparse_formats::{Coo, Csr}, tensor::Tensor};
+    sparse_2d::{self, Layers, Panel},
+    sparse_formats::{Coo, Csr},
+    sparse_matricize::{dematricize_pairs, matricize_pairs, Dematricization, Matricization},
+    symmetry::Symmetry, tensor::Tensor};
 
 #[path = "sparse_gemm_kernel.rs"]
 mod kernel;
@@ -41,14 +44,81 @@ impl Layout {
         };
         Distribution::new(shape, topology, maps)
     }
+    fn matricization(&self, operand: usize) -> Matricization {
+        let (shape, phases, folded_shape) = match operand {
+            0 => (
+                vec![self.shape[0], self.shape[1]],
+                vec![self.grid[0], self.phase],
+                vec![self.local[0], self.local[1]],
+            ),
+            1 => (
+                vec![self.shape[1], self.shape[2]],
+                vec![self.phase, self.grid[1]],
+                vec![self.local[1], self.local[2]],
+            ),
+            2 => (
+                vec![self.shape[0], self.shape[2]],
+                vec![self.grid[0], self.grid[1]],
+                vec![self.local[0], self.local[2]],
+            ),
+            _ => unreachable!(),
+        };
+        let padded_shape = shape
+            .iter()
+            .zip(&phases)
+            .map(|(&length, &phase)| length.div_ceil(phase) * phase)
+            .collect();
+        Matricization {
+            shape,
+            padded_shape,
+            links: vec![Symmetry::NS; 2],
+            folded_shape,
+            reverse_ordering: vec![0, 1],
+            row_dimensions: 1,
+            phases,
+        }
+    }
     fn output_pairs<E: Clone>(&self, matrix: &Coo<E>, rank: usize) -> Vec<(usize, E)> {
-        let mut pairs: Vec<_> = matrix.entries().iter().filter_map(|(row, col, value)| {
-            let i = (row - 1) * self.grid[0] + rank % self.grid[0];
-            let j = (col - 1) * self.grid[1] + rank / self.grid[0];
-            (i < self.shape[0] && j < self.shape[2]).then(|| (i + self.shape[0] * j, value.clone()))
-        }).collect();
-        pairs.sort_by_key(|pair| pair.0);
-        pairs
+        let physical = [rank % self.grid[0], rank / self.grid[0]];
+        let valid_rows = if physical[0] < self.shape[0] {
+            (self.shape[0] - 1 - physical[0]) / self.grid[0] + 1
+        } else {
+            0
+        };
+        let valid_columns = if physical[1] < self.shape[2] {
+            (self.shape[2] - 1 - physical[1]) / self.grid[1] + 1
+        } else {
+            0
+        };
+        let filtered = Coo::new(
+            matrix.shape().0,
+            matrix.shape().1,
+            matrix
+                .entries()
+                .iter()
+                .filter(|(row, column, _)| *row <= valid_rows && *column <= valid_columns)
+                .cloned()
+                .collect(),
+        );
+        dematricize_pairs(
+            &Dematricization {
+                shape: vec![self.shape[0], self.shape[2]],
+                reverse_ordering: vec![0, 1],
+                row_dimensions: 1,
+                phases: vec![self.grid[0], self.grid[1]],
+                phase_ranks: physical.to_vec(),
+            },
+            &filtered,
+        )
+    }
+}
+
+fn dense_blocks<E: Clone>(values: &[E], count: usize, block_size: usize) -> Vec<Vec<E>> {
+    assert_eq!(values.len(), count * block_size);
+    if block_size == 0 {
+        vec![Vec::new(); count]
+    } else {
+        values.chunks_exact(block_size).map(<[E]>::to_vec).collect()
     }
 }
 
@@ -155,16 +225,37 @@ impl<A: Semiring + Clone> SparseTensor<'_, '_, A> where A::Element: Wire {
         let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
         let original = self.distribution().clone();
         self.redistribute(layout.distribution(2));
-        let entries = self.local_pairs().into_iter().map(|(key, value)| (
-            key % layout.shape[0] / grid[0] + 1,
-            key / layout.shape[0] / grid[1] + 1, value)).collect();
-        let mut c = Coo::new(layout.local[0], layout.local[2], entries).to_csr();
         let algebra = self.algebra().clone();
-        let one = algebra.one();
-        sparse_panels(a, b, &layout, |a, b, step| {
-            c = a.multiply_sparse(b, &alpha, if step == 0 { &beta } else { &one }, Some(&c), &algebra);
-        });
-        self.blocks = vec![layout.output_pairs(&c.to_coo(), self.context().rank())];
+        let mut aa = a.clone();
+        let mut bb = b.clone();
+        aa.redistribute(layout.distribution(0));
+        bb.redistribute(layout.distribution(1));
+        let a_metadata = layout.matricization(0);
+        let b_metadata = layout.matricization(1);
+        let a_panels: Vec<_> = aa.blocks.iter()
+            .map(|block| matricize_pairs(&a_metadata, block).to_csr()).collect();
+        let b_panels: Vec<_> = bb.blocks.iter()
+            .map(|block| matricize_pairs(&b_metadata, block).to_csr()).collect();
+        let c = vec![matricize_pairs(&layout.matricization(2), &self.blocks[0]).to_csr()];
+        let rank = self.context().rank();
+        let row = self.context().split(Some((rank % grid[0]) as i32), rank as i32).unwrap();
+        let col = self.context().split(Some((rank / grid[0]) as i32), rank as i32).unwrap();
+        let c = sparse_2d::execute_csr(
+            &algebra, layout.phase, Layers { count: 1, index: 0 },
+            Panel { comm: Some(&row), outer: 1, inner: 1 },
+            Panel { comm: Some(&col), outer: 1, inner: 1 },
+            Panel { comm: None, outer: 1, inner: 0 },
+            &a_panels, &b_panels, c, beta,
+            |a, b, mut c, leaf_beta, _| {
+                c[0] = a[0].multiply_sparse(
+                    &b[0], &alpha, &leaf_beta, Some(&c[0]), &algebra,
+                );
+                c
+            },
+        );
+        row.close();
+        col.close();
+        self.blocks = vec![layout.output_pairs(&c[0].to_coo(), self.context().rank())];
         self.redistribute(original);
     }
 
@@ -176,18 +267,37 @@ impl<A: Semiring + Clone> SparseTensor<'_, '_, A> where A::Element: Wire {
         let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
         let original = self.distribution().clone();
         self.redistribute(layout.distribution(2));
-        let entries = self.local_pairs().into_iter().map(|(key, value)| (
-            key % layout.shape[0] / grid[0] + 1,
-            key / layout.shape[0] / grid[1] + 1, value)).collect();
-        let mut c = Coo::new(layout.local[0], layout.local[2], entries).to_ccsr();
         let algebra = self.algebra().clone();
-        let one = algebra.one();
-        sparse_dense_panels(a, b, &layout, |a, b, step| {
-            let a = a.to_coo().to_ccsr();
-            c = a.multiply_dense(layout.local[2], b, &alpha,
-                if step == 0 { &beta } else { &one }, Some(&c), &algebra);
-        });
-        self.blocks = vec![layout.output_pairs(&c.to_coo(), self.context().rank())];
+        let mut aa = a.clone();
+        let mut bb = b.clone();
+        aa.redistribute(layout.distribution(0));
+        bb.redistribute(layout.distribution(1));
+        let a_metadata = layout.matricization(0);
+        let a_panels: Vec<_> = aa.blocks.iter()
+            .map(|block| matricize_pairs(&a_metadata, block).to_ccsr()).collect();
+        let b_panels = dense_blocks(
+            bb.local_storage(), layout.phase / grid[0], layout.local[1] * layout.local[2],
+        );
+        let c = vec![matricize_pairs(&layout.matricization(2), &self.blocks[0]).to_ccsr()];
+        let rank = self.context().rank();
+        let row = self.context().split(Some((rank % grid[0]) as i32), rank as i32).unwrap();
+        let col = self.context().split(Some((rank / grid[0]) as i32), rank as i32).unwrap();
+        let c = sparse_2d::execute_ccsr_dense(
+            &algebra, layout.phase, Layers { count: 1, index: 0 },
+            Panel { comm: Some(&row), outer: 1, inner: 1 },
+            Panel { comm: Some(&col), outer: 1, inner: 1 },
+            Panel { comm: None, outer: 1, inner: 0 },
+            &a_panels, &b_panels, c, beta,
+            |a, b, mut c, leaf_beta, _| {
+                c[0] = a[0].multiply_dense(
+                    layout.local[2], &b[0], &alpha, &leaf_beta, Some(&c[0]), &algebra,
+                );
+                c
+            },
+        );
+        row.close();
+        col.close();
+        self.blocks = vec![layout.output_pairs(&c[0].to_coo(), self.context().rank())];
         self.redistribute(original);
     }
 
@@ -248,15 +358,36 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A> where A::Element: Wire {
         let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
         let original = self.distribution().clone();
         self.redistribute(layout.distribution(2));
-        let mut values = self.local_storage().to_vec();
         let algebra = self.algebra().clone();
-        let one = algebra.one();
-        sparse_panels(a, b, &layout, |a, b, step| {
-            kernel::csr_sparse_dense(a, b, &mut values, &alpha,
-                if step == 0 { &beta } else { &one }, &algebra);
-        });
-        let dist = self.distribution().clone();
+        let mut aa = a.clone();
+        let mut bb = b.clone();
+        aa.redistribute(layout.distribution(0));
+        bb.redistribute(layout.distribution(1));
+        let a_metadata = layout.matricization(0);
+        let b_metadata = layout.matricization(1);
+        let a_panels: Vec<_> = aa.blocks.iter()
+            .map(|block| matricize_pairs(&a_metadata, block).to_csr()).collect();
+        let b_panels: Vec<_> = bb.blocks.iter()
+            .map(|block| matricize_pairs(&b_metadata, block).to_csr()).collect();
         let rank = self.context().rank();
+        let row = self.context().split(Some((rank % grid[0]) as i32), rank as i32).unwrap();
+        let col = self.context().split(Some((rank / grid[0]) as i32), rank as i32).unwrap();
+        let values = sparse_2d::execute_csr_sparse_dense(
+            &algebra, layout.phase, Layers { count: 1, index: 0 },
+            Panel { comm: Some(&row), outer: 1, inner: 1 },
+            Panel { comm: Some(&col), outer: 1, inner: 1 },
+            Panel { comm: None, outer: 1, inner: 0 },
+            &a_panels, &b_panels, vec![self.local_storage().to_vec()], beta,
+            |a, b, mut c, leaf_beta, _| {
+                kernel::csr_sparse_dense(
+                    &a[0], &b[0], &mut c[0], &alpha, &leaf_beta, &algebra,
+                );
+                c
+            },
+        ).remove(0);
+        row.close();
+        col.close();
+        let dist = self.distribution().clone();
         self.transform(|key, value| *value = values[dist.local_offset(rank, key)].clone());
         self.redistribute(original);
     }
@@ -268,14 +399,35 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A> where A::Element: Wire {
         let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
         let original = self.distribution().clone();
         self.redistribute(layout.distribution(2));
-        let rank = self.context().rank();
         let algebra = self.algebra().clone();
-        let one = algebra.one();
-        let mut values = self.local_storage().to_vec();
-        sparse_dense_panels(a, b, &layout, |a_panel, b_panel, step| {
-            a_panel.multiply_dense(layout.local[2], &b_panel, &alpha,
-                if step == 0 { &beta } else { &one }, &mut values, &algebra);
-        });
+        let mut aa = a.clone();
+        let mut bb = b.clone();
+        aa.redistribute(layout.distribution(0));
+        bb.redistribute(layout.distribution(1));
+        let a_metadata = layout.matricization(0);
+        let a_panels: Vec<_> = aa.blocks.iter()
+            .map(|block| matricize_pairs(&a_metadata, block).to_csr()).collect();
+        let b_panels = dense_blocks(
+            bb.local_storage(), layout.phase / grid[0], layout.local[1] * layout.local[2],
+        );
+        let rank = self.context().rank();
+        let row = self.context().split(Some((rank % grid[0]) as i32), rank as i32).unwrap();
+        let col = self.context().split(Some((rank / grid[0]) as i32), rank as i32).unwrap();
+        let values = sparse_2d::execute_csr_dense(
+            &algebra, layout.phase, Layers { count: 1, index: 0 },
+            Panel { comm: Some(&row), outer: 1, inner: 1 },
+            Panel { comm: Some(&col), outer: 1, inner: 1 },
+            Panel { comm: None, outer: 1, inner: 0 },
+            &a_panels, &b_panels, vec![self.local_storage().to_vec()], beta,
+            |a, b, mut c, leaf_beta, _| {
+                a[0].multiply_dense(
+                    layout.local[2], &b[0], &alpha, &leaf_beta, &mut c[0], &algebra,
+                );
+                c
+            },
+        ).remove(0);
+        row.close();
+        col.close();
         let dist = self.distribution().clone();
         self.transform(|key, value| *value = values[dist.local_offset(rank, key)].clone());
         self.redistribute(original);

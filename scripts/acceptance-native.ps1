@@ -96,6 +96,8 @@ cargo test --test sparse_matricize
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cargo test --test mixed_sparse_output
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo test --test self_mapping
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = 'mpiexec -n 7'
 cargo test --test upstream_strassen
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

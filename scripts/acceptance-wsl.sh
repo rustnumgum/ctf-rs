@@ -110,6 +110,7 @@ cargo test --test sparse_coo
 cargo test --test mixed_kernel
 cargo test --test sparse_matricize
 cargo test --test mixed_sparse_output
+cargo test --test self_mapping
 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n 7" cargo test --test upstream_strassen
 cargo test --test random_generator --test scalar_blas --test node_peer_counts --test folded_cost --test partial_fold_kernel --test fold_storage --test partial_fold --test fold_indices --test fold_layout --test fold_selection --test mapped_cost --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
   --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction \

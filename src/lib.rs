@@ -79,3 +79,4 @@ pub mod sparse_keys;
 mod sparse_coo;
 pub mod kernel;
 pub mod sparse_matricize;
+pub mod self_mapping;

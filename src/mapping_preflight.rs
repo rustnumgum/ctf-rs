@@ -18,17 +18,13 @@ pub fn check(distributions:[&Distribution;3],indices:[&str;3])->bool{
     let mut labels=Vec::new();let mut dimensions=Vec::new();
     for operand in 0..3{
         assert!(indices[operand].is_ascii());assert_eq!(indices[operand].len(),distributions[operand].shape.len());
-        let mut used=vec![false;topology.dimensions.len()];
+        let self_indices:Vec<_>=indices[operand].bytes().map(usize::from).collect();
+        if !crate::self_mapping::check_self_mapping(&distributions[operand].mappings,&self_indices){return false;}
         for(axis,label)in indices[operand].bytes().enumerate(){
             assert!(!indices[operand].as_bytes()[..axis].contains(&label));
             if let Some(at)=labels.iter().position(|&old|old==label){
                 assert_eq!(dimensions[at],distributions[operand].shape[axis]);
             }else{labels.push(label);dimensions.push(distributions[operand].shape[axis]);}
-            let chain=physical(&distributions[operand].mappings[axis]);
-            // Literal nested source check: each subsequent physical child must
-            // be exactly one topology axis after the current physical node.
-            for i in 0..chain.len(){if chain[i+1..].iter().any(|&j|j!=chain[i]+1){return false;}}
-            if !mark(chain,&mut used){return false;}
         }
     }
     let maps:Vec<[Option<&Mapping>;3]>=labels.iter().map(|&label|std::array::from_fn(|operand|

@@ -1,5 +1,22 @@
 # Validation evidence
 
+## Sparse GEMM integration and self mapping (2026-09-08)
+
+The existing distributed_sparse_gemm, distributed_sparse_dense_output,
+distributed_sparse_fold, distributed_sparse_gemm_function and
+distributed_sparse_function_output suites passed once at WSL 1/2/4 ranks,
+world/parity, after the ordinary paths were connected to matricization and
+sparse_2d. Existing exact integer/key criteria cover dense/sparse outputs,
+CSR/CCSR, beta, empty panels/k, rectangular grids, high-order folding,
+repeated/input-only labels, custom paths and restored output distributions.
+
+self_mapping's three local tests and mapping_preflight's two existing tests
+passed once after fixing an Option index type at compilation. They cover the
+source first-pass virtual-map behavior, phase coordination, physical/repeated
+map rejection and calc_dim floor divisions. All seven targets compiled and
+linked once on Windows GNU. DIGIT / PASS; no numerical failures, extra
+precision runs or native runtime pass claimed.
+
 ## Upstream one-level Strassen (2026-09-08)
 
 upstream_strassen passed once at WSL 1/2/4 ranks plus one 7-rank run covering

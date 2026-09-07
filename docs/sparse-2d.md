@@ -45,3 +45,9 @@ tensor-to-plan assembly remains unfinished;
 the raw executor does not infer a SparseTensor's mappings or local key space.
 The pinned source disables sparse node-aware reordering; this is not a
 missing executable source branch (source-node-aware-boundary.md).
+
+Ordinary sparse-left GEMM now constructs the four matching CSR/CCSR sparse
+or dense-output executors directly from its redistributed virtual blocks.
+Its existing LCM maps, cyclic fiber roots and output restoration are retained;
+real C passes through the executor rather than a captured dummy-output child.
+Custom and dense-left helper paths are not changed by this integration.
