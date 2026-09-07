@@ -373,16 +373,6 @@ impl Comm {
             ));
         }
     }
-    pub(crate) fn replace_f64(&self, values: &mut [f64], destination: usize, source: usize, tag: i32) {
-        assert!(destination < self.size() && source < self.size());
-        unsafe {
-            check(sys::MPI_Sendrecv_replace(
-                values.as_mut_ptr().cast(), values.len().try_into().unwrap(),
-                sys::RSMPI_DOUBLE, destination as i32, tag, source as i32, tag,
-                self.raw, sys::RSMPI_STATUS_IGNORE,
-            ));
-        }
-    }
     pub(crate) fn replace_wire<T: Wire>(
         &self,
         values: &mut [T],

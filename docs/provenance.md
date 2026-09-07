@@ -1156,3 +1156,15 @@ real/imaginary pair at this internal native boundary; MPI still uses Wire.
 The folded contraction's transpose flag is ordinary T, not conjugate transpose.
 Typed local folding preserves the existing contiguous batch offsets, beta-once
 scaling and residual-index traversal rather than promoting values to f64.
+
+Typed distributed folding reuses the same map_fold/ctr_replicate/ctr_2d/ctr_virt
+sequence for f32, f64 and both complex types. Virtual blocks remain independently
+packed once before communication and restored once afterward. Node permutation
+uses Wire for every scalar; output reduction uses the established ordered
+generic monoid MPI implementation. The low-memory ownership path still restores
+the original typed A/B data rather than retaining home copies or f64 surrogates.
+
+The transpose estimator intentionally remains element-count based across
+scalar types: nosym_transp.cxx:759-793 accepts sr but does not use its element
+size, feeding {1, total_elements} to its three models. Actual storage and
+communication memory estimates still use the selected scalar's byte width.

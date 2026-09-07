@@ -120,7 +120,7 @@ src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
 src/contraction/spctr_tsr.cxx	src/contraction	pending
 src/contraction/spctr_tsr.h	src/contraction	pending
-src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar reference kernels, typed canonical partial/symmetry folded BLAS residual traversal and distributed f64 integration; custom-function folded branch and automatic compressed integration pending
+src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar reference kernels, typed canonical partial/symmetry folded BLAS residual traversal and four-type distributed integration; custom-function folded branch and automatic compressed integration pending
 src/contraction/sym_seq_ctr.h	src/contraction	pending
 src/redistribution/cyclic_reshuffle.cxx	src/redistribution	pending
 src/redistribution/cyclic_reshuffle.h	src/redistribution	pending

@@ -1065,6 +1065,19 @@ failures or added precision runs. All nine targets compiled/linked on Windows
 GNU. Native runtime remains pending. DIGIT / PASS for this scalar-kernel stage,
 not a claim of typed distributed folded or f32/complex LAPACK completion.
 
+## Typed distributed folded orchestration (2026-09-07)
+
+typed_folded_execution passed once at WSL 1/2/4 ranks, world/parity, for f32,
+f64, complex-f32 and complex-f64 native BLAS execution. Cases cover six raw
+normal mappings, partial residual dimensions, nonuniform/padded shards,
+node ordering, immutable/home and mutable/low-memory paths, and weighted
+SearchCache reuse at each scalar's actual Wire width. Input data and layouts
+are exact; all output components are finite with abs(error)<1e-6.
+The affected dense_folded_execution, dense_low_memory and distributed_node_fold
+targets passed at the same rank counts. All four targets compiled/linked on
+Windows GNU once. No failures or further precision runs. DIGIT / PASS;
+native MPI runtime and typed decomposition coverage remain incomplete.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

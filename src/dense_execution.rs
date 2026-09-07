@@ -5,7 +5,7 @@
 //! with sequential semiring or packed folded BLAS leaves.
 
 use crate::{
-    algebra::{Arithmetic, Semiring, Wire},
+    algebra::{Arithmetic, Monoid, Semiring, Wire},
     context::Context,
     ctr_2d::{Layers, Panel},
     mapping::{Distribution, Mapping},
@@ -418,17 +418,22 @@ fn execute_levels<A: Semiring, F>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn folded_virtualized<K: crate::linalg::LocalKernels>(
+fn folded_virtualized<T, K>(
     descriptor: &crate::partial_fold::Descriptor,
     block_shapes: &[Vec<usize>; 3],
     virtual_phases: &[Vec<usize>; 3],
     indices: [&str; 3],
-    a: &[f64],
-    b: &[f64],
-    c: &mut [f64],
-    alpha: f64,
-    beta: f64,
-) {
+    a: &[T],
+    b: &[T],
+    c: &mut [T],
+    alpha: T,
+    beta: T,
+)
+where
+    T: Clone + PartialEq + Wire,
+    Arithmetic<T>: Semiring<Element = T> + Clone,
+    K: crate::linalg::GemmKernel<T>,
+{
     let block_sizes = descriptor
         .layouts
         .each_ref()
@@ -446,9 +451,10 @@ fn folded_virtualized<K: crate::linalg::LocalKernels>(
         (&virtual_phases[2], indices[2]),
     ]);
     let mut visited = vec![false; counts[2]];
+    let one = Arithmetic::<T>::new().one();
     space.for_each(|offsets| {
         let (ia, ib, ic) = (offsets[0], offsets[1], offsets[2]);
-        crate::partial_fold_kernel::execute_packed::<f64,K>(
+        crate::partial_fold_kernel::execute_packed::<T, K>(
             descriptor,
             block_shapes.each_ref().map(Vec::as_slice),
             links.each_ref().map(Vec::as_slice),
@@ -456,8 +462,12 @@ fn folded_virtualized<K: crate::linalg::LocalKernels>(
             &a[ia * block_sizes[0]..(ia + 1) * block_sizes[0]],
             &b[ib * block_sizes[1]..(ib + 1) * block_sizes[1]],
             &mut c[ic * block_sizes[2]..(ic + 1) * block_sizes[2]],
-            alpha,
-            if visited[ic] { 1. } else { beta },
+            alpha.clone(),
+            if visited[ic] {
+                one.clone()
+            } else {
+                beta.clone()
+            },
         );
         visited[ic] = true;
     });
@@ -712,9 +722,13 @@ where
     }
 }
 
-impl Tensor<'_, '_, Arithmetic<f64>> {
+impl<T> Tensor<'_, '_, Arithmetic<T>>
+where
+    T: Clone + PartialEq + Wire,
+    Arithmetic<T>: Semiring<Element = T> + Clone,
+{
     #[allow(clippy::too_many_arguments)]
-    fn execute_folded_mapped<K: crate::linalg::LocalKernels>(
+    fn execute_folded_mapped<K: crate::linalg::GemmKernel<T>>(
         c: &mut Self,
         indices_c: &str,
         a: &mut Self,
@@ -724,8 +738,8 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         mapped: [Distribution; 3],
         descriptor: &crate::partial_fold::Descriptor,
         intra_node_lens: Option<&[usize]>,
-        alpha: f64,
-        beta: f64,
+        alpha: T,
+        beta: T,
         restore_inputs: bool,
     ) {
         assert!(std::ptr::eq(c.context(), a.context()));
@@ -809,9 +823,9 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         });
         if let Some((send, recv)) = exchange {
             if send != context.rank() {
-                context.inner.replace_f64(&mut a.data, send, recv, 1322);
-                context.inner.replace_f64(&mut b.data, send, recv, 1323);
-                context.inner.replace_f64(&mut c.data, send, recv, 1324);
+                context.inner.replace_wire(&mut a.data, send, recv, 1322);
+                context.inner.replace_wire(&mut b.data, send, recv, 1323);
+                context.inner.replace_wire(&mut c.data, send, recv, 1324);
             }
         }
 
@@ -825,17 +839,17 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         let output_root = execution.replicate[2]
             .iter()
             .all(|comm| comm.rank() == 0);
-        if has_replication && output_root && beta != 1. {
-            if beta == 0. {
-                c.data.fill(0.);
+        if has_replication && output_root && beta != algebra.one() {
+            if beta == algebra.zero() {
+                c.data.fill(algebra.zero());
             } else {
                 for value in &mut c.data {
-                    *value *= beta;
+                    *value = algebra.multiply(&beta, value);
                 }
             }
         }
-        let mut leaf = |a: &[f64], b: &[f64], c: &mut [f64], beta: f64| {
-            folded_virtualized::<K>(
+        let mut leaf = |a: &[T], b: &[T], c: &mut [T], beta: T| {
+            folded_virtualized::<T, K>(
                 descriptor,
                 &execution.block_shapes,
                 &execution.virtual_phases,
@@ -843,7 +857,7 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
                 a,
                 b,
                 c,
-                alpha,
+                alpha.clone(),
                 beta,
             );
         };
@@ -856,21 +870,25 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
             &b.data,
             &mut c.data,
             if has_replication {
-                if output_root { 1. } else { 0. }
+                if output_root {
+                    algebra.one()
+                } else {
+                    algebra.zero()
+                }
             } else {
                 beta
             },
             &mut leaf,
         );
         for comm in &execution.replicate[2] {
-            comm.reduce_f64(0, &mut c.data);
+            comm.reduce_monoid(&algebra, &mut c.data, false, 0);
         }
         if let Some((send, recv)) = exchange {
             if send != context.rank() {
-                context.inner.replace_f64(&mut c.data, recv, send, 1327);
+                context.inner.replace_wire(&mut c.data, recv, send, 1327);
                 if restore_inputs {
-                    context.inner.replace_f64(&mut a.data, recv, send, 1325);
-                    context.inner.replace_f64(&mut b.data, recv, send, 1326);
+                    context.inner.replace_wire(&mut a.data, recv, send, 1325);
+                    context.inner.replace_wire(&mut b.data, recv, send, 1326);
                 }
             }
         }
@@ -924,7 +942,7 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
     /// using the source node-aware permutation. Pass select_dense's chosen lens
     /// or an explicitly requested node grid; None leaves rank order unchanged.
     #[allow(clippy::too_many_arguments)]
-    pub fn contract_folded_from_mapped<K: crate::linalg::LocalKernels>(
+    pub fn contract_folded_from_mapped<K: crate::linalg::GemmKernel<T>>(
         &mut self,
         indices_c: &str,
         a: &Self,
@@ -934,8 +952,8 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         mapped: [Distribution; 3],
         descriptor: &crate::partial_fold::Descriptor,
         intra_node_lens: Option<&[usize]>,
-        alpha: f64,
-        beta: f64,
+        alpha: T,
+        beta: T,
     ) {
         let mut aa = (*a).clone();
         let mut bb = (*b).clone();
@@ -962,7 +980,7 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
     /// distributions before returning; zero-length tensor dimensions are not
     /// supported by the source low-memory path.
     #[allow(clippy::too_many_arguments)]
-    pub fn contract_folded_low_memory<K: crate::linalg::LocalKernels>(
+    pub fn contract_folded_low_memory<K: crate::linalg::GemmKernel<T>>(
         &mut self,
         indices_c: &str,
         a: &mut Self,
@@ -972,8 +990,8 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         mapped: [Distribution; 3],
         descriptor: &crate::partial_fold::Descriptor,
         intra_node_lens: Option<&[usize]>,
-        alpha: f64,
-        beta: f64,
+        alpha: T,
+        beta: T,
     ) {
         assert!(
             self.distribution().shape.iter().all(|&length| length != 0)

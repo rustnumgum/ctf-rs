@@ -524,3 +524,8 @@ harness = false
 [[test]]
 name = "scalar_blas"
 path = "tests/scalar_blas.rs"
+
+[[test]]
+name = "typed_folded_execution"
+path = "tests/typed_folded_execution.rs"
+harness = false

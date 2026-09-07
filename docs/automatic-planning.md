@@ -257,7 +257,11 @@ kernel, with native SGEMM/DGEMM/CGEMM/ZGEMM implementations. `LocalKernels`
 requires `GemmKernel<f64>` and continues to describe existing f64 LAPACK
 operations; no unimplemented f32/complex decompositions are advertised.
 Local contiguous-batch and partial folded residual kernels now accept typed
-arithmetic values directly. Existing distributed folded orchestration remains
-f64 at this stage; f32/complex distributed tensors still have their generic
-semiring execution until typed folded orchestration is connected.
+arithmetic values directly. Distributed folded orchestration now carries the
+same scalar type through virtual blocks, raw MPI panels, node rank reordering
+and low-memory restoration. Public folded entry points retain a single kernel
+type parameter, with the scalar inferred from Tensor<Arithmetic<T>>. Planning
+uses the actual element width rather than assuming eight-byte values.
+Output reductions use the existing ordered generic MPI operation, so callers
+model this executor with custom_reduce=true; no scalar promotion is performed.
 The compile-time traits remain the replacement boundary for future faer kernels.
