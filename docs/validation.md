@@ -1014,6 +1014,16 @@ exactly. These are synthetic coefficient checks, not measured seconds. The targe
 compiled and linked on Windows GNU. DIGIT / PASS; no repeated precision checks.
 Automatic selection and total candidate costs remain incomplete.
 
+## Dense redistribution and unfolded candidate cost (2026-09-07)
+
+redist_cost passed once in WSL: no-op maps, equal-phase physical-axis permutation,
+and synthetic-coefficient unfolded estimates for 2/4-process topologies. Exact
+source cost results are 520/636, input residency 192/96 bytes, temporary memory
+408/252 bytes, total source memory 600/348 bytes. These isolate formulas, not
+measured wall times or RSS. DIGIT / PASS; no failed checks or extra numerical runs.
+The test compiled and linked on Windows GNU. No MPI execution was required for
+this pure model stage; full automatic planning remains incomplete.
+
 ## High-order sparse custom contraction (2026-09-07)
 
 distributed_sparse_fold_function passed once at 1/2/4 WSL ranks, world/parity,

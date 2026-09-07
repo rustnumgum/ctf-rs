@@ -957,3 +957,12 @@ virtual multiplicity and bookkeeping follow ctr_comm/ctr_tsr. The supplied node
 counts are explicit topology facts. This is the inner aligned execution estimate,
 not total plan time/memory; redistribution/folding and candidate generation remain
 pending. See automatic-planning.md for pinned source integration boundaries.
+
+## Unfolded dense candidate redistribution costs
+
+redist_cost.rs implements dense est_redist_time/get_redist_mem and phase-based
+can_block_reshuffle (untyped_tensor.cxx:3196-3244; redist.cxx:619-628). There is no
+invented physical-permutation transpose surcharge. GridPlan::estimate_unfolded
+adds these costs with the exact A/B residency, C roundtrip and maximum workspace
+rule of contraction.cxx:2750-2810. These are source model estimates; actual Rust
+key-routing and measured process memory remain separately documented.

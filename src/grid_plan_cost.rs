@@ -9,6 +9,18 @@ use crate::{
     planning::GridPlan,
 };
 
+/// Pinned unfolded dense candidate estimate. This is source model memory, not
+/// a Rust allocator peak; folded and 2D-panel alternatives are not represented.
+#[derive(Clone,Debug)]
+pub struct UnfoldedEstimate {
+    pub inner: crate::plan_cost::Estimate,
+    pub redistribution_seconds: [f64;3],
+    pub redistributed_input_bytes: usize,
+    pub redistribution_temporary_bytes: usize,
+    pub seconds: f64,
+    pub memory_bytes: usize,
+}
+
 fn mark_physical_axes(mapping: &Mapping, used: &mut [bool]) {
     match mapping {
         Mapping::Unmapped => {}
@@ -21,6 +33,28 @@ fn mark_physical_axes(mapping: &Mapping, used: &mut [bool]) {
 }
 
 impl GridPlan {
+    /// Source detail_estimate_mem_and_time for this unfolded aligned path.
+    /// C redistribution time is counted twice; only changed A/B contribute
+    /// additional resident input storage. No folding cost is fabricated.
+    pub fn estimate_unfolded(&self,models:&crate::cost::Models,element_bytes:usize,
+        nodes_per_axis:&[usize],custom_reduce:bool)->UnfoldedEstimate {
+        let inner=self.cost_tree(element_bytes,nodes_per_axis,custom_reduce).estimate(models,1);
+        let old=self.signature().distributions();let mapped=self.mapped_distributions();
+        let mut redistribution_seconds=[0.;3];
+        let mut redistributed_input_bytes=0;let mut redistribution_temporary_bytes=0;
+        for operand in 0..3 {
+            if crate::redist_cost::same_mapping(&old[operand],&mapped[operand]) {continue;}
+            let cost=crate::redist_cost::dense(&old[operand],&mapped[operand],element_bytes,models);
+            redistribution_seconds[operand]=cost.seconds*if operand==2{2.}else{1.};
+            redistribution_temporary_bytes+=cost.temporary_bytes;
+            if operand<2 {redistributed_input_bytes+=mapped[operand].local_len()*element_bytes;}
+        }
+        let seconds=inner.seconds+redistribution_seconds.iter().sum::<f64>();
+        let memory_bytes=redistributed_input_bytes+redistribution_temporary_bytes.max(inner.working_bytes);
+        UnfoldedEstimate{inner,redistribution_seconds,redistributed_input_bytes,
+            redistribution_temporary_bytes,seconds,memory_bytes}
+    }
+
     /// Build the source replication/virtual/local tree for this unfolded dense
     /// aligned plan. `nodes_per_axis[i]` is the source `dim_comm[i].comm_nodes`.
     /// `custom_reduce` selects the native or custom reduction timing model; it

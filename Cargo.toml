@@ -419,3 +419,7 @@ harness = false
 [[test]]
 name = "grid_plan_cost"
 path = "tests/grid_plan_cost.rs"
+
+[[test]]
+name = "redist_cost"
+path = "tests/redist_cost.rs"

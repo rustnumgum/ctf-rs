@@ -22,6 +22,25 @@ and Rust allocator overhead. Its working_bytes is the source recursive workspace
 model, not peak RSS. Do not feed this inner estimate into Selector as total plan
 cost or call it completed automatic selection.
 
+## Unfolded dense redistribution now connected
+
+GridPlan::estimate_unfolded adds the pinned dense redistribution models to the
+inner tree. Equal per-axis total phases select blres_mdl; otherwise dgtog_res_mdl
+uses process log and maximum old/new local bytes. Unchanged maps cost zero.
+Temporary memory is max local bytes for block reshuffle and floor(1.5*bytes) for
+general dense reshuffle. See untyped_tensor.cxx 3196-3244.
+
+detail_estimate_mem_and_time's unfolded branch counts changed A/B mapped residency,
+sums A/B/C temporary buffers, doubles C redistribution time, and uses
+resident_AB+max(redist_temporary,inner_workspace). These values are exposed in a
+detailed estimate rather than conflated with measured RSS. Source topology pointer
+identity is represented by Rust structural topology equality.
+
+This covers ordinary dense redistribution without offset/permutation arguments.
+It models pinned source algorithms, not the performance of the current key-routed
+Rust I/O implementation. Folded/sparse/panel alternatives and automatic candidate
+enumeration remain incomplete.
+
 ## Remaining source construction and selection steps
 
 The current GridPlan creates one globally aligned greedy map. Upstream normal
@@ -34,7 +53,7 @@ distributed enumeration at 3031-3105. Exhaustive search is a refinement, not a
 fallback after failure: it is skipped below the source 0.01-second threshold and
 wins only when strictly faster (3311-3338).
 
-Total candidate evaluation must additionally port redistribution/folding costs
-(2632-2810), then connect existing collective Selector and context cache. Sparse,
+Total candidate evaluation must additionally port folding and sparse redistribution
+costs (2632-2810), then connect existing collective Selector and context cache. Sparse,
 symmetry, node-aware, low-memory and 2D panel alternatives remain in the overall
 scope; the aligned-only tree does not substitute for those branches.
