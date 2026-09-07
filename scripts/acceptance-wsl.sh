@@ -96,6 +96,7 @@ mpi_tests+=(distributed_sparse_plan upstream_spectral_element)
 mpi_tests+=(upstream_jacobi)
 mpi_tests+=(upstream_hosvd)
 mpi_tests+=(distributed_sparse_raw distributed_sparse_search)
+mpi_tests+=(distributed_sparse_search_cache)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \

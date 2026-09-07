@@ -852,3 +852,8 @@ harness = false
 name = "distributed_sparse_search"
 path = "tests/distributed_sparse_search.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_search_cache"
+path = "tests/distributed_sparse_search_cache.rs"
+harness = false

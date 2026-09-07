@@ -15,6 +15,55 @@ pub struct Options {
     pub allow_exhaustive: bool,
 }
 
+/// Source signature cache scoped to an explicit context and immutable search
+/// configuration. Sparse nonzero counts, values and coefficients are not keys.
+/// A hit reuses the selected mappings, not tensor storage or an execution tree.
+pub struct SearchCache<'c, 'r> {
+    context: &'c Context<'r>,
+    catalog: &'c [Topology],
+    models: &'c Models,
+    element_bytes: usize,
+    pair_bytes: usize,
+    custom_reduce: bool,
+    options: Options,
+    plans: std::collections::HashMap<crate::planning::Signature, Selected>,
+    stats: crate::planning::CacheStats,
+}
+
+impl<'c, 'r> SearchCache<'c, 'r> {
+    pub fn new(context: &'c Context<'r>, catalog: &'c [Topology], models: &'c Models,
+        element_bytes: usize, pair_bytes: usize, custom_reduce: bool, options: Options) -> Self {
+        assert!(catalog.iter().all(|topology|topology.size()==context.size()));
+        Self { context, catalog, models, element_bytes, pair_bytes, custom_reduce, options,
+            plans: std::collections::HashMap::new(), stats: crate::planning::CacheStats::default() }
+    }
+
+    pub fn stats(&self) -> crate::planning::CacheStats { self.stats }
+    pub fn clear(&mut self) { self.plans.clear(); }
+
+    /// A miss performs collective search; a hit and clear are local. All ranks
+    /// must prepare/clear in the same sequence, as for the pinned source cache.
+    /// Stored seconds/memory describe the miss, not a refreshed density estimate.
+    pub fn prepare(&mut self, old: [&Distribution; 3], indices: [&str; 3], nonzeros_a: u64)
+        -> Result<Option<&Selected>, Error> {
+        assert!(old.iter().all(|distribution|distribution.topology.size()==self.context.size()));
+        let signature = crate::planning::Signature::new(old, indices, old[0].topology.clone());
+        match self.plans.entry(signature) {
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                self.stats.hits += 1;
+                Ok(Some(entry.into_mut()))
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                self.stats.misses += 1;
+                let Some(selected) = search_unfolded(self.context, old, indices, self.catalog,
+                    self.models, nonzeros_a, self.element_bytes, self.pair_bytes,
+                    self.custom_reduce, self.options)? else { return Ok(None) };
+                Ok(Some(entry.insert(selected)))
+            }
+        }
+    }
+}
+
 fn consider(old: [&Distribution; 3], mapped: [&Distribution; 3], indices: [&str; 3],
     models: &Models, mut inputs: Inputs, objective: Objective) -> Option<(f64, u64)> {
     let fractions = [inputs.fractions.a, inputs.fractions.b, inputs.fractions.c];
