@@ -1123,3 +1123,10 @@ Pinned replication-layer audit: ctr_comm.cxx:22-29 initializes layers to 1/0;
 the only assignment from wholly unused topology axes at :61-70 is commented.
 Consequently the raw executor must not activate speculative 2.5D splitting on
 unused axes. The empty replication wrapper and its coefficient semantics remain.
+
+original_peer_counts ports topology.cxx:138-154's stride/group/node-boundary
+recurrence, including its accumulation order and integer np/ppn loop bound.
+For topology [3,4] and ppn=4 the peer counts are [0.5,2], not [0,2] or [1,2].
+Collective volume multiplies bytes converted to f64 by that average. Raw and
+aligned costs, folded estimates and search facts now share this representation;
+SearchCache uses to_bits for its node-fact key rather than truncating to integer.

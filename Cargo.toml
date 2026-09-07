@@ -511,3 +511,7 @@ harness = false
 name = "distributed_node_fold"
 path = "tests/distributed_node_fold.rs"
 harness = false
+
+[[test]]
+name = "node_peer_counts"
+path = "tests/node_peer_counts.rs"

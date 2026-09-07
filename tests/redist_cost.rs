@@ -26,7 +26,7 @@ fn unfolded_total_keeps_source_output_roundtrip_and_memory_rule(){
         let a=Distribution::cyclic(vec![3,4],np);let b=Distribution::cyclic(vec![4,5],np);
         let c=Distribution::cyclic(vec![3,5],np);
         let plan=GridPlan::prepare([&a,&b,&c],["ik","kj","ij"],topology.clone()).unwrap();
-        let estimate=plan.estimate_unfolded(&models,8,&vec![1;topology.dimensions.len()],false);
+        let estimate=plan.estimate_unfolded(&models,8,&vec![1.;topology.dimensions.len()],false);
         assert_eq!(estimate.seconds,seconds);assert_eq!(estimate.redistributed_input_bytes,resident);
         assert_eq!(estimate.redistribution_temporary_bytes,temporary);assert_eq!(estimate.memory_bytes,memory);
     }

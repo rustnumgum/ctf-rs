@@ -70,30 +70,30 @@ fn run(c:&Context<'_>){
     exercise(c,shapes,["ika","kja","ija"],mapped);
 
     let catalog:Vec<_>=topology_candidates::all_shapes(c.size()).into_iter().map(|topology|
-        TopologyFacts{nodes_per_axis:vec![1;topology.dimensions.len()],topology}).collect();
+        TopologyFacts{nodes_per_axis:vec![1.;topology.dimensions.len()],topology}).collect();
     let models=Models::upstream(1);
     let mut cache=SearchCache::new(c,&catalog,&models,8,false,false,Options{memory_limit:1_000_000,weight:0.,allow_exhaustive:true,enable_folding:false});
     let mut a=make(c,vec![3,3]);let mut b=make(c,vec![3,2]);let mut output=make(c,vec![3,2]);
     a.transform(|key,v|*v=a_value(key));b.transform(|key,v|*v=b_value(key));output.transform(|_,v|*v=3.);
     for(iteration,alpha,beta)in[(0,2.,3.),(1,3.,0.)]{
         if iteration==1{a.transform(|key,v|*v=2.*a_value(key));}
-        let selected=cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1];3],indices).unwrap().unwrap();
+        let selected=cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1.];3],indices).unwrap().unwrap();
         output.contract_from_mapped("ij",&a,"ik",&b,"kj",selected.distributions.clone(),alpha,beta);
         for(key,value)in output.local_pairs(){let expected=if iteration==0{2.*reference(shape,indices,key)+9.}else{6.*reference(shape,indices,key)};
             assert!(value.is_finite()&&(value-expected).abs()<1e-6);}
     }
     assert_eq!(cache.stats(),ctf::planning::CacheStats{hits:1,misses:1});assert_eq!(cache.len(),1);
     // Pure alpha-renaming is the same structural contraction signature.
-    cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1];3],["ab","bc","ac"]).unwrap().unwrap();
+    cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1.];3],["ab","bc","ac"]).unwrap().unwrap();
     assert_eq!(cache.stats().hits,2);
     a.redistribute(Distribution::new(vec![3,3],Topology::new(vec![c.size()]),
         vec![Mapping::Unmapped,Mapping::Physical{axis:0,processes:c.size(),child:Box::new(Mapping::Unmapped)}]));
-    let selected=cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1];3],indices).unwrap().unwrap();
+    let selected=cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1.];3],indices).unwrap().unwrap();
     output.contract_from_mapped("ij",&a,"ik",&b,"kj",selected.distributions.clone(),3.,0.);
     for(key,value)in output.local_pairs(){assert!(value.is_finite()&&(value-6.*reference(shape,indices,key)).abs()<1e-6);}
     assert_eq!(cache.stats().misses,2);assert_eq!(cache.len(),2);
     cache.clear();assert!(cache.is_empty());
-    cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1];3],indices).unwrap().unwrap();
+    cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1.];3],indices).unwrap().unwrap();
     assert_eq!(cache.stats().misses,3);
 }
 fn main(){let runtime=Runtime::initialize();let world=runtime.world();run(&world);

@@ -997,6 +997,18 @@ Both targets compiled/linked on Windows GNU; the corrected node target was
 recompiled after its fixture edits. Native MPI execution remains outstanding.
 Logical ppn=2 on one WSL host tests permutation semantics, not network speed.
 
+## Fractional node peer accounting (2026-09-07)
+
+node_peer_counts passed exact source cases including [3,4]/ppn4 -> [0.5,2],
+fractional original volume 72, reordered volume 32 and strict no-improvement.
+The affected plan_cost, grid_plan_cost, mapped_cost, folded_cost and redist_cost
+targets passed once. dense_search, dense_execution, dense_folded_execution and
+distributed_node_fold passed once at WSL 1/2/4 ranks, world/parity. Existing
+exact model/discrete checks and finite abs(error)<1e-6 tensor checks are unchanged.
+All ten targets compiled and linked once on Windows GNU; MPI native runtime
+acceptance is still outstanding. No failures or extra precision studies.
+DIGIT / PASS for this change; whole-project acceptance remains incomplete.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

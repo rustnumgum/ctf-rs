@@ -18,7 +18,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct TopologyFacts {
     pub topology: Topology,
-    pub nodes_per_axis: Vec<usize>,
+    pub nodes_per_axis: Vec<f64>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -59,7 +59,7 @@ pub struct SearchCache<'context,'runtime> {
     local_custom: bool,
     custom_reduce: bool,
     options: Options,
-    plans: std::collections::HashMap<(crate::planning::Signature,[Vec<usize>;3]),Selected>,
+    plans: std::collections::HashMap<(crate::planning::Signature,[Vec<u64>;3]),Selected>,
     stats: crate::planning::CacheStats,
 }
 impl<'context,'runtime> SearchCache<'context,'runtime> {
@@ -72,10 +72,10 @@ impl<'context,'runtime> SearchCache<'context,'runtime> {
     pub fn len(&self)->usize{self.plans.len()}
     pub fn is_empty(&self)->bool{self.plans.is_empty()}
     pub fn clear(&mut self){self.plans.clear();}
-    pub fn prepare(&mut self,old:[&Distribution;3],old_nodes:[&[usize];3],indices:[&str;3])
+    pub fn prepare(&mut self,old:[&Distribution;3],old_nodes:[&[f64];3],indices:[&str;3])
         ->Result<Option<&Selected>,Error>{
         let signature=crate::planning::Signature::new(old,indices,old[0].topology.clone());
-        let key=(signature,old_nodes.map(|nodes|nodes.to_vec()));
+        let key=(signature,old_nodes.map(|nodes|nodes.iter().map(|value|value.to_bits()).collect()));
         match self.plans.entry(key){
             std::collections::hash_map::Entry::Occupied(entry)=>{
                 self.stats.hits+=1;Ok(Some(entry.into_mut()))
@@ -97,6 +97,7 @@ pub enum Error {
     NodeFactRankMismatch,
     ConflictingNodeFacts,
     MissingNodeFacts,
+    InvalidNodeFacts,
     Fold(crate::partial_fold::Error),
 }
 
@@ -156,24 +157,37 @@ struct CandidateCost {
 }
 
 struct NodeFacts<'a> {
-    old: [(&'a Topology, &'a [usize]); 3],
+    old: [(&'a Topology, &'a [f64]); 3],
     catalog: &'a [TopologyFacts],
 }
 
 impl<'a> NodeFacts<'a> {
     fn new(
         old: [&'a Distribution; 3],
-        old_nodes: [&'a [usize]; 3],
+        old_nodes: [&'a [f64]; 3],
         catalog: &'a [TopologyFacts],
     ) -> Result<Self, Error> {
         for operand in 0..3 {
             if old_nodes[operand].len() != old[operand].topology.dimensions.len() {
                 return Err(Error::NodeFactRankMismatch);
             }
+            if old_nodes[operand]
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.)
+            {
+                return Err(Error::InvalidNodeFacts);
+            }
         }
         for facts in catalog {
             if facts.nodes_per_axis.len() != facts.topology.dimensions.len() {
                 return Err(Error::NodeFactRankMismatch);
+            }
+            if facts
+                .nodes_per_axis
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.)
+            {
+                return Err(Error::InvalidNodeFacts);
             }
         }
         let this = Self {
@@ -191,8 +205,8 @@ impl<'a> NodeFacts<'a> {
         Ok(this)
     }
 
-    fn get(&self, topology: &Topology) -> Result<&'a [usize], Error> {
-        let mut found: Option<&[usize]> = None;
+    fn get(&self, topology: &Topology) -> Result<&'a [f64], Error> {
+        let mut found: Option<&[f64]> = None;
         for (candidate, nodes) in self.old.iter().copied().chain(
             self.catalog
                 .iter()
@@ -213,7 +227,7 @@ fn consider(
     old: [&Distribution; 3],
     mapped: [&Distribution; 3],
     indices: [&str; 3],
-    nodes_per_axis: &[usize],
+    nodes_per_axis: &[f64],
     models: &Models,
     element_bytes: usize,
     local_custom: bool,
@@ -446,7 +460,7 @@ fn exhaustive_pass(
 pub fn search_dense(
     context: &Context<'_>,
     old: [&Distribution; 3],
-    old_nodes: [&[usize]; 3],
+    old_nodes: [&[f64]; 3],
     indices: [&str; 3],
     catalog: &[TopologyFacts],
     models: &Models,

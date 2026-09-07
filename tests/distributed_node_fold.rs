@@ -11,12 +11,12 @@ fn run(context:&Context<'_>) {
         let mapped=[Distribution::new(vec![8],topo.clone(),vec![p.clone()]),
             Distribution::new(vec![8,2],topo.clone(),vec![p,q.clone()]),Distribution::new(vec![2],topo,vec![q])];
         let models=Models::upstream(1);
-        let choice=node_reordering::select_dense(mapped.each_ref(),["i","ij","j"],&[0,1],2,8,true,&models).unwrap();
+        let choice=node_reordering::select_dense(mapped.each_ref(),["i","ij","j"],&[0.,1.],2,8,true,&models).unwrap();
         assert_eq!(choice.intra_node_lens,vec![1,2]);
         assert_eq!(choice.inter_node_lens,vec![2,1]);
         assert_eq!((choice.original_volume,choice.selected_volume),(32.,8.));
-        assert!(node_reordering::select_dense(mapped.each_ref(),["i","ij","j"],&[1,0],2,8,true,&models).is_none());
-        assert!(node_reordering::select_dense(mapped.each_ref(),["i","ij","j"],&[0,1],1,8,true,&models).is_none());
+        assert!(node_reordering::select_dense(mapped.each_ref(),["i","ij","j"],&[1.,0.],2,8,true,&models).is_none());
+        assert!(node_reordering::select_dense(mapped.each_ref(),["i","ij","j"],&[0.,1.],1,8,true,&models).is_none());
         let Outcome::Selected(fold)=partial_fold::select([&[4],&[4,1],&[1]],[&[NS],&[NS,NS],&[NS]],["i","ij","j"],&models,[1;3]).unwrap() else {panic!("dot fold")};
         let mut a=Tensor::new(context,Distribution::cyclic(vec![8],4),Arithmetic::<f64>::new());
         let mut b=Tensor::new(context,Distribution::cyclic(vec![8,2],4),Arithmetic::<f64>::new());

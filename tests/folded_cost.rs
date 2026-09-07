@@ -10,7 +10,7 @@ fn folded_two_dimensional_tree_adds_source_resident_buffers(){
     let shapes:[&[usize];3]=[&[3,4],&[4,5],&[3,5]];let indices=["ik","kj","ij"];
     let mapped=Problem::new(shapes,indices).unwrap().map_to_topology(&Topology::new(vec![2,2]),0,[None;3]).unwrap();
     let old=shapes.map(|s|Distribution::cyclic(s.to_vec(),4));
-    let e=folded_cost::estimate_dense_folded(old.each_ref(),mapped.each_ref(),indices,&models(),8,&[1,2],false).unwrap().unwrap();
+    let e=folded_cost::estimate_dense_folded(old.each_ref(),mapped.each_ref(),indices,&models(),8,&[1.,2.],false).unwrap().unwrap();
     let Tree::Panels{steps,panel_bytes,child,..}=&e.tree else{panic!("lost 2D communication")};
     assert_eq!(*steps,2);assert_eq!(*panel_bytes,[32,48,0]);
     let Tree::Local{folded,operand_bytes,flops,..}=child.as_ref()else{panic!("missing folded leaf")};

@@ -6,6 +6,31 @@
 
 use crate::{cost::Models, mapping::Distribution};
 
+/// Original (not reordered) topology.cxx:138-154 average remote-node counts.
+/// Node-major rank placement and the explicit ranks-per-node value follow the
+/// source topology constructor. Fractional averages must not be rounded.
+pub fn original_peer_counts(lens: &[usize], ranks_per_node: usize) -> Vec<f64> {
+    assert!(ranks_per_node > 0 && lens.iter().all(|&length| length > 0));
+    let ranks: usize = lens.iter().product();
+    let mut stride = 1;
+    lens.iter().map(|&length| {
+        let groups = ranks / (stride * length);
+        let peers = if stride >= ranks_per_node {
+            (length - 1) as f64
+        } else {
+            let mut count = 0.;
+            for node in 0..ranks / ranks_per_node {
+                let offset = (node * ranks_per_node) % (stride * length);
+                let distance = offset.min(stride * length - offset);
+                count += stride.min(distance) as f64 / (groups * stride) as f64;
+            }
+            count
+        };
+        stride *= length;
+        peers
+    }).collect()
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Choice {
     pub intra_node_lens: Vec<usize>,
@@ -76,7 +101,7 @@ pub fn inverse_rank(lens: &[usize], intra_node_lens: &[usize], rank: usize) -> u
 pub fn select_dense(
     distributions: [&Distribution; 3],
     indices: [&str; 3],
-    original_nodes: &[usize],
+    original_nodes: &[f64],
     ranks_per_node: usize,
     element_bytes: usize,
     custom_reduce: bool,
@@ -116,7 +141,7 @@ pub fn select_dense(
             .map(|(&length, &inter)| length / inter)
             .collect();
         let communication_nodes: Vec<_> =
-            inter_node_lens.iter().map(|&count| count - 1).collect();
+            inter_node_lens.iter().map(|&count| (count - 1) as f64).collect();
         let volume = crate::mapped_cost::dense_unfolded(
             distributions,
             indices,

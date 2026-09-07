@@ -14,7 +14,7 @@ fn generated_execution_tree_uses_source_local_flops_and_fiber_bytes(){
         let a=Distribution::cyclic(vec![3,4],np);let b=Distribution::cyclic(vec![4,5],np);
         let c=Distribution::cyclic(vec![3,5],np);
         let plan=GridPlan::prepare([&a,&b,&c],["ik","kj","ij"],topology.clone()).unwrap();
-        let nodes=if np==4{vec![1,2]}else{vec![1;topology.dimensions.len()]};
+        let nodes=if np==4{vec![1.,2.]}else{vec![1.;topology.dimensions.len()]};
         let tree=plan.cost_tree(8,&nodes,false);
         let estimate=tree.estimate(&models,1);
         assert_eq!(estimate.seconds,seconds);

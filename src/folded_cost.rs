@@ -113,7 +113,7 @@ pub fn estimate_dense_folded(
     indices: [&str; 3],
     models: &Models,
     element_bytes: usize,
-    nodes_per_axis: &[usize],
+    nodes_per_axis: &[f64],
     custom_reduce: bool,
 ) -> Result<Option<FoldedEstimate>, partial_fold::Error> {
     let block_shapes = mapped.map(Distribution::block_shape);

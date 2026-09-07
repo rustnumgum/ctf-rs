@@ -212,8 +212,10 @@ uses MPI_Sendrecv_replace on local packed blocks, runs the existing raw panel
 tree in that context and backmaps C before restoring its distribution. Private
 A/B copies are discarded rather than unnecessarily exchanged back.
 
-Node facts remain explicit integer peer counts in this cost-tree interface;
-fractional average peer counts from irregular physical node placement and
-automatic hardware-node discovery are not yet integrated. Sparse and generic
+Node facts are explicit f64 average peer counts throughout raw/aligned cost
+trees, folded costs, search and node selection. `original_peer_counts` ports
+the source node-boundary average without rounding; cache keys preserve the
+supplied facts' bit patterns. Automatic hardware-node discovery is not yet
+integrated. Sparse and generic
 semiring node-aware execution remain pending. Logical node partitions in
 single-machine tests do not establish multi-node performance.

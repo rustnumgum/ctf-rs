@@ -62,13 +62,13 @@ fn run(c:&Context<'_>){
     exercise(c,nested,["imkl","kljn","imjn"],std::array::from_fn(|o|Distribution::new(nested[o].to_vec(),topology.clone(),maps[o].clone())));
 
     let catalog:Vec<_>=topology_candidates::all_shapes(c.size()).into_iter().map(|topology|
-        TopologyFacts{nodes_per_axis:vec![1;topology.dimensions.len()],topology}).collect();
+        TopologyFacts{nodes_per_axis:vec![1.;topology.dimensions.len()],topology}).collect();
     let models=Models::upstream(1);let mut cache=SearchCache::new(c,&catalog,&models,8,false,true,
         Options{memory_limit:1_000_000,weight:0.,allow_exhaustive:true,enable_folding:true});
     let mut a=make(c,shapes[0]);let mut b=make(c,shapes[1]);let mut output=make(c,shapes[2]);
     b.transform(|key,v|*v=bv(key));
     for factor in [1.,2.]{a.transform(|key,v|*v=factor*av(key));output.transform(|_,v|*v=3.);
-        let selected=cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1];3],indices).unwrap().unwrap();
+        let selected=cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1.];3],indices).unwrap().unwrap();
         output.contract_folded_from_mapped::<Native>("ij",&a,"ik",&b,"kj",selected.distributions.clone(),selected.fold.as_ref().unwrap(),None,2.,3.);
         for(key,value)in output.local_pairs(){assert!(value.is_finite()&&(value-(2.*factor*reference(shapes,indices,key)+9.)).abs()<1e-6);}
     }

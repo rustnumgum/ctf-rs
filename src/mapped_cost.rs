@@ -193,7 +193,7 @@ pub fn dense_unfolded(
     distributions: [&Distribution; 3],
     indices: [&str; 3],
     element_bytes: usize,
-    nodes_per_axis: &[usize],
+    nodes_per_axis: &[f64],
     local_custom: bool,
     custom_reduce: bool,
 ) -> Tree {
@@ -420,7 +420,7 @@ pub fn estimate_dense_unfolded(
     indices: [&str; 3],
     models: &crate::cost::Models,
     element_bytes: usize,
-    nodes_per_axis: &[usize],
+    nodes_per_axis: &[f64],
     local_custom: bool,
     custom_reduce: bool,
 ) -> crate::grid_plan_cost::UnfoldedEstimate {

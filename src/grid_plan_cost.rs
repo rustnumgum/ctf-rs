@@ -38,7 +38,7 @@ impl GridPlan {
     /// C redistribution time is counted twice; only changed A/B contribute
     /// additional resident input storage. No folding cost is fabricated.
     pub fn estimate_unfolded(&self,models:&crate::cost::Models,element_bytes:usize,
-        nodes_per_axis:&[usize],custom_reduce:bool)->UnfoldedEstimate {
+        nodes_per_axis:&[f64],custom_reduce:bool)->UnfoldedEstimate {
         let inner=self.cost_tree(element_bytes,nodes_per_axis,custom_reduce).estimate(models,1);
         let old=self.signature().distributions();let mapped=self.mapped_distributions();
         let mut redistribution_seconds=[0.;3];
@@ -63,7 +63,7 @@ impl GridPlan {
     pub fn cost_tree(
         &self,
         element_bytes: usize,
-        nodes_per_axis: &[usize],
+        nodes_per_axis: &[f64],
         custom_reduce: bool,
     ) -> Tree {
         let signature = self.signature();
