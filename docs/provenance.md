@@ -1,5 +1,12 @@
 # Source provenance
 
+The three custom sparse-left GEMM production paths now use source
+matricization and sparse_2d, retaining the custom CSR identity-alpha rule,
+first-panel dense beta, and empty temporary/top-level sum for sparse C.
+Unused sparse-left communication loops were removed. The representative
+release sparse measurement is documented separately in sparse-performance.md;
+its time/RSS samples are not model estimates or numerical tolerances.
+
 sparse_gemm.rs now connects four ordinary sparse-left GEMM storage cases
 to source matricization and the corresponding recursive sparse_2d executor,
 using the existing redistributed virtual-block arrays and LCM ownership.

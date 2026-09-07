@@ -143,80 +143,6 @@ fn broadcast<E: Wire + Clone>(context: &Context<'_>, root: usize,
     Coo::new(rows, cols, entries).to_csr()
 }
 
-fn sparse_panels<A: Semiring + Clone>(a: &SparseTensor<'_, '_, A>, b: &SparseTensor<'_, '_, A>,
-    layout: &Layout, mut child: impl FnMut(&Csr<A::Element>, &Csr<A::Element>, usize))
-where A::Element: Wire {
-    let mut a = a.clone();
-    let mut b = b.clone();
-    a.redistribute(layout.distribution(0));
-    b.redistribute(layout.distribution(1));
-    let context = a.context();
-    let rank = context.rank();
-    let row = context.split(Some((rank % layout.grid[0]) as i32), rank as i32).unwrap();
-    let col = context.split(Some((rank / layout.grid[0]) as i32), rank as i32).unwrap();
-    let aa = a.local_pairs();
-    let bb = b.local_pairs();
-    for step in 0..layout.phase {
-        let ae = aa.iter().filter_map(|(key, value)| {
-            let i = key % layout.shape[0];
-            let k = key / layout.shape[0];
-            (k % layout.phase == step).then(|| (i / layout.grid[0] + 1,
-                k / layout.phase + 1, value.clone()))
-        }).collect();
-        let be = bb.iter().filter_map(|(key, value)| {
-            let k = key % layout.shape[1];
-            let j = key / layout.shape[1];
-            (k % layout.phase == step).then(|| (k / layout.phase + 1,
-                j / layout.grid[1] + 1, value.clone()))
-        }).collect();
-        let a_panel = broadcast(&row, step % layout.grid[1], ae, layout.local[0], layout.local[1]);
-        let b_panel = broadcast(&col, step % layout.grid[0], be, layout.local[1], layout.local[2]);
-        child(&a_panel, &b_panel, step);
-    }
-    row.close();
-    col.close();
-}
-
-fn sparse_dense_panels<A: Semiring + Clone>(a: &SparseTensor<'_, '_, A>, b: &Tensor<'_, '_, A>,
-    layout: &Layout, mut child: impl FnMut(&Csr<A::Element>, &[A::Element], usize))
-where A::Element: Wire {
-    let mut a = a.clone();
-    let mut b = b.clone();
-    a.redistribute(layout.distribution(0));
-    b.redistribute(layout.distribution(1));
-    let rank = a.context().rank();
-    let context = a.context();
-    let row = context.split(Some((rank % layout.grid[0]) as i32), rank as i32).unwrap();
-    let col = context.split(Some((rank / layout.grid[0]) as i32), rank as i32).unwrap();
-    let aa = a.local_pairs();
-    let bb = b.local_pairs();
-    for step in 0..layout.phase {
-        let ae = aa.iter().filter_map(|(key, value)| {
-            let i = key % layout.shape[0];
-            let k = key / layout.shape[0];
-            (k % layout.phase == step).then(|| (i / layout.grid[0] + 1,
-                k / layout.phase + 1, value.clone()))
-        }).collect();
-        let a_panel = broadcast(&row, step % layout.grid[1], ae,
-            layout.local[0], layout.local[1]);
-        let mut b_panel = vec![b.algebra().zero(); layout.local[1] * layout.local[2]];
-        if col.rank() == step % layout.grid[0] {
-            for (key, value) in &bb {
-                let k = key % layout.shape[1];
-                let j = key / layout.shape[1];
-                if k % layout.phase == step {
-                    b_panel[k / layout.phase + (j / layout.grid[1]) * layout.local[1]] =
-                        value.clone();
-                }
-            }
-        }
-        col.broadcast(step % layout.grid[0], &mut b_panel);
-        child(&a_panel, &b_panel, step);
-    }
-    row.close();
-    col.close();
-}
-
 impl<A: Semiring + Clone> SparseTensor<'_, '_, A> where A::Element: Wire {
     /// Explicit-grid sparse matrix product, with sparse output throughout.
     pub fn gemm_sparse(&mut self, a: &Self, b: &Self, grid: [usize; 2],
@@ -338,14 +264,40 @@ impl<A: Semiring + Clone> SparseTensor<'_, '_, A> where A::Element: Wire {
         let algebra = self.algebra().clone();
         let one = algebra.one();
         assert!(alpha == one,"source custom CSR kernel requires identity alpha");
-        let mut c = Coo::new(layout.local[0],layout.local[2],Vec::new()).to_csr();
-        sparse_panels(a, b, &layout, |a, b, _| {
-            c = crate::sparse_function_kernel::csr_sparse_output(&algebra,a,b,&c,&function);
-        });
+        let mut aa = a.clone();
+        let mut bb = b.clone();
+        aa.redistribute(layout.distribution(0));
+        bb.redistribute(layout.distribution(1));
+        let a_metadata = layout.matricization(0);
+        let b_metadata = layout.matricization(1);
+        let a_panels: Vec<_> = aa.blocks.iter()
+            .map(|block| matricize_pairs(&a_metadata, block).to_csr()).collect();
+        let b_panels: Vec<_> = bb.blocks.iter()
+            .map(|block| matricize_pairs(&b_metadata, block).to_csr()).collect();
+        let rank = self.context().rank();
+        let row = self.context().split(Some((rank % grid[0]) as i32), rank as i32).unwrap();
+        let col = self.context().split(Some((rank / grid[0]) as i32), rank as i32).unwrap();
+        let c = sparse_2d::execute_csr(
+            &algebra, layout.phase, Layers { count: 1, index: 0 },
+            Panel { comm: Some(&row), outer: 1, inner: 1 },
+            Panel { comm: Some(&col), outer: 1, inner: 1 },
+            Panel { comm: None, outer: 1, inner: 0 },
+            &a_panels, &b_panels,
+            vec![Coo::new(layout.local[0], layout.local[2], Vec::new()).to_csr()],
+            one.clone(),
+            |a, b, mut c, _, _| {
+                c[0] = crate::sparse_function_kernel::csr_sparse_output(
+                    &algebra, &a[0], &b[0], &c[0], &function,
+                );
+                c
+            },
+        );
+        row.close();
+        col.close();
         // Source home_contract computes into empty C_buf, then sparse-sums it
         // into old C. This retains old-only zero keys and right-scales by beta.
         let mut product = Self::new(self.context(),layout.distribution(2),algebra);
-        product.blocks = vec![layout.output_pairs(&c.to_coo(),self.context().rank())];
+        product.blocks = vec![layout.output_pairs(&c[0].to_coo(),self.context().rank())];
         self.sum_from("ij",&product,"ij",one,beta);
     }
 }
@@ -448,14 +400,37 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A> where A::Element: Wire {
         let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
         let original = self.distribution().clone();
         self.redistribute(layout.distribution(2));
-        let rank = self.context().rank();
         let algebra = self.algebra().clone();
         let one = algebra.one();
-        let mut values = self.local_storage().to_vec();
-        sparse_panels(a, b, &layout, |a_panel, b_panel, step| {
-            crate::sparse_function_kernel::csr_sparse(&algebra, a_panel, b_panel,
-                &mut values, &alpha, if step == 0 { &beta } else { &one }, &function);
-        });
+        assert!(alpha == one,"source custom CSR kernel requires identity alpha");
+        let mut aa = a.clone();
+        let mut bb = b.clone();
+        aa.redistribute(layout.distribution(0));
+        bb.redistribute(layout.distribution(1));
+        let a_metadata = layout.matricization(0);
+        let b_metadata = layout.matricization(1);
+        let a_panels: Vec<_> = aa.blocks.iter()
+            .map(|block| matricize_pairs(&a_metadata, block).to_csr()).collect();
+        let b_panels: Vec<_> = bb.blocks.iter()
+            .map(|block| matricize_pairs(&b_metadata, block).to_csr()).collect();
+        let rank = self.context().rank();
+        let row = self.context().split(Some((rank % grid[0]) as i32), rank as i32).unwrap();
+        let col = self.context().split(Some((rank / grid[0]) as i32), rank as i32).unwrap();
+        let values = sparse_2d::execute_csr_sparse_dense(
+            &algebra, layout.phase, Layers { count: 1, index: 0 },
+            Panel { comm: Some(&row), outer: 1, inner: 1 },
+            Panel { comm: Some(&col), outer: 1, inner: 1 },
+            Panel { comm: None, outer: 1, inner: 0 },
+            &a_panels, &b_panels, vec![self.local_storage().to_vec()], beta,
+            |a, b, mut c, leaf_beta, _| {
+                crate::sparse_function_kernel::csr_sparse(
+                    &algebra, &a[0], &b[0], &mut c[0], &alpha, &leaf_beta, &function,
+                );
+                c
+            },
+        ).remove(0);
+        row.close();
+        col.close();
         let dist = self.distribution().clone();
         self.transform(|key, value| *value = values[dist.local_offset(rank, key)].clone());
         self.redistribute(original);
@@ -477,14 +452,38 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A> where A::Element: Wire {
         let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
         let original = self.distribution().clone();
         self.redistribute(layout.distribution(2));
-        let rank = self.context().rank();
         let algebra = self.algebra().clone();
         let one = algebra.one();
-        let mut values = self.local_storage().to_vec();
-        sparse_dense_panels(a, b, &layout, |a_panel, b_panel, step| {
-            crate::sparse_function_kernel::csr_dense(&algebra, a_panel, layout.local[2], b_panel,
-                &mut values, &alpha, if step == 0 { &beta } else { &one }, &function);
-        });
+        assert!(alpha == one,"source custom CSR kernel requires identity alpha");
+        let mut aa = a.clone();
+        let mut bb = b.clone();
+        aa.redistribute(layout.distribution(0));
+        bb.redistribute(layout.distribution(1));
+        let a_metadata = layout.matricization(0);
+        let a_panels: Vec<_> = aa.blocks.iter()
+            .map(|block| matricize_pairs(&a_metadata, block).to_csr()).collect();
+        let b_panels = dense_blocks(
+            bb.local_storage(), layout.phase / grid[0], layout.local[1] * layout.local[2],
+        );
+        let rank = self.context().rank();
+        let row = self.context().split(Some((rank % grid[0]) as i32), rank as i32).unwrap();
+        let col = self.context().split(Some((rank / grid[0]) as i32), rank as i32).unwrap();
+        let values = sparse_2d::execute_csr_dense(
+            &algebra, layout.phase, Layers { count: 1, index: 0 },
+            Panel { comm: Some(&row), outer: 1, inner: 1 },
+            Panel { comm: Some(&col), outer: 1, inner: 1 },
+            Panel { comm: None, outer: 1, inner: 0 },
+            &a_panels, &b_panels, vec![self.local_storage().to_vec()], beta,
+            |a, b, mut c, leaf_beta, _| {
+                crate::sparse_function_kernel::csr_dense(
+                    &algebra, &a[0], layout.local[2], &b[0], &mut c[0],
+                    &alpha, &leaf_beta, &function,
+                );
+                c
+            },
+        ).remove(0);
+        row.close();
+        col.close();
         let dist = self.distribution().clone();
         self.transform(|key, value| *value = values[dist.local_offset(rank, key)].clone());
         self.redistribute(original);

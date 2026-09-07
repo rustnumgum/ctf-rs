@@ -1,5 +1,20 @@
 # Validation evidence
 
+## Custom sparse GEMM integration and representative measurement (2026-09-08)
+
+distributed_sparse_gemm_function, distributed_sparse_function_output and
+distributed_sparse_fold_function passed once at WSL 1/2/4 ranks, world/parity,
+after replacing their custom sparse-left panel loops with matricization and
+sparse_2d. Existing exact i64/key criteria cover non-distributive functions,
+stored/missing zeros, beta-zero merging, high-order batches, permutations
+and repeated labels. DIGIT / PASS; no precision studies. All three targets
+and sparse_gemm_bench compiled/linked on Windows GNU, not runtime-accepted.
+
+The explicitly requested time/memory measurement was performed once per
+1/2/4 ranks on a fixed release-build sparse contraction. Results and the
+per-rank lifetime RSS interpretation are in sparse-performance.md; no
+speedup claim or additional numerical verification was made.
+
 ## Sparse GEMM integration and self mapping (2026-09-08)
 
 The existing distributed_sparse_gemm, distributed_sparse_dense_output,

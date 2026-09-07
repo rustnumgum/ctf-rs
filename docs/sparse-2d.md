@@ -50,4 +50,8 @@ Ordinary sparse-left GEMM now constructs the four matching CSR/CCSR sparse
 or dense-output executors directly from its redistributed virtual blocks.
 Its existing LCM maps, cyclic fiber roots and output restoration are retained;
 real C passes through the executor rather than a captured dummy-output child.
-Custom and dense-left helper paths are not changed by this integration.
+The three custom sparse-left GEMM paths also use these source executors.
+Sparse custom output uses an empty temporary followed by the source top-level
+beta sum; dense custom output gets beta only on its first panel. The old
+duplicate sparse-left panel loops have been removed. Dense-left helper code
+remains where it has no corresponding sparse-first executor.
