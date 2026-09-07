@@ -49,7 +49,7 @@ pub(crate) fn plan(
 /// Visit canonical packed keys in ascending global-key order. Axis zero is
 /// the fastest coordinate, so recursion starts at the highest axis and each
 /// lower axis is bounded by its next coordinate in the same symmetry group.
-fn visit_canonical_keys(
+pub(crate) fn visit_canonical_keys(
     distribution: &SymmetricDistribution,
     rank: usize,
     mut visit: impl FnMut(usize),

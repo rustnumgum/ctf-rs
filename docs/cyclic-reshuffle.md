@@ -27,6 +27,8 @@ groups and higher-order groups use the same bounds. Source tensors remain intact
 
 This closes the NS and packed value-stream paths, not every optimized source case.
 Closed-form bucket counts, buffer reuse, nonzero offsets,
-permutation arguments and subworld integration remain to be ported. The source's
+permutation arguments remain to be ported. Dense and compressed subworld
+accumulation now reuse the ordered local traversals and derive peer offset
+streams through explicit child-to-parent rank orientation. The source's
 scalar rank-zero storage convention is represented by the existing Rust explicit
 replica rules instead of silently discarding other stored replicas.

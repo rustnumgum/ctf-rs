@@ -18,8 +18,11 @@ also for noncommutative algebras. Source tensors are unchanged.
 
 Canonical source owners send entries through the parent communicator directly
 to all destination owners, including replicas. No root assembles the tensor.
-The current implementation uses explicit serialized key routing; optimized
-upstream cyclic-reshuffle buffer kernels remain a separate backlog item.
+The implementation derives matching offset streams from the distributions and
+the child-rank-to-parent-rank orientation. Only values cross the communicator;
+keys are not carried per element. Each side traverses its own local coordinates
+in global-key order. Native source buffer reuse and closed-form bucket-count
+optimizations remain separate backlog items.
 
 Child tensors borrow their child context. Finish transfers and drop those
 tensors before explicitly closing the child context. Destructors do not perform
@@ -35,6 +38,8 @@ holes and replica ownership. Ring coefficients remain right multipliers:
 incoming*alpha + old*beta. Inactive parent ranks pass None even for reversed or
 noncontiguous child memberships. Source values remain unchanged.
 
-This path currently uses serialized canonical keys like dense subworld transfer;
-integration with value-only subworld reshuffle is still pending. It does not
-claim sparse-pair storage compatibility with the pinned dense-buffer routine.
+This path uses the same value-only protocol as dense subworld transfer, with
+symmetry-bounded traversal and packed offsets. It does not claim sparse-pair
+storage compatibility with the pinned dense-buffer routine. Rank orientation is
+applied directly to peer buckets rather than creating source mirror buffers and
+then forwarding them in a second point-to-point phase.

@@ -1,5 +1,16 @@
 # Validation evidence
 
+## Value-only subworld streams (2026-09-07)
+
+`subworld_transfer`, `symmetric_subworld`, `typed_distributed_eigh` and `schedule`
+passed once at 1/2/4 WSL ranks. Dense tests now also cover scalar and zero-length
+global domains. Existing exact noncommutative matrix/i64, bounded complex and
+four-type eigendecomposition quantities are unchanged. Coverage includes reversed
+odd/even children, virtual/full replicas, canonical packed SY/AS/SH streams and
+empty messages. DIGIT / PASS; no diagnostics or precision reruns. Windows native
+MPI execution remains pending; this stage performs compile/link acceptance only.
+All four integration targets compiled and linked once on Windows GNU.
+
 ## Compressed subworld accumulation (2026-09-07)
 
 `symmetric_subworld` passed once at 1/2/4 WSL ranks, world/parity, after fixing a

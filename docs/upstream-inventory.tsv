@@ -122,7 +122,7 @@ src/contraction/spctr_tsr.cxx	src/contraction	pending
 src/contraction/spctr_tsr.h	src/contraction	pending
 src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar reference kernels, typed canonical partial/symmetry folded BLAS residual traversal and four-type distributed integration; custom-function folded branch and automatic compressed integration pending
 src/contraction/sym_seq_ctr.h	src/contraction	pending
-src/redistribution/cyclic_reshuffle.cxx	src/cyclic_reshuffle.rs; src/symmetric_reshuffle.rs; src/tensor.rs; src/symmetric_tensor.rs; tests/cyclic_reshuffle.rs; tests/symmetric_reshuffle.rs	partial: NS and symmetry-bounded physical-residue traversal, ordered value-only peer streams, virtual blocks, packed holes/padding and replica restoration; closed-form bucket counts, buffer reuse, offset/permutation arguments and subworld integration pending
+src/redistribution/cyclic_reshuffle.cxx	src/cyclic_reshuffle.rs; src/symmetric_reshuffle.rs; src/subworld.rs; src/symmetric_subworld.rs; src/tensor.rs; src/symmetric_tensor.rs; tests/cyclic_reshuffle.rs; tests/symmetric_reshuffle.rs	partial: NS and symmetry-bounded physical-residue traversal, ordered value-only peer streams, virtual blocks, packed holes/padding, replica restoration and rank-oriented subworld streams; closed-form bucket counts, buffer reuse and offset/permutation arguments pending
 src/redistribution/cyclic_reshuffle.h	src/redistribution	pending
 src/redistribution/dgtog_bucket.h	src/redistribution	pending
 src/redistribution/dgtog_calc_cnt.cxx	src/redistribution	pending

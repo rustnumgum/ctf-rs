@@ -44,7 +44,7 @@ impl Plan {
 /// Visit a rank's valid local keys in global column-major order. Physical
 /// residues define the first coordinate on every axis; virtual copies remain
 /// represented by all later values spaced by that axis' physical phase.
-fn visit_local_keys(distribution: &Distribution, rank: usize, mut visit: impl FnMut(usize)) {
+pub(crate) fn visit_local_keys(distribution: &Distribution, rank: usize, mut visit: impl FnMut(usize)) {
     let shape = &distribution.shape;
     if shape.iter().any(|&extent| extent == 0) {
         return;

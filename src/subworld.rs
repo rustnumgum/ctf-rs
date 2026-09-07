@@ -33,23 +33,76 @@ pub(crate) fn orient_subworld(
 fn apply_received<A: Semiring + Clone>(
     tensor: &mut Tensor<'_, '_, A>,
     received: Vec<Vec<u8>>,
+    expected_offsets: &[Vec<usize>],
     algebra: &A,
     alpha: &A::Element,
     beta: &A::Element,
 ) where
     A::Element: Wire,
 {
-    let rank = tensor.context().rank();
-    for message in received {
-        for pair in message.chunks_exact(8 + A::Element::WIDTH) {
-            let key = u64::decode(&pair[..8]) as usize;
-            let incoming = A::Element::decode(&pair[8..]);
-            let offset = tensor.distribution().local_offset(rank, key);
+    for (message, offsets) in received.into_iter().zip(expected_offsets) {
+        assert_eq!(message.len(), offsets.len() * A::Element::WIDTH);
+        for (offset, bytes) in offsets.iter().zip(message.chunks_exact(A::Element::WIDTH)) {
+            let incoming = A::Element::decode(bytes);
             let incoming = algebra.multiply(&incoming, alpha);
-            let old = algebra.multiply(&tensor.data[offset], beta);
-            tensor.data[offset] = algebra.add(&incoming, &old);
+            let old = algebra.multiply(&tensor.data[*offset], beta);
+            tensor.data[*offset] = algebra.add(&incoming, &old);
         }
     }
+}
+
+fn plan(
+    old: &Distribution,
+    new: &Distribution,
+    old_rank: Option<usize>,
+    new_rank: Option<usize>,
+    source_parents: &[usize],
+    destination_parents: &[usize],
+    parent_size: usize,
+) -> crate::cyclic_reshuffle::Plan {
+    let mut send = vec![Vec::new(); parent_size];
+    if let Some(rank) = old_rank {
+        crate::cyclic_reshuffle::visit_local_keys(old, rank, |key| {
+            if old.owner(key) != rank {
+                return;
+            }
+            let offset = old.local_offset(rank, key);
+            for (destination, &parent) in destination_parents.iter().enumerate() {
+                if new.owns(destination, key) {
+                    send[parent].push(offset);
+                }
+            }
+        });
+    }
+
+    let mut receive = vec![Vec::new(); parent_size];
+    if let Some(rank) = new_rank {
+        crate::cyclic_reshuffle::visit_local_keys(new, rank, |key| {
+            let source = old.owner(key);
+            receive[source_parents[source]].push(new.local_offset(rank, key));
+        });
+    }
+
+    crate::cyclic_reshuffle::Plan { send, receive }
+}
+
+fn encode_offsets<A: Semiring + Clone>(
+    data: &[A::Element],
+    send: &[Vec<usize>],
+) -> Vec<Vec<u8>>
+where
+    A::Element: Wire,
+{
+    send.iter()
+        .map(|offsets| {
+            let mut bytes = Vec::with_capacity(offsets.len() * A::Element::WIDTH);
+            for &offset in offsets {
+                data[offset].encode(&mut bytes);
+            }
+            assert_eq!(bytes.len(), offsets.len() * A::Element::WIDTH);
+            bytes
+        })
+        .collect()
 }
 
 impl<A: Semiring + Clone> Tensor<'_, '_, A>
@@ -74,23 +127,27 @@ where
         });
         let parent_for_child = orient_subworld(self.context(), child_rank, child_size);
 
-        let parent_rank = self.context().rank();
-        let mut buckets = vec![Vec::new(); self.context().size()];
-        for (key, value) in self.local_pairs() {
-            if self.distribution().owner(key) != parent_rank {
-                continue;
-            }
-            for child_rank in 0..child_size {
-                if target_distribution.owns(child_rank, key) {
-                    let bucket = &mut buckets[parent_for_child[child_rank]];
-                    (key as u64).encode(bucket);
-                    value.encode(bucket);
-                }
-            }
-        }
+        let parent_size = self.context().size();
+        let plan = plan(
+            self.distribution(),
+            target_distribution,
+            Some(self.context().rank()),
+            child_rank,
+            &(0..parent_size).collect::<Vec<_>>(),
+            &parent_for_child,
+            parent_size,
+        );
+        let buckets = encode_offsets::<A>(&self.data, &plan.send);
         let received = self.context().inner.exchange(&buckets);
         if let Some(destination) = destination {
-            apply_received(destination, received, self.algebra(), &alpha, &beta);
+            apply_received(
+                destination,
+                received,
+                &plan.receive,
+                self.algebra(),
+                &alpha,
+                &beta,
+            );
         }
     }
 
@@ -110,26 +167,22 @@ where
             assert_eq!(source.distribution(), source_distribution);
             source.context().rank()
         });
-        orient_subworld(self.context(), child_rank, child_size);
-
-        let mut buckets = vec![Vec::new(); self.context().size()];
-        if let Some(source) = source {
-            let child_rank = source.context().rank();
-            for (key, value) in source.local_pairs() {
-                if source_distribution.owner(key) != child_rank {
-                    continue;
-                }
-                for parent_rank in 0..self.context().size() {
-                    if self.distribution().owns(parent_rank, key) {
-                        let bucket = &mut buckets[parent_rank];
-                        (key as u64).encode(bucket);
-                        value.encode(bucket);
-                    }
-                }
-            }
-        }
+        let parent_for_child = orient_subworld(self.context(), child_rank, child_size);
+        let parent_size = self.context().size();
+        let plan = plan(
+            source_distribution,
+            self.distribution(),
+            child_rank,
+            Some(self.context().rank()),
+            &parent_for_child,
+            &(0..parent_size).collect::<Vec<_>>(),
+            parent_size,
+        );
+        let buckets = source
+            .map(|source| encode_offsets::<A>(&source.data, &plan.send))
+            .unwrap_or_else(|| vec![Vec::new(); parent_size]);
         let received = self.context().inner.exchange(&buckets);
         let algebra = self.algebra().clone();
-        apply_received(self, received, &algebra, &alpha, &beta);
+        apply_received(self, received, &plan.receive, &algebra, &alpha, &beta);
     }
 }

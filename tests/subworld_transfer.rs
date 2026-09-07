@@ -15,10 +15,12 @@ enum ChildMode {
 fn replicated_distribution(shape: &[usize], processes: usize) -> Distribution {
     let topology = Topology::new(vec![processes]);
     let mut mappings = vec![Mapping::Unmapped; shape.len()];
-    mappings[0] = Mapping::Virtual {
-        copies: processes,
-        child: Box::new(Mapping::Unmapped),
-    };
+    if !shape.is_empty() {
+        mappings[0] = Mapping::Virtual {
+            copies: processes,
+            child: Box::new(Mapping::Unmapped),
+        };
+    }
     Distribution::new(shape.to_vec(), topology, mappings)
 }
 
@@ -32,7 +34,7 @@ fn child_distribution(shape: &[usize], processes: usize, mode: ChildMode) -> Dis
             first.augment_physical(&topology, 0);
             first.augment_virtual(processes * 2);
             let mut mappings = vec![Mapping::Unmapped; shape.len()];
-            mappings[0] = first;
+            if !shape.is_empty() { mappings[0] = first; }
             Distribution::new(shape.to_vec(), topology, mappings)
         }
     }
@@ -86,7 +88,7 @@ fn exercise_group<A, F, G, C>(
         assert!(child.is_none());
     }
 
-    for shape in [vec![3, 2], vec![1]] {
+    for shape in [vec![3, 2], vec![1], vec![0, 2], vec![]] {
         let parent_distribution = if parent_replicated {
             replicated_distribution(&shape, world_size)
         } else {
