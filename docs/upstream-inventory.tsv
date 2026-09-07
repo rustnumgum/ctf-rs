@@ -99,7 +99,7 @@ src/contraction/contraction_plan.h	src/planning.rs	partial: executable explicit-
 src/contraction/contraction_selector.h	src/contraction	pending
 src/contraction/contraction_signature.cxx	src/planning.rs	partial: dense structural signature and context-scoped cache; sparse/symmetry signatures pending
 src/contraction/contraction_signature.h	src/planning.rs	partial: dense structural signature, full collision-safe equality
-src/contraction/contraction.cxx	src/folding.rs; src/planning.rs; src/selector.rs	partial: full NS fold ordering/BLAS execution, explicit-grid plans and candidate selection; automatic/general/symmetric planning pending
+src/contraction/contraction.cxx	src/folding.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs	partial: NS fold/BLAS and explicit packed canonical tensor execution with aligned physical/virtual mapping; automatic selection and symmetric orbit orchestration pending
 src/contraction/contraction.h	src/contraction	pending
 src/contraction/ctr_2d_general.cxx	src/contraction	pending
 src/contraction/ctr_2d_general.h	src/contraction	pending

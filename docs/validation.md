@@ -818,3 +818,15 @@ No failures/retries; DIGIT / PASS. Existing passing f64 numerical fixtures were
 not rerun. The new target compiled and linked once on Windows GNU; native MPI
 runtime acceptance is still pending. These tests do not add a study of
 higher-order fractional coincidence corrections.
+
+## Tensor-connected packed contraction (2026-09-07)
+
+distributed_canonical_contraction passed once at each of 1/2/4 WSL MPI ranks,
+world and parity contexts. Exact i64 fixtures cover physical mapping on a
+reduced index (root Reduce), mapping output indices (input broadcasts, including
+a 2x2 grid), equalized symmetric virtual phases, nonuniform padded extents and
+empty local slices, packed SY Hadamard/dot products, AS structural holes, and
+restoration of the original output mapping. No failures/retries; DIGIT / PASS,
+tolerance zero. The new target compiled and linked once on Windows GNU.
+No symmetry overcount factors or full semantic symmetric contraction are
+claimed by these canonical tests; native runtime acceptance is still pending.

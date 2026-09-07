@@ -694,3 +694,23 @@ The source recursion, transpose tasks and coincidence-surface formula are
 unchanged. Algebra and element cloning follows ownership needs, with no Copy
 requirement on custom elements. Full cross-group diagonal semantics and source
 higher-order coincidence limitations remain separate from this scalar extension.
+
+## Explicit mapped packed tensor contraction (2026-09-07)
+
+src/symmetric_contract_tensor.rs connects compressed tensors to the existing
+packed sequential/virtual/replication kernels. contract_canonical_on takes an
+explicit topology and one union index label per physical axis, aligns preserved
+symmetric indices, then applies source coordinate_symmetry to the union mapping
+table. Each operand is redistributed into its mapped compressed layout. Missing
+operand dimensions use explicit topology-fiber broadcasts; missing output
+dimensions use root Reduce. Canonical output owners restore the original
+destination distribution through indexed writes. Temporary fibers are closed
+explicitly and tensor destruction does not communicate.
+
+This route does not substitute sparse contraction or a globally gathered dense
+tensor. Replicated local operands/output buffers follow the original replication
+layer. It remains a canonical operation: unique operand labels and positive
+aligned sign are required; upper-layer orbit expansion, overcounting factors,
+diagonal preprocessing and automatic physical-label selection are not supplied
+by this method. Current key-based redistribution is not a claim that all
+optimized source redistribution kernels have been ported.

@@ -287,3 +287,8 @@ harness = false
 name = "distributed_sy_scalars"
 path = "tests/distributed_sy_scalars.rs"
 harness = false
+
+[[test]]
+name = "distributed_canonical_contraction"
+path = "tests/distributed_canonical_contraction.rs"
+harness = false
