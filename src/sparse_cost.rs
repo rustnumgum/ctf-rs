@@ -17,6 +17,48 @@ pub struct Fractions {
     pub c: f64,
 }
 
+impl Fractions {
+    /// `calc_nnz_frac` / `estimate_output_nnz_frac` in the original layouts.
+    /// `None` denotes dense storage; sparse counts include stored zeros but
+    /// exclude physical replicas. Collecting those counts is explicitly the
+    /// caller's responsibility, not a hidden collective in this model helper.
+    pub fn from_layouts(
+        distributions: [&crate::mapping::Distribution; 3],
+        indices: [&str; 3],
+        nonzeros: [Option<u64>; 3],
+        output_fraction: Option<f64>,
+    ) -> Self {
+        let signature = crate::planning::Signature::new(
+            distributions, indices, distributions[0].topology.clone(),
+        );
+        let stored: [f64; 3] = std::array::from_fn(|operand| {
+            nonzeros[operand].map_or(1., |nnz| {
+                let ranks: usize = distributions[operand].mappings.iter()
+                    .map(crate::mapping::Mapping::physical_phase).product();
+                1.0f64.min(nnz as f64 / distributions[operand].local_len() as f64 / ranks as f64)
+            })
+        });
+        let output = output_fraction.unwrap_or_else(|| {
+            if nonzeros[2].is_none() { return 1.; }
+            let maps = signature.indices();
+            let mut seen = Vec::new();
+            let mut contracted = 1usize;
+            for operand in 0..2 {
+                for (axis, label) in maps[operand].iter().enumerate() {
+                    if !maps[2].contains(label) && !seen.contains(label) {
+                        seen.push(*label);
+                        contracted *= distributions[operand].shape[axis];
+                    }
+                }
+            }
+            1.0f64.min(stored[2].max(stored[0] * stored[1] * contracted as f64))
+        });
+        let fractions = Self { a: stored[0], b: stored[1], c: 1.0f64.min(output) };
+        assert!(fractions.a >= 0. && fractions.b >= 0. && fractions.c >= 0.);
+        fractions
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Storage {
     pub sparse: bool,

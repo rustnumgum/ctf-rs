@@ -19,6 +19,25 @@ fn unchanged_and_equal_phase_block_reshuffle(){
     let cost=redist_cost::dense(&old,&new,8,&models);assert_eq!(cost.seconds,48.);assert_eq!(cost.temporary_bytes,48);
 }
 #[test]
+fn sparse_uses_pair_workspace_and_truncated_element_traffic(){
+    let mut models=models();
+    models.get_mut("spredist_mdl").set_coefficients(&[1.,2.,3.]);
+    let topology=Topology::new(vec![2,2]);
+    let mut i=Mapping::Unmapped;let mut j=Mapping::Unmapped;
+    i.augment_physical(&topology,0);j.augment_physical(&topology,1);
+    let old=Distribution::new(vec![3,5],topology.clone(),vec![i.clone(),j.clone()]);
+    let new=Distribution::new(vec![3,5],topology,vec![j,i]);
+    assert!(redist_cost::can_block_reshuffle(&old,&new));
+    let unchanged=redist_cost::sparse(&old,&old,8,16,0.23,&models);
+    assert_eq!(unchanged.seconds,0.);assert_eq!(unchanged.temporary_bytes,0);
+    // max local size=6: time traffic trunc(8*6*.23)=11, workspace
+    // trunc(16*6*.23*2)=44. Equal phases still use spredist_mdl.
+    let cost=redist_cost::sparse(&old,&new,8,16,0.23,&models);
+    assert_eq!(cost.seconds,71.);assert_eq!(cost.temporary_bytes,44);
+    let empty=redist_cost::sparse(&old,&new,8,16,0.,&models);
+    assert_eq!(empty.seconds,5.);assert_eq!(empty.temporary_bytes,0);
+}
+#[test]
 fn unfolded_total_keeps_source_output_roundtrip_and_memory_rule(){
     let models=models();
     for(shape,seconds,resident,temporary,memory)in[(vec![2],520.,192,408,600),(vec![2,2],636.,96,252,348)]{

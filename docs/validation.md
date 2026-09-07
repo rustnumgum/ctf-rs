@@ -1,5 +1,24 @@
 # Validation evidence
 
+## Sparse density/redistribution estimates and Jacobi (2026-09-08)
+
+redist_cost (three tests) and sparse_cost (four tests) passed once in WSL.
+New checks use exact representable density/model values and integer workspace
+counts, including physical replicas, explicit output-density override, equal
+phase sparse redistribution, fractional-byte truncation and empty sparse input.
+upstream_jacobi passed once at WSL 1/2/4 ranks with world/parity contexts.
+It preserves source residual stopping <1e-4 (maximum 100 iterations) and final
+dense/sparse solution difference norm <=1e-6; residuals must be finite.
+N=3 and a rank-local MT stream are explicit bounded-fixture adaptations.
+All three targets compiled/linked on Windows GNU; no native MPI runtime pass
+is claimed. DIGIT / PASS; no additional precision verification.
+
+The subsequently completed sparse_mapped_cost assembly passed its three local
+WSL checks once and compiled/linked on Windows GNU. Exact model coefficients
+check tree order, panel strides, virtual factors, recursive time/workspace and
+redistribution totals. These are metadata/formula checks, not a claim of
+automatic sparse candidate execution or measured peak memory.
+
 ## Sparse plan reuse and spectral element (2026-09-08)
 
 distributed_sparse_plan, upstream_spectral_element, distributed_sparse_general

@@ -53,8 +53,8 @@ src/shared/util.h	src/shared	pending
 src/interface/back_comp.h	src/interface	pending
 src/interface/common.cxx	src/random.rs	partial: exact MT19937-64 engine and get_rand48 interval conversion; remaining common runtime helpers pending
 src/interface/common.h	src/interface	pending
-src/interface/decomposition.cxx	src/interface	pending
-src/interface/decomposition.h	src/interface	pending
+src/interface/decomposition.cxx	src/tensor_svd.rs; src/reshape.rs	incomplete upstream HoSVD class and excluded C++ expression machinery, not a working class API to port; indexed tensor SVD exists; working examples/hosvd.cxx algorithm remains pending separately
+src/interface/decomposition.h	Rust direct tensor/matrix APIs	unfinished upstream HoSVD declaration and excluded expression interface; see docs/coverage.md
 src/interface/flop_counter.cxx	src/interface	pending
 src/interface/fun_term.cxx	src/interface	pending
 src/interface/fun_term.h	src/interface	pending
@@ -99,7 +99,7 @@ src/contraction/contraction_plan.h	src/planning.rs	partial: executable explicit-
 src/contraction/contraction_selector.h	src/contraction	pending
 src/contraction/contraction_signature.cxx	src/planning.rs; src/sparse_contract_general.rs	partial: dense and NS sparse-A/dense-B/dense-C structural grid-plan reuse and context-scoped cache; compressed symmetry and automatic sparse candidate assembly pending
 src/contraction/contraction_signature.h	src/planning.rs	partial: dense structural signature, full collision-safe equality
-src/contraction/contraction.cxx	src/folding.rs; src/sparse_fold.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs; src/normal_mapping.rs; src/mapping_variants.rs; src/dense_search.rs; src/dense_execution.rs	partial: dense folded/unfolded normal/exhaustive cached selection and raw execution, f64 node-aware and generic/folded low-memory ownership, sparse input-only reduction, ordinary sparse-output storage dispatch with source zero-retention/operand-swap quirks, and explicit symmetry/custom-function orchestration; full automatic sparse/compressed plans pending
+src/contraction/contraction.cxx	src/folding.rs; src/sparse_fold.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs; src/normal_mapping.rs; src/mapping_variants.rs; src/dense_search.rs; src/dense_execution.rs; src/sparse_mapped_cost.rs; src/sparse_cost.rs; src/redist_cost.rs	partial: dense folded/unfolded normal/exhaustive cached selection and raw execution, node-aware and generic/folded low-memory ownership, sparse input-only reduction, ordinary sparse-output dispatch and explicit symmetry/custom functions; source original-layout density/output-fill estimate, sparse redistribution cost, raw unfolded sparse-A pin/replication/panel/virtual/k0 cost assembly; full automatic sparse/compressed selection/execution pending
 src/contraction/contraction.h	src/contraction	pending
 src/contraction/ctr_2d_general.cxx	src/ctr_2d.rs; src/mapped_cost.rs; src/plan_cost.rs; src/dense_execution.rs	partial: raw NS generic semiring and selected f64 folded nested panel execution; sparse integration pending
 src/contraction/ctr_2d_general.h	src/contraction	pending
@@ -219,7 +219,7 @@ examples/fft.cxx	tests/upstream/examples/fft.rs	pending
 examples/force_integration_sparse.cxx	tests/upstream/examples/force_integration_sparse.rs	pending
 examples/force_integration.cxx	tests/upstream/examples/force_integration.rs	pending
 examples/hosvd.cxx	tests/upstream/examples/hosvd.rs	pending
-examples/jacobi.cxx	tests/upstream/examples/jacobi.rs	pending
+examples/jacobi.cxx	tests/upstream_jacobi.rs	ported: dense/sparse Jacobi iterations, residual stopping <1e-4 and final solution difference norm <=1e-6; bounded N=3 and explicit MT stream; WSL 1/2/4 world/parity passed; native compile/link only
 examples/Makefile	Cargo/build tooling	replaced
 examples/matmul.cxx	tests/upstream/examples/matmul.rs	pending
 examples/mis.cxx	tests/upstream/examples/mis.rs	pending

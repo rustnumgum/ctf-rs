@@ -93,6 +93,7 @@ mpi_tests+=(upstream_sssp)
 mpi_tests+=(distributed_mixed_coo)
 mpi_tests+=(upstream_strassen)
 mpi_tests+=(distributed_sparse_plan upstream_spectral_element)
+mpi_tests+=(upstream_jacobi)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
@@ -106,6 +107,7 @@ cargo test --lib symmetric_reshuffle
 cargo test --lib sparse_virtual
 cargo test --test narrow_algebra
 cargo test --test sparse_cost
+cargo test --test sparse_mapped_cost
 cargo test --test sparse_keys
 cargo test --test sparse_coo
 cargo test --test mixed_kernel

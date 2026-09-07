@@ -13,6 +13,25 @@ fn storage(sparse:bool,pair_size:usize,dense_virtual_size:usize)->Storage {
     Storage { sparse,element_size:2,pair_size,dense_virtual_size,custom_addition:false }
 }
 #[test]
+fn original_layout_fractions_and_output_fill_estimate() {
+    use ctf::mapping::{Distribution,Mapping,Topology};
+    let topology=Topology::new(vec![2,2]);
+    let mut physical=Mapping::Unmapped;physical.augment_physical(&topology,0);
+    let a=Distribution::new(vec![4,4],topology.clone(),vec![physical.clone(),Mapping::Unmapped]);
+    let b=Distribution::new(vec![4,4],topology.clone(),vec![physical.clone(),Mapping::Unmapped]);
+    let c=Distribution::new(vec![4,4],topology,vec![physical,Mapping::Unmapped]);
+    let layouts=[&a,&b,&c];
+    // Physical replicas do not dilute density: 4/(local 8 * mapped ranks 2).
+    let f=Fractions::from_layouts(layouts,["ik","kj","ij"],[Some(4),Some(4),Some(0)],None);
+    assert_eq!(f,Fractions{a:0.25,b:0.25,c:0.25});
+    let old=Fractions::from_layouts(layouts,["ik","kj","ij"],[Some(4),Some(4),Some(12)],None);
+    assert_eq!(old.c,0.75);
+    let explicit=Fractions::from_layouts(layouts,["ik","kj","ij"],[Some(4),None,Some(0)],Some(0.125));
+    assert_eq!(explicit,Fractions{a:0.25,b:1.,c:0.125});
+    let dense=Fractions::from_layouts(layouts,["ik","kj","ij"],[Some(0),Some(0),None],None);
+    assert_eq!(dense.c,1.);
+}
+#[test]
 fn two_dimensional_payload_memory_and_layers() {
     let m=models(); let f=Fractions { a:0.125,b:0.25,c:0.0625 };
     let mut level=TwoDimensional { edge:4,

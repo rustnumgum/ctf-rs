@@ -32,8 +32,8 @@ csrred_mdl even for custom addition, retaining the pinned source selection.
 The 2D child time is estimated at one layer before multiplying by
 edge/min(layers,edge). Replication retains the parent's layer count; virtual
 execution multiplies child time by the product of virtual dimensions.
-Callers supply these child estimates explicitly rather than using another
-backend or plan-tree framework.
+The standalone layer APIs accept child estimates explicitly. The raw-mapping
+builder below now assembles these source layers without a backend framework.
 
 Resident and temporary costs retain the source's distinct conditions:
 sparse input copies for moving/strided 2D panels, three sparse output buffers,
@@ -45,3 +45,45 @@ the virtual layer, which simply adds its source integer-index bookkeeping.
 These estimates are source heuristics, not measured Rust peak memory or
 guaranteed runtime. Automatic sparse candidate-plan cost attachment remains
 unfinished; no performance ratio is claimed from a prediction.
+
+## Original-layout density and redistribution
+
+`Fractions::from_layouts` ports contraction.cxx:211-242,2620-2629. Sparse
+counts are divided by padded local size and the product of physical mapping
+phases, not by all context ranks (which can include replicas). Counts include
+stored zeros. The caller provides globally counted canonical entries explicitly.
+For sparse C the source estimate is the larger of existing density and
+A-density * B-density * contracted-label volume, capped at one. A user output
+fraction overrides that estimate before the final cap. Dense storage defaults
+to density one. This does not evaluate tensor values or communicate implicitly.
+
+`redist_cost::sparse` ports untyped_tensor.cxx:25-28,3196-3245, with the same
+outer unchanged-mapping preflight as the existing dense API. Sparse storage
+never uses block reshuffling, even at equal phases. Model traffic truncates
+element_size * max(old_size,new_size) * fraction before multiplying by log2(np);
+temporary memory truncates pair_size * max_size * fraction * 2 afterward.
+Neither formula is a measured allocation count.
+
+## Unfolded raw-mapping assembly
+
+`sparse_mapped_cost::build_unfolded` constructs the source sequence from actual
+distributions: key pinning, missing-axis replication, shared-index 2D panels,
+residual virtual blocks, and the general k0 leaf. Sparse mutable panel state
+counts virtual blocks; dense state counts elements. The builder retains physical
+head phases, source operand orientation, outer/inner strides, and LCM panel
+edges. It accepts preflight-valid mismatched shared mappings, not only aligned
+GridPlan layouts. Its scope is NS unique-label sparse A with dense B/C; A-only
+labels are rejected as in the executable general recursion.
+
+This is `construct_sparse_ctr(is_inner=false)` (contraction.cxx:3951-4354),
+not folded k1-k5 selection. Folded kernels require their own fold metadata.
+The source comment calling k0 obsolete is not an assertion removing that branch.
+`Plan::estimate_with_redistribution` adds the source changed-input residency,
+sum of redistribution temporaries, output round-trip time, and recursive
+working-memory maximum. It is cost metadata, not another cached execution plan.
+
+Three exact local checks cover aligned replication/virtualization, a normal
+GEMM mapping with mismatched shared axes and sparse panel strides, and the
+supported input boundary. Connecting these estimates to automatic sparse
+normal/exhaustive selection and executing arbitrary selected panel trees
+remains unfinished; passing metadata tests does not prove that integration.

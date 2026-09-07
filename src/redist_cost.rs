@@ -1,6 +1,6 @@
 // Adapted from cc4s tensor/untyped_tensor.cxx and redistribution/{redist,
 // dgtog_redist}.cxx. Copyright (c) 2011, Edgar Solomonik. See LICENSE.
-//! Dense redistribution estimates using the pinned source model branches.
+//! Dense and sparse redistribution estimates using pinned source model branches.
 
 use crate::{cost::Models, mapping::Distribution};
 
@@ -74,5 +74,34 @@ pub fn dense(
             ]),
             temporary_bytes: bytes + bytes / 2,
         }
+    }
+}
+
+/// Sparse redistribution (`tensor::est_redist_time` / `get_redist_mem`).
+/// The fraction is calculated in the original layout by the contraction caller.
+/// Sparse storage never takes the equal-phase block-reshuffle branch. Source
+/// time uses element bytes; temporary memory uses two key/value-pair buffers.
+pub fn sparse(
+    old: &Distribution,
+    new: &Distribution,
+    element_bytes: usize,
+    pair_bytes: usize,
+    fraction: f64,
+    models: &Models,
+) -> Estimate {
+    assert_eq!(old.shape, new.shape);
+    assert_eq!(old.topology.size(), new.topology.size());
+    if same_mapping(old, new) {
+        return Estimate { seconds: 0., temporary_bytes: 0 };
+    }
+    let size = old.local_len().max(new.local_len());
+    // spredist_est_time takes int64_t, so truncate before multiplying by log2.
+    let bytes = ((element_bytes * size) as f64 * fraction) as usize;
+    let log_processes = (new.topology.size() as f64).log2();
+    Estimate {
+        seconds: models.get("spredist_mdl").estimate(&[
+            1., log_processes, bytes as f64 * log_processes,
+        ]),
+        temporary_bytes: ((pair_bytes * size) as f64 * fraction * 2.) as usize,
     }
 }

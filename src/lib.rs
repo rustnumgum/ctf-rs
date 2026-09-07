@@ -80,3 +80,4 @@ mod sparse_coo;
 pub mod kernel;
 pub mod sparse_matricize;
 pub mod self_mapping;
+pub mod sparse_mapped_cost;

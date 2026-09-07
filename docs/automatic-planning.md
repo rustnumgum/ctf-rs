@@ -228,7 +228,9 @@ Node facts are explicit f64 average peer counts throughout raw/aligned cost
 trees, folded costs, search and node selection. `original_peer_counts` ports
 the source node-boundary average without rounding; cache keys preserve the
 supplied facts' bit patterns. Automatic hardware-node discovery is not yet
-integrated. Sparse node-aware execution remains pending. Logical node partitions in
+integrated. Direct sparse node-aware execution is excluded by the pinned
+`ppn != 1 && !is_sparse()` branch, not an unfinished working CPU capability
+(see source-node-aware-boundary.md). Logical node partitions in
 single-machine tests do not establish multi-node performance.
 
 ## Low-memory folded execution
