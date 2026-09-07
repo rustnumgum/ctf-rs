@@ -932,3 +932,15 @@ after staging changed to canonical-root-only transfer; local passing tests were
 not rerun. Final distributed implementation also passed all required rank counts.
 DIGIT / PASS. Both targets compiled/linked on Windows GNU, and the changed
 distributed staging target was rebuilt; native runtime remains unaccepted.
+
+## General sparse custom-function branch (2026-09-07)
+
+sparse_function and affected sparse_sequential passed once locally (six tests).
+The custom tests cover stored scalar zero, dense zeros, absent structure, exact
+callback count and pinned all-scalar ordinary-multiplication behavior. The
+distributed_sparse_function and affected distributed_sparse_general targets
+passed once at 1/2/4 WSL ranks, world/parity, with exact i64 values. The supported
+custom path uses scalar A, alpha=one, mapped B/C shared label and C-only output;
+unsupported source custom branches are not presented as accepted capability.
+DIGIT / PASS; no failures or extra numerical runs. All four targets compiled and
+linked once on Windows GNU. Native runtime acceptance remains outstanding.

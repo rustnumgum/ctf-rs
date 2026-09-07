@@ -100,16 +100,11 @@ where
     values
 }
 
-impl<A: Semiring + Clone> Tensor<'_, '_, A>
-where
-    A::Element: Wire,
-{
-    /// Contract sparse `A` and dense `B` into dense `self` on an explicit
-    /// label-to-topology-axis mapping. Labels are unique within each operand.
-    /// A-only labels are unsupported by the source local sparse recursion;
-    /// labels occurring in only one operand must not be physically mapped.
-    /// Unmapped B-only and C-only labels are traversed locally.
-    pub fn contract_from_sparse_dense_on(
+macro_rules! define_mapped_contraction {
+    ($(#[$attribute:meta])* $name:ident, $kernel:path
+        $(, $function:ident : $function_type:ty)?) => {
+    $(#[$attribute])*
+    pub fn $name(
         &mut self,
         indices_c: &str,
         a: &SparseTensor<'_, '_, A>,
@@ -121,6 +116,7 @@ where
         alpha: A::Element,
         beta: A::Element,
         commutative: bool,
+        $( $function: $function_type, )?
     ) {
         assert!(std::ptr::eq(self.context(), a.context()));
         assert!(std::ptr::eq(self.context(), b.context()));
@@ -224,7 +220,7 @@ where
             self.algebra().zero()
         };
         let shapes: [Vec<usize>; 3] = std::array::from_fn(|operand| mapped[operand].block_shape());
-        crate::sparse_sequential::sequential(
+        ($kernel)(
             self.algebra(),
             &shapes[0],
             indices_a,
@@ -237,6 +233,7 @@ where
             &mut dense_c,
             &alpha,
             &child_beta,
+            $( $function, )?
         );
         for communicator in &communicators[2] {
             communicator.reduce_monoid(self.algebra(), &mut dense_c, commutative, 0);
@@ -262,4 +259,32 @@ where
         self.transform(|_, value| *value = zero.clone());
         self.write_add(&contributions);
     }
+    };
+}
+
+impl<A: Semiring + Clone> Tensor<'_, '_, A>
+where
+    A::Element: Wire,
+{
+    define_mapped_contraction!(
+        /// Contract sparse `A` and dense `B` into dense `self` on an explicit
+        /// label-to-topology-axis mapping. Labels are unique within each operand.
+        /// A-only labels are unsupported by the source local sparse recursion;
+        /// labels occurring in only one operand must not be physically mapped.
+        /// Unmapped B-only and C-only labels are traversed locally.
+        contract_from_sparse_dense_on,
+        crate::sparse_sequential::sequential
+    );
+
+    define_mapped_contraction!(
+        /// Apply a custom bivariate function to each stored sparse-A/dense-B
+        /// pair on an explicit label-to-topology-axis mapping. Missing sparse A
+        /// keys are not evaluated; stored zeros and dense B zeros are evaluated.
+        /// The pinned general sparse kernel permits custom evaluation only for
+        /// scalar A with a non-scalar union and unit alpha. Its all-scalar branch
+        /// retains ordinary multiplication rather than invoking the function.
+        contract_from_sparse_dense_function_on,
+        crate::sparse_sequential::sequential_function,
+        function: impl Fn(&A::Element, &A::Element) -> A::Element
+    );
 }

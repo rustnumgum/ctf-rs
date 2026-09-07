@@ -848,3 +848,17 @@ Only canonical reduced output owners restore the original C distribution. There
 is no full tensor gather, dense expansion of A, or contraction-then-broadcast C
 substitute. Source 2D sparse and virtual plan assembly, automatic mapping, and
 other general sparse storage combinations remain separate pending paths.
+
+## Pinned general sparse custom-function branch
+
+sequential_function and contract_from_sparse_dense_function_on retain the actual
+sp_seq_ctr.cxx custom branch, rather than supplying an algebraically broader
+replacement. At the lowest normalized label, custom evaluation is implemented
+only when A has no axis there (scalar A under source A-first label normalization)
+and alpha is the multiplicative identity. The function result is accumulated as
+old_C + f(A,B), following Bivar_Function::acc_f. Stored scalar zero is evaluated;
+an absent sparse scalar performs no calls. The all-scalar branch instead performs
+ordinary multiplication, ignores the function and retains right-beta ordering.
+Other reached custom branches assert in the fixed source. Folded custom kernels
+and their high-level dispatch are separate working CPU paths still to be ported.
+No distributivity is inferred for a user function and no pre-reduction is added.

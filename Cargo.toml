@@ -352,3 +352,12 @@ path = "tests/sparse_sequential.rs"
 name = "distributed_sparse_general"
 path = "tests/distributed_sparse_general.rs"
 harness = false
+
+[[test]]
+name = "sparse_function"
+path = "tests/sparse_function.rs"
+
+[[test]]
+name = "distributed_sparse_function"
+path = "tests/distributed_sparse_function.rs"
+harness = false

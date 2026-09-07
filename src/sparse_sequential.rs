@@ -89,15 +89,14 @@ fn label_offsets(labels: &[u8], shape: &[usize], indices: &str) -> Vec<usize> {
     }).collect()
 }
 
-fn recurse<A: Semiring>(
-    algebra: &A,
+fn recurse<E, F: Fn(&E, &E, &mut E)>(
     plan: &Plan,
     level: Option<usize>,
     index: &mut [usize],
-    a: &[(usize, A::Element)],
-    b: &[A::Element],
-    c: &mut [A::Element],
-    alpha: &A::Element,
+    a: &[(usize, E)],
+    b: &[E],
+    c: &mut [E],
+    update: &F,
 ) {
     if a.is_empty() {
         return;
@@ -108,9 +107,7 @@ fn recurse<A: Semiring>(
         let offset_c: usize = index.iter().zip(&plan.offsets_c)
             .map(|(&coordinate, &stride)| coordinate * stride).sum();
         for (_, value_a) in a {
-            let product = algebra.multiply(value_a, &b[offset_b]);
-            let scaled = algebra.multiply(&product, alpha);
-            c[offset_c] = algebra.add(&scaled, &c[offset_c]);
+            update(value_a, &b[offset_b], &mut c[offset_c]);
         }
         return;
     };
@@ -126,13 +123,13 @@ fn recurse<A: Semiring>(
                 end += 1;
             }
             index[label] = coordinate;
-            recurse(algebra, plan, next, index, &a[start..end], b, c, alpha);
+            recurse(plan, next, index, &a[start..end], b, c, update);
             start = end;
         }
     } else {
         for coordinate in 0..plan.dimensions[label] {
             index[label] = coordinate;
-            recurse(algebra, plan, next, index, a, b, c, alpha);
+            recurse(plan, next, index, a, b, c, update);
         }
     }
 }
@@ -187,6 +184,76 @@ pub fn sequential<A: Semiring>(
     }
 
     let mut index = vec![0; plan.dimensions.len()];
-    recurse(algebra, &plan, plan.dimensions.len().checked_sub(1), &mut index,
-        a, b, c, alpha);
+    recurse(&plan, plan.dimensions.len().checked_sub(1), &mut index, a, b, c,
+        &|value_a, value_b, output| {
+            let product = algebra.multiply(value_a, value_b);
+            let scaled = algebra.multiply(&product, alpha);
+            *output = algebra.add(&scaled, output);
+        });
+}
+
+/// Custom-function branch of the pinned sparse sequential kernel. The source
+/// can reach `func->acc_f` only when A is scalar and the global index space is
+/// nonempty, and then only with multiplicative-identity alpha. Accumulation is
+/// `old_C + function(A, B)`. The all-scalar source branch does not invoke the
+/// custom function at all; it uses ordinary semiring multiplication and retains
+/// the scalar right-beta ordering.
+pub fn sequential_function<
+    A: Semiring,
+    F: Fn(&A::Element, &A::Element) -> A::Element,
+>(
+    algebra: &A,
+    shape_a: &[usize],
+    indices_a: &str,
+    a: &[(usize, A::Element)],
+    shape_b: &[usize],
+    indices_b: &str,
+    b: &[A::Element],
+    shape_c: &[usize],
+    indices_c: &str,
+    c: &mut [A::Element],
+    alpha: &A::Element,
+    beta: &A::Element,
+    function: F,
+) {
+    let plan = Plan::new(shape_a, indices_a, shape_b, indices_b, shape_c, indices_c);
+    let length_a = checked_len(shape_a);
+    assert_eq!(b.len(), checked_len(shape_b));
+    assert_eq!(c.len(), checked_len(shape_c));
+    for pair in a.windows(2) {
+        assert!(pair[0].0 < pair[1].0, "sparse A keys must be strictly increasing");
+    }
+    assert!(a.iter().all(|(key, _)| *key < length_a));
+
+    if plan.dimensions.is_empty() {
+        assert_eq!(a.len(), 1);
+        let product = algebra.multiply(&a[0].1, &b[0]);
+        let scaled = algebra.multiply(&product, alpha);
+        let previous = algebra.multiply(&c[0], beta);
+        c[0] = algebra.add(&scaled, &previous);
+        return;
+    }
+
+    let one = algebra.one();
+    if beta != &one {
+        let zero = algebra.zero();
+        if beta == &zero {
+            c.fill(zero);
+        } else {
+            for value in c.iter_mut() {
+                *value = algebra.multiply(beta, value);
+            }
+        }
+    }
+
+    let mut index = vec![0; plan.dimensions.len()];
+    recurse(&plan, plan.dimensions.len().checked_sub(1), &mut index, a, b, c,
+        &|value_a, value_b, output| {
+            assert!(indices_a.is_empty(),
+                "source custom sparse sequential kernel requires scalar A");
+            assert!(alpha == &one,
+                "source custom sparse sequential kernel requires identity alpha");
+            let value = function(value_a, value_b);
+            *output = algebra.add(output, &value);
+        });
 }
