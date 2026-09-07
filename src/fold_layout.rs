@@ -3,6 +3,9 @@
 //! Local tensor::fold metadata. This does not transpose or alias tensor storage.
 use crate::symmetry::{Layout,Symmetry};
 
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub enum Direction { Forward, Backward }
+
 #[derive(Clone,Debug,PartialEq,Eq)]
 pub struct FoldLayout {
     /// Packed lengths of every original adjacent symmetry group.
@@ -41,5 +44,27 @@ impl FoldLayout {
         let mut sorted=order.to_vec();sorted.sort_unstable();assert_eq!(sorted,(0..order.len()).collect::<Vec<_>>());
         let old=self.inner_ordering[..order.len()].to_vec();
         for(i,&axis)in order.iter().enumerate(){self.inner_ordering[i]=old[axis];}
+    }
+
+    /// Source nosym_transpose over each local virtual block. Compressed groups
+    /// remain packed dimensions; neither direction expands their symmetry.
+    /// Data is owned independently rather than sharing CTF's raw alias pointers.
+    pub fn transpose<T:Clone>(&self,data:&[T],virtual_blocks:usize,direction:Direction)->Vec<T>{
+        let block:usize=self.group_lengths.iter().product();
+        assert_eq!(data.len(),block*virtual_blocks);
+        let mut strides=vec![0;self.group_lengths.len()];let mut stride=1;
+        let identity:Vec<_>=(0..self.group_lengths.len()).collect();
+        let (source_order,destination_order)=match direction{
+            Direction::Forward=>(identity.as_slice(),self.inner_ordering.as_slice()),
+            Direction::Backward=>(self.inner_ordering.as_slice(),identity.as_slice()),
+        };
+        for &axis in source_order{strides[axis]=stride;stride*=self.group_lengths[axis];}
+        (0..data.len()).map(|offset|{
+            let base=offset/block*block;let mut remainder=offset%block;let mut source=base;
+            for &axis in destination_order{
+                source+=(remainder%self.group_lengths[axis])*strides[axis];
+                remainder/=self.group_lengths[axis];
+            }data[source].clone()
+        }).collect()
     }
 }

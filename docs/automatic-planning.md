@@ -57,6 +57,14 @@ selected rec_tsr shape and index IDs, and selected-first inner ordering. Its
 permutation changes only the selected prefix. These metadata stages do not yet
 transpose distributed packed storage or execute partially folded contractions.
 
+FoldLayout::transpose now converts owned local storage forward/backward for each
+virtual block, treating compressed symmetry groups as packed dimensions rather
+than expanding them. partial_fold::select composes eligibility, packed group
+layouts and all six source permutations using full local group lengths, including
+the residual/unfolded dimensions in transpose costs. Its descriptor exposes the
+packed lnmk parameters, transpose flags and selected storage ordering. The source
+partially folded local kernel and distributed folded execution are still pending.
+
 ## Executable inner cost tree now connected
 
 GridPlan::cost_tree derives the aligned unfolded dense execution tree from the

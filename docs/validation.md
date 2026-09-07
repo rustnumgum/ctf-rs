@@ -1057,6 +1057,18 @@ No floating-point computation or MPI execution is introduced by these modules,
 so no old MPI/numerical suite was rerun. Both targets compiled/linked once on
 Windows GNU. Full partial/symmetric folded execution remains unaccepted.
 
+## Partial fold descriptors and packed storage conversion (2026-09-07)
+
+partial_fold and fold_storage passed five exact local WSL tests. Forward and
+backward conversions cover independent virtual blocks, packed SY/AS groups,
+non-Copy String elements, scalar and zero-size storage. Partial NS selection
+includes the residual x dimension of xik/kj/ij in its source transpose cost
+(permutation1, [24,0,0]) and verifies the resulting storage offsets. SY/AS/SH
+contracted pairs produce packed k lengths 6/3/3 with unchanged zero-cost layouts.
+No failures, floating-point studies or old MPI reruns. Both targets compiled and
+linked on Windows GNU. These are local fold/storage stages, not proof of complete
+partial-folded contraction execution.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each

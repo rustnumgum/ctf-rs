@@ -485,3 +485,11 @@ path = "tests/fold_indices.rs"
 [[test]]
 name = "fold_layout"
 path = "tests/fold_layout.rs"
+
+[[test]]
+name = "fold_storage"
+path = "tests/fold_storage.rs"
+
+[[test]]
+name = "partial_fold"
+path = "tests/partial_fold.rs"

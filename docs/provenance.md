@@ -1064,3 +1064,12 @@ are rejected separately. fold_layout.rs adapts tensor::fold
 sy_packed_size is evaluated per adjacent symmetry group, and selection uses the
 terminal label. Folded index IDs are positions in the global fold list. No alias
 buffer lifetime, local transpose or implicit unfolding is invented by this stage.
+
+FoldLayout::transpose implements the ownership-based local storage conversion
+needed by nosym_transpose/tensor folding: virtual blocks remain independent,
+symmetry groups stay packed, and backward conversion restores original group
+order. partial_fold.rs composes get_fold_ctr/select_ctr_perm/map_fold metadata
+(contraction.cxx:701-1030). Full group lengths, selected-prefix permutations and
+residual groups participate in estimates; group-terminal fold-index holes remain
+explicit and are never converted to fictitious dimensions. Role membership is
+independent of role order; transpose cost addition retains source role order.
