@@ -993,6 +993,19 @@ bytes; these are model checks, not measured seconds. The 2x2 inner estimate is
 units/272 bytes. No failures or extra precision checks. Both new targets compiled
 and linked once on Windows GNU; native MPI execution remains pending.
 
+## Collective dense-unfolded search (2026-09-07)
+
+dense_search passed once at WSL 1/2/4 ranks, world/parity. A test-only serial
+reference collects the rank-partitioned candidate stream and checks exact
+selected namespace/ID/time/memory against production winner-only communication.
+Cases cover time-only and weighted two-pass selection, optional exhaustive
+refinement, source 0.01 cutoff with small synthetic coefficients, and rejection
+when the strict memory limit admits no candidate. Returned layouts also pass
+mapping preflight. All comparisons passed without diagnostic reruns or precision
+studies. Windows GNU compilation/linking passed once; native MPI runtime remains
+pending. These checks validate selection/model logic, not contraction execution
+or performance speedup.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each

@@ -2,6 +2,27 @@
 
 Reference: cc4s CTF f69cbb46e23bc2f39cda5722ce096f56301dab4f.
 
+## Collective raw dense-unfolded search
+
+dense_search::search_dense_unfolded connects source normal and exhaustive
+candidate generation, raw mapping costs, rank-local selection, global winner
+selection and selected-ID reconstruction. It does not constrain candidates to
+GridPlan's aligned maps. Old topologies and catalog topologies have explicitly
+supplied node-count facts; equal topologies must have equal facts.
+
+The normal search first minimizes time. A non-negligible memory weight triggers
+the source second normal pass using the first winner as baseline. Optional
+exhaustive refinement starts only at normal time >= 0.01, uses that normal winner
+as baseline, and is accepted only when its time is strictly lower, even for a
+weighted search. Strict mapped-residency/detailed-memory bounds and INT_MAX local
+element limits precede ranking. Equal scores retain source local order and then
+rank order. Only local winner costs and the winning ID are communicated, not all
+candidate maps or tensor values.
+
+The result is a selected mapping with modeled time/memory, not yet a cached
+executable automatic contraction. Folding, sparse estimates, selection-scan
+diagnostics and the full mapping-to-execution connection remain unfinished.
+
 ## Executable inner cost tree now connected
 
 GridPlan::cost_tree derives the aligned unfolded dense execution tree from the

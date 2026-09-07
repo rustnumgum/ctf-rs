@@ -1015,3 +1015,12 @@ Physical head communicator selection, total-phase LCM step counts, zero stationa
 panel buffers and residual virtual-phase assignment retain source semantics.
 The total estimate adds contraction.cxx:2739-2810 dense unfolded redistribution
 terms. Folded/sparse estimates and actual candidate execution are not claimed.
+
+dense_search.rs connects contraction.cxx:2834-3190 selection with 3280-3342
+two-pass weighting and exhaustive refinement. Early mapped storage is summed as
+double, as in the source's pre-integer-overflow rejection. Normal scores start at
+DBL_MAX; exhaustive scores start at the normal time or normalized zero. Global
+selection gathers one time/memory pair per rank, broadcasts the winner rank and
+ID/cost payload, and rebuilds that ID locally. Full structural topology/node
+facts replace pointer identity. No timing probes or alternate mapping fallback
+are introduced during candidate selection.

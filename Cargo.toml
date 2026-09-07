@@ -458,3 +458,8 @@ harness = false
 [[test]]
 name = "mapped_cost"
 path = "tests/mapped_cost.rs"
+
+[[test]]
+name = "dense_search"
+path = "tests/dense_search.rs"
+harness = false
