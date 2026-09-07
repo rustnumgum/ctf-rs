@@ -108,6 +108,46 @@ where A::Element: Wire {
     col.close();
 }
 
+fn sparse_dense_panels<A: Semiring + Clone>(a: &SparseTensor<'_, '_, A>, b: &Tensor<'_, '_, A>,
+    layout: &Layout, mut child: impl FnMut(&Csr<A::Element>, &[A::Element], usize))
+where A::Element: Wire {
+    let mut a = a.clone();
+    let mut b = b.clone();
+    a.redistribute(layout.distribution(0));
+    b.redistribute(layout.distribution(1));
+    let rank = a.context().rank();
+    let context = a.context();
+    let row = context.split(Some((rank % layout.grid[0]) as i32), rank as i32).unwrap();
+    let col = context.split(Some((rank / layout.grid[0]) as i32), rank as i32).unwrap();
+    let aa = a.local_pairs();
+    let bb = b.local_pairs();
+    for step in 0..layout.phase {
+        let ae = aa.iter().filter_map(|(key, value)| {
+            let i = key % layout.shape[0];
+            let k = key / layout.shape[0];
+            (k % layout.phase == step).then(|| (i / layout.grid[0] + 1,
+                k / layout.phase + 1, value.clone()))
+        }).collect();
+        let a_panel = broadcast(&row, step % layout.grid[1], ae,
+            layout.local[0], layout.local[1]);
+        let mut b_panel = vec![b.algebra().zero(); layout.local[1] * layout.local[2]];
+        if col.rank() == step % layout.grid[0] {
+            for (key, value) in &bb {
+                let k = key % layout.shape[1];
+                let j = key / layout.shape[1];
+                if k % layout.phase == step {
+                    b_panel[k / layout.phase + (j / layout.grid[1]) * layout.local[1]] =
+                        value.clone();
+                }
+            }
+        }
+        col.broadcast(step % layout.grid[0], &mut b_panel);
+        child(&a_panel, &b_panel, step);
+    }
+    row.close();
+    col.close();
+}
+
 impl<A: Semiring + Clone> SparseTensor<'_, '_, A> where A::Element: Wire {
     /// Explicit-grid sparse matrix product, with sparse output throughout.
     pub fn gemm_sparse(&mut self, a: &Self, b: &Self, grid: [usize; 2],
@@ -158,42 +198,71 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A> where A::Element: Wire {
         let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
         let original = self.distribution().clone();
         self.redistribute(layout.distribution(2));
-        let mut a = a.clone();
-        let mut b = b.clone();
-        a.redistribute(layout.distribution(0));
-        b.redistribute(layout.distribution(1));
         let rank = self.context().rank();
-        let context = self.context();
-        let row = context.split(Some((rank % grid[0]) as i32), rank as i32).unwrap();
-        let col = context.split(Some((rank / grid[0]) as i32), rank as i32).unwrap();
-        let aa = a.local_pairs();
-        let bb = b.local_pairs();
         let algebra = self.algebra().clone();
         let one = algebra.one();
         let mut values = self.local_storage().to_vec();
-        for step in 0..layout.phase {
-            let ae = aa.iter().filter_map(|(key, value)| {
-                let i = key % layout.shape[0];
-                let k = key / layout.shape[0];
-                (k % layout.phase == step).then(|| (i / grid[0] + 1, k / layout.phase + 1, value.clone()))
-            }).collect();
-            let a_panel = broadcast(&row, step % grid[1], ae, layout.local[0], layout.local[1]);
-            let mut b_panel = vec![algebra.zero(); layout.local[1] * layout.local[2]];
-            if col.rank() == step % grid[0] {
-                for (key, value) in &bb {
-                    let k = key % layout.shape[1];
-                    let j = key / layout.shape[1];
-                    if k % layout.phase == step {
-                        b_panel[k / layout.phase + (j / grid[1]) * layout.local[1]] = value.clone();
-                    }
-                }
-            }
-            col.broadcast(step % grid[0], &mut b_panel);
+        sparse_dense_panels(a, b, &layout, |a_panel, b_panel, step| {
             a_panel.multiply_dense(layout.local[2], &b_panel, &alpha,
                 if step == 0 { &beta } else { &one }, &mut values, &algebra);
-        }
-        row.close();
-        col.close();
+        });
+        let dist = self.distribution().clone();
+        self.transform(|key, value| *value = values[dist.local_offset(rank, key)].clone());
+        self.redistribute(original);
+    }
+
+    /// Sparse-by-sparse matrix product into dense storage using a custom
+    /// bivariate function. Missing sparse entries are never evaluated.
+    pub fn gemm_sparse_function(
+        &mut self,
+        a: &SparseTensor<'_, '_, A>,
+        b: &SparseTensor<'_, '_, A>,
+        grid: [usize; 2],
+        alpha: A::Element,
+        beta: A::Element,
+        function: impl Fn(&A::Element, &A::Element) -> A::Element,
+    ) {
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
+        let original = self.distribution().clone();
+        self.redistribute(layout.distribution(2));
+        let rank = self.context().rank();
+        let algebra = self.algebra().clone();
+        let one = algebra.one();
+        let mut values = self.local_storage().to_vec();
+        sparse_panels(a, b, &layout, |a_panel, b_panel, step| {
+            crate::sparse_function_kernel::csr_sparse(&algebra, a_panel, b_panel,
+                &mut values, &alpha, if step == 0 { &beta } else { &one }, &function);
+        });
+        let dist = self.distribution().clone();
+        self.transform(|key, value| *value = values[dist.local_offset(rank, key)].clone());
+        self.redistribute(original);
+    }
+
+    /// Sparse-by-dense matrix product into dense storage using a custom
+    /// bivariate function. Stored sparse zeros and all dense values, including
+    /// zeros, are evaluated; absent sparse entries are not.
+    pub fn gemm_sparse_dense_function(
+        &mut self,
+        a: &SparseTensor<'_, '_, A>,
+        b: &Self,
+        grid: [usize; 2],
+        alpha: A::Element,
+        beta: A::Element,
+        function: impl Fn(&A::Element, &A::Element) -> A::Element,
+    ) {
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
+        let original = self.distribution().clone();
+        self.redistribute(layout.distribution(2));
+        let rank = self.context().rank();
+        let algebra = self.algebra().clone();
+        let one = algebra.one();
+        let mut values = self.local_storage().to_vec();
+        sparse_dense_panels(a, b, &layout, |a_panel, b_panel, step| {
+            crate::sparse_function_kernel::csr_dense(&algebra, a_panel, layout.local[2], b_panel,
+                &mut values, &alpha, if step == 0 { &beta } else { &one }, &function);
+        });
         let dist = self.distribution().clone();
         self.transform(|key, value| *value = values[dist.local_offset(rank, key)].clone());
         self.redistribute(original);

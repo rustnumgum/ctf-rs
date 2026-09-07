@@ -862,3 +862,19 @@ ordinary multiplication, ignores the function and retains right-beta ordering.
 Other reached custom branches assert in the fixed source. Folded custom kernels
 and their high-level dispatch are separate working CPU paths still to be ported.
 No distributivity is inferred for a user function and no pre-reduction is added.
+
+## Folded CSR custom functions and distributed panels
+
+sparse_function_kernel.rs ports Bivar_Function::csrmm (functions.h:196-224) and
+csrmultd (227-254), separately from the limited general sparse custom branch.
+The first loops rowA/columnB/stored-A-entry; the second loops rowA/stored-A-entry/
+matching-stored-B-entry. Both accumulate old_C+f(A,B), never evaluate missing
+sparse entries, and preserve explicitly stored zeros. CSR custom dispatch
+requires unit alpha (csr.cxx:135-183). The caller's arbitrary beta is applied
+once as zero-fill or left scaling, following spctr_tsr.cxx:346-353 and 489-500.
+
+gemm_sparse_dense_function and gemm_sparse_function reuse the existing source
+2D panel broadcasts with those kernels. Only the first panel receives caller
+beta; subsequent panels use one. Sparse and dense layouts remain distinct; a
+user function is not disguised as a semiring multiplication implementation.
+Output is restored to its original distribution after panel execution.

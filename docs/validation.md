@@ -944,3 +944,14 @@ custom path uses scalar A, alpha=one, mapped B/C shared label and C-only output;
 unsupported source custom branches are not presented as accepted capability.
 DIGIT / PASS; no failures or extra numerical runs. All four targets compiled and
 linked once on Windows GNU. Native runtime acceptance remains outstanding.
+
+## Folded sparse custom-function GEMM (2026-09-07)
+
+sparse_function_kernel passed its exact-i64 CSR sparse/dense and sparse/sparse
+oracle. distributed_sparse_gemm_function and affected distributed_sparse_gemm
+passed once at 1/2/4 WSL ranks, world/parity. Custom checks use f(a,b)=a+b+1,
+unit alpha and beta=3, explicitly distinguishing sparse stored zeros from missing
+entries and preserving dense zero evaluations. Empty sparse A, padded/empty local
+panels, 2x2 grid at four ranks, and original output distribution are covered.
+DIGIT / PASS; no failures or diagnostic runs. All three targets compiled and
+linked once on Windows GNU; native runtime acceptance remains outstanding.
