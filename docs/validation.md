@@ -966,3 +966,13 @@ Beta=zero retains old-only zero coordinates per pinned sparse summation; beta=3
 scales and merges old entries. Output distribution is unchanged. DIGIT / PASS,
 no failures or extra numerical runs. Both targets compiled/linked on Windows GNU;
 native runtime remains unaccepted.
+
+## High-order sparse custom contraction (2026-09-07)
+
+distributed_sparse_fold_function passed once at 1/2/4 WSL ranks, world/parity,
+with exact i64 values. It covers three storage combinations through A[ikl] and
+B[kjl] into permuted C[jil], plus repeated A[ikkl] and C[jiil]. Stored A/B zeros,
+missing sparse values versus dense zeros, separate l batches, off-diagonal input
+exclusion, output off-diagonal preservation and original distributions are
+checked. DIGIT / PASS; no failures or further precision runs. The target compiled
+and linked once on Windows GNU; native runtime acceptance remains outstanding.

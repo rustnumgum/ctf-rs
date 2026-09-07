@@ -19,6 +19,9 @@ use crate::{
     tensor::Tensor,
 };
 
+#[path = "sparse_fold_function.rs"]
+mod functions;
+
 struct Plan {
     order_a: Vec<usize>,
     order_b: Vec<usize>,

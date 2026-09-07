@@ -892,3 +892,15 @@ on collisions (spr_seq_sum.cxx:235-285). Old-only coordinates remain present wit
 zero values when beta=zero. This ordering is deliberately distinguished from
 both the raw csr_add and existing ordinary sparse GEMM's beta convention.
 No dense m*n intermediate is allocated; symbolic row workspace is O(n).
+
+## Fullyfoldable high-order sparse custom contraction
+
+sparse_fold_function.rs combines the existing source k/m/n/l fold layout with
+the custom CSR kernels, for sparse/sparse-to-sparse, sparse/sparse-to-dense and
+sparse/dense-to-dense operations. It uses the same axis permutations, batch
+slices, mapped panel execution and output distribution restoration as ordinary
+sparse folding. Repeated operand labels are extracted and output diagonals are
+reinserted without modifying off-diagonal values. Projected Plan validation
+occurs before communication. Unit alpha follows custom CSR dispatch. Input-only
+pre-reduction is deliberately not performed for arbitrary functions, whose
+distributivity cannot be assumed; nonfoldable indices remain an explicit error.

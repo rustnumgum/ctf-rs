@@ -58,7 +58,7 @@ src/interface/decomposition.h	src/interface	pending
 src/interface/flop_counter.cxx	src/interface	pending
 src/interface/fun_term.cxx	src/interface	pending
 src/interface/fun_term.h	src/interface	pending
-src/interface/functions.h	src/sparse_function_kernel.rs; src/sparse_gemm.rs	partial: Bivar_Function CSR sparse/dense and sparse/sparse dense/sparse-output kernels with distributed panels; remaining function kernels and high-order dispatch pending
+src/interface/functions.h	src/sparse_function_kernel.rs; src/sparse_gemm.rs; src/sparse_fold_function.rs	partial: Bivar_Function CSR sparse/dense and sparse/sparse dense/sparse-output kernels with distributed panels and fullyfoldable high-order custom dispatch; remaining function kernels and general dense dispatch pending
 src/interface/graph_io_aux.cxx	src/interface	pending
 src/interface/group.h	src/interface	pending
 src/interface/idx_tensor.cxx	src/interface	pending
