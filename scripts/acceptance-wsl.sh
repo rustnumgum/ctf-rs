@@ -88,6 +88,8 @@ mpi_tests+=(upstream_scan)
 mpi_tests+=(distributed_sparse_2d upstream_trace)
 mpi_tests+=(distributed_sparse_2d_dense)
 mpi_tests+=(distributed_sparse_2d_pairs)
+mpi_tests+=(distributed_coo_2d)
+mpi_tests+=(upstream_sssp)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
@@ -102,6 +104,7 @@ cargo test --lib sparse_virtual
 cargo test --test narrow_algebra
 cargo test --test sparse_cost
 cargo test --test sparse_keys
+cargo test --test sparse_coo
 cargo test --test random_generator --test scalar_blas --test node_peer_counts --test folded_cost --test partial_fold_kernel --test fold_storage --test partial_fold --test fold_indices --test fold_layout --test fold_selection --test mapped_cost --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
   --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction \
   --test sparse_formats --test sparse_sequential --test sparse_function --test sparse_function_kernel --test cost_models --test plan_cost --test grid_plan_cost --test redist_cost --test mapping_preflight --test mapping_variants --test topology_canonicalization --test normal_mapping --test symmetry_layout --test sym_indices --test sym_triple --test sym_operations --test folding -- --nocapture

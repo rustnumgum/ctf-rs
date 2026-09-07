@@ -76,3 +76,4 @@ mod sparse_permuted_io;
 pub mod sparse_2d;
 pub mod sparse_cost;
 pub mod sparse_keys;
+mod sparse_coo;

@@ -1,5 +1,31 @@
 # Validation evidence
 
+## Upstream sparse shortest paths (2026-09-07)
+
+upstream_sssp passed once at WSL 1/2/4 ranks, world/parity. It keeps source
+n=7, finite tropical infinity=n*n, min/plus algebra, diagonal infinity and
+strict <5*n sparsification. The integer RNG is explicitly adapted to seeded
+MT19937-64; no cycle edges are reserved or removed before the positive case.
+Source cycle entries are overwritten through write_scaled with one/zero
+coefficients in the tropical algebra, not accumulated with the old edges.
+The ordinary integer SUM of distances must never increase; positive graph
+convergence and injected negative-cycle nonconvergence retain the n+1 limit.
+Source P["ij"] is an order-one indexed term (extra label ignored by C++)
+converted through the default integer ring, not a tropical-min reduction.
+DIGIT / PASS with exact integers. Native compilation/linking passed; Windows
+MPI execution remains blocked by the missing runtime DLL.
+
+## Native COO CPU kernels and 2D execution (2026-09-07)
+
+sparse_coo passed two local WSL tests once after fixing explicit Rust
+PartialEq bounds at compile time. Exact integer checks cover duplicates,
+stored zeros, generic/default beta paths, mixed A/B/C types, order-sensitive
+custom accumulators and empty COO. distributed_coo_2d passed once at WSL
+1/2/4 ranks, world/parity, covering variable COO A broadcasts, dense B
+broadcasts, cyclic output reduction and contiguous/strided dense scatter.
+DIGIT / PASS; no numerical failures or precision studies. Both targets
+compiled/linked once on Windows GNU; missing MPI runtime remains unaccepted.
+
 ## Sparse key pin/depin and mapped production integration (2026-09-07)
 
 sparse_keys passed three local WSL tests once: exact virtual residues,

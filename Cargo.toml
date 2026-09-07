@@ -802,3 +802,13 @@ harness = false
 name = "distributed_sparse_2d_pairs"
 path = "tests/distributed_sparse_2d_pairs.rs"
 harness = false
+
+[[test]]
+name = "distributed_coo_2d"
+path = "tests/distributed_coo_2d.rs"
+harness = false
+
+[[test]]
+name = "upstream_sssp"
+path = "tests/upstream_sssp.rs"
+harness = false

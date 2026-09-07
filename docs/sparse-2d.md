@@ -5,6 +5,8 @@ CSR/CSR/CSR and CCSR/dense/CCSR branches of pinned spctr_2d_general.cxx.
 `execute_csr_dense` and `execute_csr_sparse_dense` cover its folded mixed
 CSR/dense/dense and CSR/CSR/dense branches. Sparse inputs remain CSR; dense
 output uses native MPI Reduce rather than sparse structural reduction.
+`execute_coo_dense` similarly supports the native COO leaf without reordering
+entries or converting to CSR; see sparse-coo.md for its distinct leaf rules.
 `execute_pairs_dense` covers the nonfolded raw sparse-A/dense-B/dense-C
 branch. Each A block is a sorted local-key/value list; byte sizes precede
 the concatenated pair payload. Keys, ordering and explicitly stored zeros

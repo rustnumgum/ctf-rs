@@ -1,5 +1,20 @@
 # Source provenance
 
+tests/upstream_sssp.rs ports examples/sssp.cxx Bellman-Ford, retaining its
+tropical algebra, sparsification, injected negative cycle and integer-SUM
+convergence rule. Scalar conversion follows idx_tensor.cxx index copying and
+term.cxx Term::operator int(), not the tensor's min addition. The n=7 graph
+uses an explicitly seeded MT integer RNG adaptation; no graph edges are
+reserved to simplify the cycle case. Negative-cycle writes use replacement
+coefficients in the source tropical algebra.
+
+src/sparse_coo.rs ports COO default arithmetic, generic semiring and
+Kernel<f,g> CPU paths from interface/{semiring,kernel}.h and sparse_formats/
+coo.cxx. Source alpha/beta restrictions and distinct accumulation orders are
+retained; undefined ordinary Bivar_Function COO dispatch is not fabricated.
+sparse_2d::execute_coo_dense keeps COO entry ordering during panel broadcasts
+and uses the source dense-output reductions. See sparse-coo.md.
+
 src/sparse_keys.rs ports tensor/algstrct.cxx ConstPairIterator::pin and depin,
 including full-phase local radices, virtual/physical residues and conditional
 padding filtering. sparse_contract_general.rs now uses this transform after

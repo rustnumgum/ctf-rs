@@ -463,6 +463,54 @@ fn dense_output_scatter<A: Semiring>(
     }
 }
 
+/// Folded COO/dense/dense source 2D level. COO entry order, duplicates and
+/// stored zeros survive communication unchanged; no CSR conversion is used.
+pub fn execute_coo_dense<A: Semiring>(
+    algebra: &A, edge: usize, layers: Layers,
+    a_plan: Panel<'_, '_>, b_plan: Panel<'_, '_>, c_plan: Panel<'_, '_>,
+    a: &[Coo<A::Element>], b: &[Vec<A::Element>], mut c: Vec<Vec<A::Element>>,
+    beta: A::Element,
+    mut child: impl FnMut(&[Coo<A::Element>], &[Vec<A::Element>], Vec<Vec<A::Element>>,
+        A::Element, Layers) -> Vec<Vec<A::Element>>,
+) -> Vec<Vec<A::Element>> where A::Element: Wire {
+    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
+    let (count,index,next)=schedule(edge,layers);
+    let mut child_beta=beta.clone();
+    for step in (index..edge).step_by(count) {
+        let positions=a_plan.operand_positions(a.len(),step,edge);
+        let mut op_a:Vec<_>=positions.iter().map(|&position|a[position].clone()).collect();
+        if let Some(context)=a_plan.comm { broadcast_sparse(context,step%context.size(),&mut op_a); }
+        let op_b=dense_operand(b_plan,b,step,edge);
+        if let Some(context)=c_plan.comm {
+            let positions=c_plan.operand_positions(c.len(),step,edge);
+            let work=positions.iter().map(|&position|vec![algebra.zero();c[position].len()]).collect();
+            let mut work=child(&op_a,&op_b,work,algebra.zero(),next);
+            assert_eq!(work.len(),positions.len());
+            let owner=step%context.size();
+            for block in &mut work { context.reduce_monoid(algebra,block,false,owner); }
+            if context.rank()==owner { dense_output_scatter(algebra,&positions,work,&mut c,&beta); }
+        } else if c_plan.inner==0 {
+            c=child(&op_a,&op_b,c,child_beta,next);
+            child_beta=algebra.one();
+        } else {
+            let positions=c_plan.operand_positions(c.len(),step,edge);
+            if c_plan.outer==1 {
+                let work=positions.iter().map(|&position|c[position].clone()).collect();
+                let work=child(&op_a,&op_b,work,beta.clone(),next);
+                assert_eq!(work.len(),positions.len());
+                for (position,block) in positions.into_iter().zip(work) {
+                    assert_eq!(block.len(),c[position].len()); c[position]=block;
+                }
+            } else {
+                let work=positions.iter().map(|&position|vec![algebra.zero();c[position].len()]).collect();
+                let work=child(&op_a,&op_b,work,algebra.zero(),next);
+                dense_output_scatter(algebra,&positions,work,&mut c,&beta);
+            }
+        }
+    }
+    c
+}
+
 /// Execute the source sparse-A/dense-B/dense-C 2D level. Dense output panels
 /// are reduced directly to their cyclic owners; no sparse input is converted to
 /// dense storage. The callback is the next contraction level or native folded

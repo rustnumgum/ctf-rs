@@ -2,7 +2,7 @@ source	rust_destination	status
 src/Makefile	Cargo/build tooling	replaced
 src/sparse_formats/ccsr.cxx	src/sparse_formats.rs	partial: row encoding, partition/assemble, addition; local exact tests pass
 src/sparse_formats/ccsr.h	src/sparse_formats	pending
-src/sparse_formats/coo.cxx	src/sparse_formats	pending
+src/sparse_formats/coo.cxx	src/sparse_formats.rs; src/sparse_coo.rs; src/sparse_2d.rs	partial: native default/generic/Kernel COO dense-output leaves and explicit order-preserving 2D panels, duplicate/stored-zero behavior; remaining format responsibilities and automatic selection pending
 src/sparse_formats/coo.h	src/sparse_formats	pending
 src/sparse_formats/csr.cxx	src/sparse_formats.rs	partial: partition/assemble, addition; local exact tests pass
 src/sparse_formats/csr.h	src/sparse_formats	pending
@@ -63,7 +63,7 @@ src/interface/graph_io_aux.cxx	src/sparse_text.rs; src/ffi/mpi_io.rs	implemented
 src/interface/group.h	src/interface	pending
 src/interface/idx_tensor.cxx	src/interface	pending
 src/interface/idx_tensor.h	src/interface	pending
-src/interface/kernel.h	src/interface	pending
+src/interface/kernel.h	src/sparse_coo.rs	partial: mixed-type Kernel<f,g> COO leaf with arbitrary accumulator and source alpha/beta restrictions; remaining Kernel operations pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
 src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed thin/truncated/randomized SVD, QR, Cholesky, triangular/positive-definite solves and square-subworld symmetric/Hermitian eigh; remaining routines pending
@@ -81,7 +81,7 @@ src/interface/scalar.h	src/interface	pending
 src/interface/schedule.cxx	src/schedule.rs; src/schedule_graph.rs; src/schedule_partition.rs; tests/schedule.rs	partial: explicit replayable dense task DAG, RAW/WAR/WAW hazards, source cost-window partitioning and child-context execution/timing; source integer-cost/null-clone/root/overwrite defects corrected; automatic operation cost attachment and optimized reshuffle pending
 src/interface/schedule.h	src/schedule.rs	replaced: direct Rust closures, explicit input/output IDs, context and estimated costs; no global recorder or C++ AST compatibility
 src/interface/semiring.cxx	src/algebra.rs; src/linalg.rs; src/ffi/linalg.rs; src/contraction.rs	partial: generic scalar semiring and native four-type GEMM/batched folded kernels; complete sparse/native specialized dispatch pending
-src/interface/semiring.h	src/algebra.rs; src/sparse_formats.rs	partial: algebra, gen_csrmm, gen_csrmultcsr, gen_ccsrmm; remaining kernels pending
+src/interface/semiring.h	src/algebra.rs; src/sparse_formats.rs; src/sparse_coo.rs	partial: algebra, gen_csrmm, gen_csrmultcsr, gen_ccsrmm, native default_coomm and generic beta-one coomm; remaining kernels pending
 src/interface/set.cxx	src/interface	pending
 src/interface/set.h	src/sparse_formats.rs	partial: seq_coo_to_csr, seq_coo_to_ccsr, seq_csr_to_coo; remaining set responsibilities pending
 src/interface/sparse_tensor.cxx	src/interface	pending
@@ -235,7 +235,7 @@ examples/sparse_mp3.cxx	tests/upstream_sparse_mp3.rs; tests/upstream_sparse_mp3_
 examples/sparse_permuted_slice.cxx	pending: source-semantic packed permutation APIs exist	unaccepted: static full-orbit/canonical-duplicate analysis conflicts with compressed callback-copy assertion (SY/AS/SH off-diagonal 2x); no driver execution or tolerance change; see docs/upstream-known-failures.md
 examples/spectral_element.cxx	tests/upstream/examples/spectral_element.rs	pending
 examples/spmv.cxx	tests/upstream_spmv.rs	ported active sparse-A/dense-vector equations with dense and sparse output, both operand orders; bounded n=5 and source sparsity 0.5/n, explicit MT seed adaptation; original initial norm>=1e-6 and residual<=1e-6; PASS WSL 1/2/4 world/parity, native compile/link
-examples/sssp.cxx	tests/upstream/examples/sssp.rs	pending
+examples/sssp.cxx	tests/upstream_sssp.rs	ported active n=7 tropical Bellman-Ford, source sparsification, ordinary integer-SUM convergence and injected negative-cycle assertions; explicit MT integer RNG adaptation; exact PASS WSL1/2/4 world/parity, native compile/link
 examples/strassen.cxx	tests/upstream/examples/strassen.rs	pending
 examples/trace.cxx	tests/upstream_trace.rs	ported four cyclic NS ABCD products, diagonal extraction and sum; bounded n=3, source drand48 recurrence and relative<=1e-10 criteria; PASS WSL 1/2/4 world/parity, native compile/link
 scalapack_tests/conj.h	tests/upstream/scalapack_tests/conj.h	pending

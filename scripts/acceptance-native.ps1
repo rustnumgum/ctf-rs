@@ -66,6 +66,8 @@ $arguments += @('--test', 'upstream_scan')
 $arguments += @('--test', 'distributed_sparse_2d', '--test', 'upstream_trace')
 $arguments += @('--test', 'distributed_sparse_2d_dense')
 $arguments += @('--test', 'distributed_sparse_2d_pairs')
+$arguments += @('--test', 'distributed_coo_2d')
+$arguments += @('--test', 'upstream_sssp')
 foreach ($test in @('upstream_subworld_gemm','upstream_readall','upstream_readwrite','upstream_sptensor_sum')) { $arguments += @('--test', $test) }
 foreach ($test in @('typed_grid_blas','typed_randomized_svd','typed_distributed_eigh','typed_tensor_svd','typed_multilinear','tttp_memory','tensor_norms','storage_conversion','sparse_random_fill','subworld_transfer','sparse_text_io','symmetric_norms','symmetric_text_io','pair_read')) { $arguments += @('--test', $test) }
 foreach ($ranks in 1,2,4) {
@@ -83,6 +85,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cargo test --test sparse_cost
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cargo test --test sparse_keys
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo test --test sparse_coo
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $localTests = @('random_generator','scalar_blas','node_peer_counts','folded_cost','partial_fold_kernel','fold_storage','partial_fold','fold_indices','fold_layout','fold_selection','mapped_cost','local_linalg','topology_candidates','node_aware','map_tensor',
     'sequential_sum','virtual_sum','sequential_contraction','folded_contraction',
