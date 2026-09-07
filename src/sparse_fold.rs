@@ -7,14 +7,14 @@
 //! Axes are matricized as `A[m,k,l]`, `B[k,n,l]`, and `C[m,n,l]`; every
 //! `l` coordinate is then executed by the existing distributed sparse GEMM.
 //! Repeated labels are projected onto diagonals before folding; output
-//! reinsertion preserves off-diagonal values. One-operand-only labels are
-//! not supported by this folded path.
+//! reinsertion preserves off-diagonal values. Input-only labels are reduced
+//! before folding, while output-only labels are not supported by this path.
 
 use crate::{
     algebra::{Semiring, Wire},
     diagonal::Projection,
     folding::{Operand, Rejected},
-    mapping::Distribution,
+    mapping::{Distribution, Topology},
     sparse::SparseTensor,
     tensor::Tensor,
 };
@@ -175,11 +175,9 @@ fn validate_grid(grid: [usize; 2], processes: usize) {
     assert_eq!(grid[0].checked_mul(grid[1]), Some(processes));
 }
 
-// Preserve typed validation errors before any diagonal redistribution occurs.
-fn repeated_projections(shapes: [&[usize]; 3], indices: [&str; 3])
-    -> Result<Option<[Projection; 3]>, Rejected> {
-    if !indices.iter().any(|labels| labels.bytes().enumerate()
-        .any(|(axis, label)| labels.as_bytes()[..axis].contains(&label))) { return Ok(None); }
+// Preserve typed validation errors before any reduction or diagonal redistribution occurs.
+fn validated_projections(shapes: [&[usize]; 3], indices: [&str; 3])
+    -> Result<[Projection; 3], Rejected> {
     let operands = [Operand::A, Operand::B, Operand::C];
     let mut dimensions = [None; 256];
     for operand in 0..3 {
@@ -194,11 +192,54 @@ fn repeated_projections(shapes: [&[usize]; 3], indices: [&str; 3])
             }
             dimensions[label as usize] = Some(dimension);
         }
+        checked_product(shapes[operand])?;
     }
     let projections = std::array::from_fn(|operand| Projection::new(shapes[operand], indices[operand]));
-    let [a, b, c] = &projections;
-    Plan::new([&a.shape, &b.shape, &c.shape], [&a.labels, &b.labels, &c.labels])?;
-    Ok(Some(projections))
+    for label in 0_u8..=u8::MAX {
+        if projections[2].labels.as_bytes().contains(&label)
+            && !projections[0].labels.as_bytes().contains(&label)
+            && !projections[1].labels.as_bytes().contains(&label)
+        {
+            return Err(Rejected::OneOperandLabel {
+                operand: Operand::C,
+                label: label as char,
+            });
+        }
+    }
+    Ok(projections)
+}
+
+// Source self_reduce scans operand axes and removes exactly one unmatched axis.
+// A repeated label is a match until diagonal extraction makes it unique.
+fn first_input_only_axis(labels: &str, other: &str, output: &str) -> Option<usize> {
+    labels.bytes().enumerate().find_map(|(axis, label)| {
+        (!labels.bytes().enumerate().any(|(candidate, value)| {
+            candidate != axis && value == label
+        }) && !other.as_bytes().contains(&label)
+            && !output.as_bytes().contains(&label))
+        .then_some(axis)
+    })
+}
+
+fn remove_axis(distribution: &Distribution, labels: &str, axis: usize)
+    -> (Distribution, String) {
+    let shape = distribution.shape.iter().enumerate()
+        .filter_map(|(candidate, &length)| (candidate != axis).then_some(length)).collect();
+    let mappings = distribution.mappings.iter().enumerate()
+        .filter_map(|(candidate, mapping)| (candidate != axis).then_some(mapping.clone())).collect();
+    let labels = String::from_utf8(labels.bytes().enumerate()
+        .filter_map(|(candidate, label)| (candidate != axis).then_some(label)).collect()).unwrap();
+    (Distribution::new(shape, distribution.topology.clone(), mappings), labels)
+}
+
+// self_reduce gives every tensor axis a distinct summation label, so unrelated
+// repeated contraction labels are not projected until the later diagonal step.
+fn reduction_indices(rank: usize, axis: usize) -> (String, String) {
+    assert!(rank <= 128);
+    let input: Vec<_> = (0..rank as u8).collect();
+    let output = input.iter().enumerate()
+        .filter_map(|(candidate, &label)| (candidate != axis).then_some(label)).collect();
+    (String::from_utf8(input).unwrap(), String::from_utf8(output).unwrap())
 }
 
 impl<'c, 'r, A: Semiring + Clone> SparseTensor<'c, 'r, A>
@@ -218,11 +259,30 @@ where
         alpha: A::Element,
         beta: A::Element,
     ) -> Result<(), Rejected> {
-        if let Some([_, _, output]) = repeated_projections(
+        let [input_a, input_b, output] = validated_projections(
             [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
-            [indices_a, indices_b, indices_c])? {
-            assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
-            validate_grid(grid, self.context().size());
+            [indices_a, indices_b, indices_c])?;
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        validate_grid(grid, self.context().size());
+        if let Some(axis) = first_input_only_axis(indices_a, indices_b, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(a.distribution(), indices_a, axis);
+            let mut reduced = Self::new(a.context(), distribution, a.algebra().clone());
+            let one = a.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_a.len(), axis);
+            reduced.sum_from(&sum_output, a, &sum_input, one.clone(), one);
+            return self.contract_from(indices_c, &reduced, &reduced_indices, b, indices_b,
+                grid, alpha, beta);
+        }
+        if let Some(axis) = first_input_only_axis(indices_b, indices_a, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(b.distribution(), indices_b, axis);
+            let mut reduced = Self::new(b.context(), distribution, b.algebra().clone());
+            let one = b.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_b.len(), axis);
+            reduced.sum_from(&sum_output, b, &sum_input, one.clone(), one);
+            return self.contract_from(indices_c, a, indices_a, &reduced, &reduced_indices,
+                grid, alpha, beta);
+        }
+        if input_a.repeated() || input_b.repeated() || output.repeated() {
             let (aa, ia) = a.extract_diagonal(indices_a);
             let (bb, ib) = b.extract_diagonal(indices_b);
             let (mut cc, ic) = self.extract_diagonal(indices_c);
@@ -310,11 +370,30 @@ where
         alpha: A::Element,
         beta: A::Element,
     ) -> Result<(), Rejected> {
-        if let Some([_, _, output]) = repeated_projections(
+        let [input_a, input_b, output] = validated_projections(
             [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
-            [indices_a, indices_b, indices_c])? {
-            assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
-            validate_grid(grid, self.context().size());
+            [indices_a, indices_b, indices_c])?;
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        validate_grid(grid, self.context().size());
+        if let Some(axis) = first_input_only_axis(indices_a, indices_b, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(a.distribution(), indices_a, axis);
+            let mut reduced = SparseTensor::new(a.context(), distribution, a.algebra().clone());
+            let one = a.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_a.len(), axis);
+            reduced.sum_from(&sum_output, a, &sum_input, one.clone(), one);
+            return self.contract_from_sparse(indices_c, &reduced, &reduced_indices, b, indices_b,
+                grid, alpha, beta);
+        }
+        if let Some(axis) = first_input_only_axis(indices_b, indices_a, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(b.distribution(), indices_b, axis);
+            let mut reduced = SparseTensor::new(b.context(), distribution, b.algebra().clone());
+            let one = b.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_b.len(), axis);
+            reduced.sum_from(&sum_output, b, &sum_input, one.clone(), one);
+            return self.contract_from_sparse(indices_c, a, indices_a, &reduced, &reduced_indices,
+                grid, alpha, beta);
+        }
+        if input_a.repeated() || input_b.repeated() || output.repeated() {
             let (aa, ia) = a.extract_diagonal(indices_a);
             let (bb, ib) = b.extract_diagonal(indices_b);
             let (mut cc, ic) = self.extract_diagonal(indices_c);
@@ -397,11 +476,31 @@ where
         alpha: A::Element,
         beta: A::Element,
     ) -> Result<(), Rejected> {
-        if let Some([_, _, output]) = repeated_projections(
+        let [input_a, input_b, output] = validated_projections(
             [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
-            [indices_a, indices_b, indices_c])? {
-            assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
-            validate_grid(grid, self.context().size());
+            [indices_a, indices_b, indices_c])?;
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        validate_grid(grid, self.context().size());
+        if let Some(axis) = first_input_only_axis(indices_a, indices_b, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(a.distribution(), indices_a, axis);
+            let mut reduced = SparseTensor::new(a.context(), distribution, a.algebra().clone());
+            let one = a.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_a.len(), axis);
+            reduced.sum_from(&sum_output, a, &sum_input, one.clone(), one);
+            return self.contract_from_sparse_dense(indices_c, &reduced, &reduced_indices,
+                b, indices_b, grid, alpha, beta);
+        }
+        if let Some(axis) = first_input_only_axis(indices_b, indices_a, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(b.distribution(), indices_b, axis);
+            let mut reduced = Self::new(b.context(), distribution, b.algebra().clone());
+            let one = b.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_b.len(), axis);
+            reduced.sum_from(&sum_output, b, &sum_input, Topology::new(grid.to_vec()),
+                one.clone(), one).unwrap();
+            return self.contract_from_sparse_dense(indices_c, a, indices_a, &reduced,
+                &reduced_indices, grid, alpha, beta);
+        }
+        if input_a.repeated() || input_b.repeated() || output.repeated() {
             let (aa, ia) = a.extract_diagonal(indices_a);
             let (bb, ib) = b.extract_diagonal(indices_b);
             let (mut cc, ic) = self.extract_diagonal(indices_c);
@@ -484,11 +583,31 @@ where
         alpha: A::Element,
         beta: A::Element,
     ) -> Result<(), Rejected> {
-        if let Some([_, _, output]) = repeated_projections(
+        let [input_a, input_b, output] = validated_projections(
             [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
-            [indices_a, indices_b, indices_c])? {
-            assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
-            validate_grid(grid, self.context().size());
+            [indices_a, indices_b, indices_c])?;
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        validate_grid(grid, self.context().size());
+        if let Some(axis) = first_input_only_axis(indices_a, indices_b, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(a.distribution(), indices_a, axis);
+            let mut reduced = Self::new(a.context(), distribution, a.algebra().clone());
+            let one = a.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_a.len(), axis);
+            reduced.sum_from(&sum_output, a, &sum_input, Topology::new(grid.to_vec()),
+                one.clone(), one).unwrap();
+            return self.contract_from_dense_sparse(indices_c, &reduced, &reduced_indices,
+                b, indices_b, grid, alpha, beta);
+        }
+        if let Some(axis) = first_input_only_axis(indices_b, indices_a, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(b.distribution(), indices_b, axis);
+            let mut reduced = SparseTensor::new(b.context(), distribution, b.algebra().clone());
+            let one = b.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_b.len(), axis);
+            reduced.sum_from(&sum_output, b, &sum_input, one.clone(), one);
+            return self.contract_from_dense_sparse(indices_c, a, indices_a, &reduced,
+                &reduced_indices, grid, alpha, beta);
+        }
+        if input_a.repeated() || input_b.repeated() || output.repeated() {
             let (aa, ia) = a.extract_diagonal(indices_a);
             let (bb, ib) = b.extract_diagonal(indices_b);
             let (mut cc, ic) = self.extract_diagonal(indices_c);

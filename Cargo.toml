@@ -338,3 +338,8 @@ name = "distributed_sparse_solve_factor"
 path = "tests/distributed_sparse_solve_factor.rs"
 harness = false
 required-features = ["native-linalg"]
+
+[[test]]
+name = "distributed_sparse_input_reduction"
+path = "tests/distributed_sparse_input_reduction.rs"
+harness = false

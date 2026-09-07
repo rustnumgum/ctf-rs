@@ -812,3 +812,19 @@ Sparse MTTKRP now calls the existing multilinear_kernel.rs source fiber-grouped
 kernel instead of independently multiplying every sparse entry's factor rows.
 Canonical local stored pairs are key-sorted across virtual blocks; mode-zero
 fibers reuse the product of remaining factor rows, matching interface/semiring.h.
+
+## Sparse contraction input-only pre-reduction
+
+contraction.cxx:5024-5049 calls self_reduce on A, recurses if it changed, and only
+then tries B. untyped_tensor.cxx:3939-4017 removes the first unmatched unique axis
+and performs a summation with multiplicative identities before returning. The
+four sparse/mixed Rust contraction entrypoints now follow that order, one axis
+per recursive pass, before diagonal extraction and folding. Positional distinct
+summation labels prevent unrelated repeated contraction indices from selecting
+diagonals prematurely. Surviving mapping edges/topology remain; a removed mapped
+axis becomes a replica fiber. Current indexed summation supplies communication.
+
+This does not implement C-only indices by contracting then broadcasting. In the
+source those indices use map_extra_indices (virtual phase one) and the general
+sp_seq_ctr loop. That path remains pending and still returns OneOperandLabel(C)
+from the folded entrypoints before communication; it is not counted as complete.

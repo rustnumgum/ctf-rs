@@ -907,3 +907,14 @@ mode with both vector and matrix factors through the source fiber-grouped kernel
 Existing empty-shard, virtual-block and auxiliary-division checks remain active.
 DIGIT / PASS, no diagnostic or tighter-precision runs. Both targets compiled and
 linked once on Windows GNU; this does not constitute native runtime acceptance.
+
+## Sparse input-only contraction reduction (2026-09-07)
+
+distributed_sparse_input_reduction plus affected distributed_sparse_fold and
+distributed_sparse_diagonal passed once at 1/2/4 WSL ranks, world/parity contexts.
+The new exact-i64 test covers A[ixpk]*B[kqj]->C[ij] and repeated-index variants
+A[ixpkk]*B[kqqj]->C[ijj], all four sparse/mixed combinations, nontrivial alpha/beta,
+empty input-only reduction extent, replicas, virtual blocks, and 2x2 rank grid.
+Off-diagonal output entries remain exact. DIGIT / PASS; no diagnostic runs.
+All three targets compiled and linked once on Windows GNU. Native runtime and
+the source general sparse C-only execution path remain unaccepted/incomplete.
