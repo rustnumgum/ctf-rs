@@ -476,6 +476,7 @@ where
         b: &mut Self,
         indices_b: &str,
         mapped: [Distribution; 3],
+        intra_node_lens: Option<&[usize]>,
         alpha: A::Element,
         beta: A::Element,
         restore_inputs: bool,
@@ -496,9 +497,18 @@ where
             b.distribution().clone(),
             c.distribution().clone(),
         ];
+        let context = c.context();
         let algebra = c.algebra().clone();
+        let reordered = intra_node_lens.map(|intra| {
+            let rank = crate::node_reordering::reorder_rank(
+                &mapped[0].topology.dimensions,
+                intra,
+                context.rank(),
+            );
+            context.split(Some(0), rank.try_into().unwrap()).unwrap()
+        });
         let execution = build_execution(
-            c.context(),
+            reordered.as_ref().unwrap_or(context),
             mapped.each_ref(),
             [indices_a, indices_b, indices_c],
         );
@@ -510,6 +520,21 @@ where
         }
         if c.distribution() != &mapped[2] {
             c.redistribute(mapped[2].clone());
+        }
+
+        let exchange = intra_node_lens.map(|intra| {
+            let lens = &mapped[0].topology.dimensions;
+            (
+                crate::node_reordering::inverse_rank(lens, intra, context.rank()),
+                crate::node_reordering::reorder_rank(lens, intra, context.rank()),
+            )
+        });
+        if let Some((send, recv)) = exchange {
+            if send != context.rank() {
+                context.inner.replace_wire(&mut a.data, send, recv, 1322);
+                context.inner.replace_wire(&mut b.data, send, recv, 1323);
+                context.inner.replace_wire(&mut c.data, send, recv, 1324);
+            }
         }
 
         for comm in &execution.replicate[0] {
@@ -578,6 +603,15 @@ where
         for comm in &execution.replicate[2] {
             comm.reduce_monoid(&algebra, &mut c.data, false, 0);
         }
+        if let Some((send, recv)) = exchange {
+            if send != context.rank() {
+                context.inner.replace_wire(&mut c.data, recv, send, 1327);
+                if restore_inputs {
+                    context.inner.replace_wire(&mut a.data, recv, send, 1325);
+                    context.inner.replace_wire(&mut b.data, recv, send, 1326);
+                }
+            }
+        }
         for group in execution.replicate {
             for comm in group {
                 comm.close();
@@ -587,6 +621,9 @@ where
             for comm in level.comms.into_iter().flatten() {
                 comm.close();
             }
+        }
+        if let Some(context) = reordered {
+            context.close();
         }
         if c.distribution() != &original[2] {
             c.redistribute(original[2].clone());
@@ -614,6 +651,7 @@ where
         b: &Self,
         indices_b: &str,
         mapped: [Distribution; 3],
+        intra_node_lens: Option<&[usize]>,
         alpha: A::Element,
         beta: A::Element,
     ) {
@@ -628,6 +666,7 @@ where
             &mut bb,
             indices_b,
             mapped,
+            intra_node_lens,
             alpha,
             beta,
             false,
@@ -647,6 +686,7 @@ where
         b: &mut Self,
         indices_b: &str,
         mapped: [Distribution; 3],
+        intra_node_lens: Option<&[usize]>,
         alpha: A::Element,
         beta: A::Element,
     ) {
@@ -664,6 +704,7 @@ where
             b,
             indices_b,
             mapped,
+            intra_node_lens,
             alpha,
             beta,
             true,

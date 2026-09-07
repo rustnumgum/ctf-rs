@@ -31,10 +31,11 @@ fn exercise<A:Semiring+Clone>(c:&Context<'_>,low_memory:bool,algebra:A,value:imp
         output.transform(|_,v|*v=value(4));
         let mapped=problem.map_to_topology(&topology,permutation,[None;3]).unwrap();
         let old=[a.distribution().clone(),b.distribution().clone(),output.distribution().clone()];
+        let intra=if c.size()==4{Some(&[1,2][..])}else{None};
         if low_memory{
-            output.contract_low_memory_from_mapped("ij",&mut a,"ik",&mut b,"kj",mapped,value(2),value(3));
+            output.contract_low_memory_from_mapped("ij",&mut a,"ik",&mut b,"kj",mapped,intra,value(2),value(3));
         }else{
-            output.contract_from_mapped("ij",&a,"ik",&b,"kj",mapped,value(2),value(3));
+            output.contract_from_mapped("ij",&a,"ik",&b,"kj",mapped,intra,value(2),value(3));
         }
         assert_eq!([a.distribution(),b.distribution(),output.distribution()],old.each_ref());
         for(key,actual)in a.local_pairs(){assert!(actual==value(key%5+1),"A restored exactly");}
@@ -55,9 +56,9 @@ fn exercise<A:Semiring+Clone>(c:&Context<'_>,low_memory:bool,algebra:A,value:imp
         output.transform(|_,v|*v=value(4));
         let mapped=std::array::from_fn(|_|Distribution::new(vec![],topology.clone(),vec![]));
         if low_memory{
-            output.contract_low_memory_from_mapped("",&mut a,"",&mut b,"",mapped,value(2),value(3));
+            output.contract_low_memory_from_mapped("",&mut a,"",&mut b,"",mapped,None,value(2),value(3));
         }else{
-            output.contract_from_mapped("",&a,"",&b,"",mapped,value(2),value(3));
+            output.contract_from_mapped("",&a,"",&b,"",mapped,None,value(2),value(3));
         }
         for(_,actual)in a.local_pairs(){assert!(actual==value(1));}
         for(_,actual)in b.local_pairs(){assert!(actual==value(2));}
@@ -82,5 +83,5 @@ fn run(c:&Context<'_>){
 }
 fn main(){let runtime=Runtime::initialize();let world=runtime.world();run(&world);
     let child=world.split(Some((world.rank()%2)as i32),world.rank()as i32).unwrap();run(&child);child.close();
-    if world.rank()==0{println!("DIGIT / PASS dense_execution_algebra: home/lowmem; input restoration/matrix ring/integer exact; f32/complex abs<1e-6; raw permutations/scalar coefficient order; world+parity");}
+    if world.rank()==0{println!("DIGIT / PASS dense_execution_algebra: home/lowmem with Wire node backmapping; input restoration/matrix ring/integer exact; f32/complex abs<1e-6; raw permutations/scalar coefficient order; world+parity");}
     world.close();runtime.finalize();}

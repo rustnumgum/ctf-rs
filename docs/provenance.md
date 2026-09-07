@@ -1143,3 +1143,9 @@ The same lowmem_contract ownership transfer now applies to the generic raw
 semiring executor. Its scalar coefficient ordering follows sym_seq_ctr rather
 than assuming multiplication commutes; MPI reductions retain the explicit
 noncommutative custom-operation flag. No f64 conversion of generic values is used.
+
+Generic node-aware exchange follows the same contraction.cxx rank permutation
+and source tags as the f64 folded path. A Wire serialization buffer replaces
+the source runtime MPI element datatype, allowing non-Copy/custom Rust values
+without exposing their object representation. Mutable low-memory inputs are
+exchanged back; disposable immutable-input working copies are not.

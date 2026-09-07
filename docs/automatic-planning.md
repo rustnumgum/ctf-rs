@@ -216,8 +216,7 @@ Node facts are explicit f64 average peer counts throughout raw/aligned cost
 trees, folded costs, search and node selection. `original_peer_counts` ports
 the source node-boundary average without rounding; cache keys preserve the
 supplied facts' bit patterns. Automatic hardware-node discovery is not yet
-integrated. Sparse and generic
-semiring node-aware execution remain pending. Logical node partitions in
+integrated. Sparse node-aware execution remains pending. Logical node partitions in
 single-machine tests do not establish multi-node performance.
 
 ## Low-memory folded execution
@@ -244,4 +243,9 @@ reductions, right alpha scaling, nonscalar left beta and the scalar/no-replicati
 right-beta special case. Mutable operands restore their original distributions
 in C/A/B order. This adds integer, f32, complex and custom-algebra low-memory
 execution without routing them through f64 BLAS or introducing a backend layer.
-Generic node-aware rank reordering is still pending.
+Both generic raw entry points also accept optional intra-node lengths. The
+node-aware context permutation and forward/back exchanges use the same source
+rank rules as the folded path. Generic values are encoded into one Wire byte
+buffer for MPI_Sendrecv_replace and decoded afterward; Rust object layout is
+never treated as an MPI datatype. This communication workspace is distinct
+from the retained home copies eliminated by low-memory execution.

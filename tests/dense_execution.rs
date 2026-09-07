@@ -30,7 +30,7 @@ fn exercise(c:&Context<'_>,shapes:[&[usize];3],indices:[&str;3],mapped:[Distribu
     let mut a=make(c,shapes[0].to_vec());let mut b=make(c,shapes[1].to_vec());let mut output=make(c,shapes[2].to_vec());
     a.transform(|key,v|*v=a_value(key));b.transform(|key,v|*v=b_value(key));output.transform(|_,v|*v=3.);
     let old=output.distribution().clone();
-    output.contract_from_mapped(indices[2],&a,indices[0],&b,indices[1],mapped,2.,3.);
+    output.contract_from_mapped(indices[2],&a,indices[0],&b,indices[1],mapped,None,2.,3.);
     assert_eq!(output.distribution(),&old);
     for(key,value)in output.local_pairs(){let expected=2.*reference(shapes,indices,key)+9.;
         assert!(value.is_finite()&&(value-expected).abs()<1e-6,"key {key}: {value} != {expected}");}
@@ -78,7 +78,7 @@ fn run(c:&Context<'_>){
     for(iteration,alpha,beta)in[(0,2.,3.),(1,3.,0.)]{
         if iteration==1{a.transform(|key,v|*v=2.*a_value(key));}
         let selected=cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1.];3],indices).unwrap().unwrap();
-        output.contract_from_mapped("ij",&a,"ik",&b,"kj",selected.distributions.clone(),alpha,beta);
+        output.contract_from_mapped("ij",&a,"ik",&b,"kj",selected.distributions.clone(),None,alpha,beta);
         for(key,value)in output.local_pairs(){let expected=if iteration==0{2.*reference(shape,indices,key)+9.}else{6.*reference(shape,indices,key)};
             assert!(value.is_finite()&&(value-expected).abs()<1e-6);}
     }
@@ -89,7 +89,7 @@ fn run(c:&Context<'_>){
     a.redistribute(Distribution::new(vec![3,3],Topology::new(vec![c.size()]),
         vec![Mapping::Unmapped,Mapping::Physical{axis:0,processes:c.size(),child:Box::new(Mapping::Unmapped)}]));
     let selected=cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1.];3],indices).unwrap().unwrap();
-    output.contract_from_mapped("ij",&a,"ik",&b,"kj",selected.distributions.clone(),3.,0.);
+    output.contract_from_mapped("ij",&a,"ik",&b,"kj",selected.distributions.clone(),None,3.,0.);
     for(key,value)in output.local_pairs(){assert!(value.is_finite()&&(value-6.*reference(shape,indices,key)).abs()<1e-6);}
     assert_eq!(cache.stats().misses,2);assert_eq!(cache.len(),2);
     cache.clear();assert!(cache.is_empty());

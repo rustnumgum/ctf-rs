@@ -383,6 +383,37 @@ impl Comm {
             ));
         }
     }
+    pub(crate) fn replace_wire<T: Wire>(
+        &self,
+        values: &mut [T],
+        destination: usize,
+        source: usize,
+        tag: i32,
+    ) {
+        assert!(destination < self.size() && source < self.size());
+        assert!(T::WIDTH > 0);
+        let mut bytes = Vec::with_capacity(values.len() * T::WIDTH);
+        for value in values.iter() {
+            value.encode(&mut bytes);
+        }
+        assert_eq!(bytes.len(), values.len() * T::WIDTH);
+        unsafe {
+            check(sys::MPI_Sendrecv_replace(
+                bytes.as_mut_ptr().cast(),
+                bytes.len().try_into().unwrap(),
+                sys::RSMPI_UINT8_T,
+                destination as i32,
+                tag,
+                source as i32,
+                tag,
+                self.raw,
+                sys::RSMPI_STATUS_IGNORE,
+            ));
+        }
+        for (value, encoded) in values.iter_mut().zip(bytes.chunks_exact(T::WIDTH)) {
+            *value = T::decode(encoded);
+        }
+    }
     pub(crate) fn broadcast(&self, root: usize, buffer: &mut [u8]) {
         assert!(root < self.size());
         let mut empty = 0u8;

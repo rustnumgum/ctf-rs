@@ -1039,6 +1039,17 @@ Both targets compiled/linked once on Windows GNU. No failures, tolerance changes
 or extra numerical runs. DIGIT / PASS; native MPI runtime and overall port
 acceptance remain outstanding.
 
+## Generic node-aware Wire exchange (2026-09-07)
+
+dense_execution and dense_execution_algebra passed once at WSL 1/2/4 ranks,
+world/parity, after adding optional node ordering to both generic ownership
+modes. Four-rank custom non-Copy matrix values, i64, f32 and complex values
+exercise serialized forward/back exchanges on all six raw normal mappings.
+Input data/layout restoration and discrete results are exact; existing floating
+1e-6 checks and scalar coefficient-side cases are unchanged. No failures or
+additional precision checks. Both targets compiled/linked on Windows GNU;
+native MPI execution remains pending. DIGIT / PASS for this change.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,
