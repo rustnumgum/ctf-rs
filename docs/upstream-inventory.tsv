@@ -22,7 +22,7 @@ src/scripts/expand_includes.sh	Cargo/build tooling	replaced
 src/scripts/license.sh	Cargo/build tooling	replaced
 src/scripts/manual_readlink.sh	Cargo/build tooling	replaced
 src/scripts/recursive_expand_includes.sh	Cargo/build tooling	replaced
-src/tensor/algstrct.cxx	src/sparse_reduce.rs; src/ffi/gather.rs	partial: source CSR/CCSR cyclic-row subgroup exchange, binary-tree merge, recursive reduction and Gather/Gatherv root assembly; exact WSL 1/2/4 plus three-rank subgroup PASS; other responsibilities/full integration pending
+src/tensor/algstrct.cxx	src/sparse_reduce.rs; src/ffi/gather.rs; src/sparse_keys.rs	partial: source CSR/CCSR cyclic-row subgroup exchange, binary-tree merge, recursive reduction and Gather/Gatherv root assembly; raw pin/depin local radices, virtual residues and padding removal with mapped sparse-A production integration; exact WSL local and MPI coverage; other responsibilities/full integration pending
 src/tensor/algstrct.h	src/tensor	pending
 src/tensor/Makefile	Cargo/build tooling	replaced
 src/tensor/untyped_tensor_tmpl.h	src/tensor	pending
@@ -118,7 +118,7 @@ src/contraction/spctr_comm.cxx	src/sparse_contract_general.rs; src/sparse_contra
 src/contraction/spctr_comm.h	src/contraction	pending
 src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
-src/contraction/spctr_tsr.cxx	src/sparse_virtual.rs; src/sparse_contract_general.rs; src/sparse_gemm.rs; src/sparse_fold.rs; src/sparse_cost.rs; src/sparse_cost_local.rs	partial: source virtual strides/order, repeated-index offsets and per-output beta-first tracking, mapped sparse-A/dense-B/dense-C virtual blocks and native krnl5 sparse-A/dense-B/CCSR-output with folded orchestration; virtual time/memory and all twelve CPU k0..k5 ordinary/custom leaf cost models; automatic sparse-output/nested panel assembly pending; non-inner sparse-output is a source assertion, not a working leaf
+src/contraction/spctr_tsr.cxx	src/sparse_virtual.rs; src/sparse_contract_general.rs; src/sparse_gemm.rs; src/sparse_fold.rs; src/sparse_cost.rs; src/sparse_cost_local.rs; src/sparse_keys.rs	partial: source virtual strides/order, repeated-index offsets and per-output beta-first tracking, mapped sparse-A pinning and virtual blocks, native krnl5 CCSR output; virtual and pin time/memory plus all twelve CPU leaf models; explicit output depin avoids invalid source null-pointer orchestration; automatic sparse-output/nested panel assembly pending; non-inner sparse-output is a source assertion, not a working leaf
 src/contraction/spctr_tsr.h	src/contraction	pending
 src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar/custom-function reference kernels, packed custom MPI orchestration, typed canonical partial/symmetry folded BLAS residual traversal and four-type distributed integration; custom-function folded branch and automatic compressed integration pending
 src/contraction/sym_seq_ctr.h	src/contraction	pending

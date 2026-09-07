@@ -286,3 +286,35 @@ impl Virtual {
         child_memory + self.footprint()
     }
 }
+
+/// Source spctr_pin_keys estimates. Output pinning includes the return depin
+/// pass; the memory switch intentionally falls through from A to B to C.
+#[derive(Clone, Copy, Debug)]
+pub struct KeyPinning {
+    pub operand: crate::folding::Operand,
+    pub dense_block_size: usize,
+    pub pair_sizes: [usize; 3],
+}
+impl KeyPinning {
+    pub fn fixed_time(&self, models: &Models, fractions: Fractions) -> f64 {
+        let (fraction, passes) = match self.operand {
+            crate::folding::Operand::A => (fractions.a, 1.0),
+            crate::folding::Operand::B => (fractions.b, 1.0),
+            crate::folding::Operand::C => (fractions.c, 2.0),
+        };
+        passes * models.get("pin_keys_mdl").estimate(&[1.0, self.dense_block_size as f64 * fraction])
+    }
+    pub fn footprint(&self, fractions: Fractions) -> i64 {
+        let first = match self.operand {
+            crate::folding::Operand::A => 0,
+            crate::folding::Operand::B => 1,
+            crate::folding::Operand::C => 2,
+        };
+        let fractions = [fractions.a, fractions.b, fractions.c];
+        let mut memory = 0;
+        for operand in first..3 {
+            add_truncated(&mut memory, self.dense_block_size as f64 * fractions[operand] * self.pair_sizes[operand] as f64);
+        }
+        memory
+    }
+}

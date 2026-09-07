@@ -75,3 +75,4 @@ mod symmetric_permuted_io;
 mod sparse_permuted_io;
 pub mod sparse_2d;
 pub mod sparse_cost;
+pub mod sparse_keys;

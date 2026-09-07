@@ -1,5 +1,13 @@
 # Source provenance
 
+src/sparse_keys.rs ports tensor/algstrct.cxx ConstPairIterator::pin and depin,
+including full-phase local radices, virtual/physical residues and conditional
+padding filtering. sparse_contract_general.rs now uses this transform after
+owner exchange and per-virtual-block sorting. spctr_pin_keys' unsafe null
+operand-C destination is not copied; the defined depin transform is explicit.
+sparse_cost::KeyPinning preserves spctr_tsr.cxx's memory switch fallthrough
+and output double-pass timing. See sparse-keys.md for integration boundaries.
+
 src/sparse_cost.rs directly ports spctr_2d_general.cxx time/memory estimates,
 spctr_comm.cxx replication estimates and spctr_tsr.cxx virtual bookkeeping.
 src/sparse_cost_local.rs ports seq_tsr_spctr::est_fp/est_membw/est_time_fp for

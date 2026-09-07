@@ -12,14 +12,14 @@ use crate::{
 
 // Sparse panels have a variable entry count, so broadcast the count before the
 // serialized local-key/value pairs, as in spctr_replicate.
-fn broadcast_sparse<E: Wire>(context: &Context<'_>, pairs: &mut Vec<(usize, E)>) {
-    let mut count = [u64::try_from(pairs.len()).unwrap()];
+fn broadcast_sparse<E: Wire>(context: &Context<'_>, blocks: &mut [Vec<(usize, E)>]) {
+    let mut count: Vec<_> = blocks.iter().map(|block| u64::try_from(block.len()).unwrap()).collect();
     context.broadcast(0, &mut count);
     let width = 8 + E::WIDTH;
-    let length = usize::try_from(count[0]).unwrap();
+    let length: usize = count.iter().map(|&n| usize::try_from(n).unwrap()).sum();
     let mut bytes = Vec::with_capacity(length * width);
     if context.rank() == 0 {
-        for (key, value) in pairs.iter() {
+        for (key, value) in blocks.iter().flatten() {
             u64::try_from(*key).unwrap().encode(&mut bytes);
             value.encode(&mut bytes);
         }
@@ -28,15 +28,16 @@ fn broadcast_sparse<E: Wire>(context: &Context<'_>, pairs: &mut Vec<(usize, E)>)
     }
     context.inner.broadcast(0, &mut bytes);
     if context.rank() != 0 {
-        *pairs = bytes
-            .chunks_exact(width)
-            .map(|pair| {
+        let mut pairs = bytes.chunks_exact(width);
+        for (block, count) in blocks.iter_mut().zip(count) {
+            *block = pairs.by_ref().take(usize::try_from(count).unwrap()).map(|pair| {
                 (
                     usize::try_from(u64::decode(&pair[..8])).unwrap(),
                     E::decode(&pair[8..]),
                 )
             })
             .collect();
+        }
     }
 }
 
@@ -45,7 +46,7 @@ fn broadcast_sparse<E: Wire>(context: &Context<'_>, pairs: &mut Vec<(usize, E)>)
 fn sparse_on_roots<A: Semiring>(
     source: &SparseTensor<'_, '_, A>,
     target: &Distribution,
-) -> Vec<(usize, A::Element)>
+) -> Vec<Vec<(usize, A::Element)>>
 where
     A::Element: Wire,
 {
@@ -62,15 +63,25 @@ where
             .encode(&mut buckets[target.owner(key)]);
         value.encode(&mut buckets[target.owner(key)]);
     }
-    let mut pairs = Vec::new();
+    let phases: Vec<_> = target.mappings.iter().map(Mapping::phase).collect();
+    let virtual_dimensions: Vec<_> = target.mappings.iter()
+        .map(|mapping| mapping.phase() / mapping.physical_phase()).collect();
+    let block_size: usize = target.block_shape().iter().product();
+    let mut blocks = vec![Vec::new(); virtual_dimensions.iter().product()];
     for bytes in context.inner.exchange(&buckets) {
         for pair in bytes.chunks_exact(width) {
             let key = usize::try_from(u64::decode(&pair[..8])).unwrap();
-            pairs.push((target.local_offset(rank, key), A::Element::decode(&pair[8..])));
+            let block = target.local_offset(rank, key) / block_size;
+            blocks[block].push((key, A::Element::decode(&pair[8..])));
         }
     }
-    pairs.sort_by_key(|pair| pair.0);
-    pairs
+    for block in &mut blocks { block.sort_by_key(|pair| pair.0); }
+    let coordinates = target.topology.coordinates(rank);
+    let metadata = crate::sparse_keys::KeyMetadata {
+        shape: target.shape.clone(), phases, virtual_dimensions,
+        physical_ranks: target.mappings.iter().map(|mapping| mapping.physical_rank(&coordinates)).collect(),
+    };
+    crate::sparse_keys::pin_blocks(&metadata, &blocks)
 }
 
 // Dense mapped blocks likewise originate only on canonical roots; missing-axis
@@ -213,9 +224,9 @@ macro_rules! define_mapped_contraction {
         }
 
         let rank = self.context().rank();
-        let mut sparse_a = sparse_on_roots(a, &mapped[0]);
+        let mut sparse_blocks = sparse_on_roots(a, &mapped[0]);
         for communicator in &communicators[0] {
-            broadcast_sparse(communicator, &mut sparse_a);
+            broadcast_sparse(communicator, &mut sparse_blocks);
         }
 
         let mut dense_b = dense_on_roots(b, &mapped[1]);
@@ -233,11 +244,6 @@ macro_rules! define_mapped_contraction {
         };
         let shapes: [Vec<usize>; 3] = std::array::from_fn(|operand| mapped[operand].block_shape());
         let block_sizes: [usize; 3] = std::array::from_fn(|operand| shapes[operand].iter().product());
-        let count_a: usize = index_maps[0].iter().map(|&axis|virtual_dimensions[axis]).product();
-        let mut sparse_blocks = vec![Vec::new(); count_a];
-        for (offset,value) in sparse_a {
-            sparse_blocks[offset / block_sizes[0]].push((offset % block_sizes[0],value));
-        }
         let one = self.algebra().one();
         crate::sparse_virtual::execute(&virtual_dimensions,
             [&index_maps[0],&index_maps[1],&index_maps[2]],&child_beta,&one,|blocks,leaf_beta| {

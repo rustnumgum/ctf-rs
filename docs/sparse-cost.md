@@ -5,6 +5,9 @@ layer estimates; `sparse_cost::local` ports CPU sequential kernel IDs 0–5.
 They use the existing named `cost::Models` bank. Model evaluation does not
 communicate, allocate tensor storage, time a kernel or modify coefficients.
 
+`KeyPinning` also retains source pin_keys_mdl timing (two passes for C) and
+the literal memory switch fallthrough described in sparse-keys.md.
+
 ## Local kernels
 
 The general leaf multiplies the distinct union-label extents; folded leaves

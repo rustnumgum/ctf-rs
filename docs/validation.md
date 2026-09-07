@@ -1,5 +1,19 @@
 # Validation evidence
 
+## Sparse key pin/depin and mapped production integration (2026-09-07)
+
+sparse_keys passed three local WSL tests once: exact virtual residues,
+partial-phase padding removal, divisible shapes, stored zeros, empty blocks,
+zero extent, scalar keys and source pin-cost switch fallthrough. After
+integrating pinning into mapped sparse contractions, distributed_sparse_general
+and distributed_sparse_function passed once at WSL 1/2/4 ranks, world/parity,
+with their existing exact i64 criteria. These cover input/output-only labels,
+physical i/j/k mappings, virtual factors, sparse replicas, custom stored-zero
+evaluation, empty shards and output distribution restoration. DIGIT / PASS;
+no failures or precision studies. All three targets compiled/linked once on
+Windows GNU; runtime remains blocked by the previously confirmed missing MPI
+DLL, not claimed as passing.
+
 ## Sparse CPU time and memory models (2026-09-07)
 
 sparse_cost passed its three local tests once in WSL. Exact constructed
