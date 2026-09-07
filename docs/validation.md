@@ -1,5 +1,35 @@
 # Validation evidence
 
+## D5 native interface and FFT close (2026-09-08)
+
+The remaining pinned interface surface is represented by native Rust types and
+operations rather than C++ compatibility wrappers. `Partition` and
+`IdxPartition` bind explicit process-grid dimensions to tensor labels; a
+one-dimensional `Tensor` plus typed `arange` replaces `Vector`; zero-order
+`Tensor` set/read operations replace `Scalar`; and the existing `Context` and
+`Runtime` remain the native world/communicator owners. The algebra traits now
+cover the pinned set, monoid and ring responsibilities, including wrapping
+`u32`/`u64` arithmetic. Common index, prefix, permutation and allocation
+helpers have direct Rust owners.
+
+`d5_partition`, `d5_algebra_interfaces`, `d5_value_interfaces` and `d5_common`
+passed exactly at WSL 1/2/4 ranks with world/parity contexts. The source-faithful
+`upstream_fft_with_idx_partition`, `upstream_fft`, `upstream_dft_3d`,
+`upstream_endomorphism_cust_sp`, `upstream_endomorphism_cust`,
+`upstream_endomorphism`, `upstream_univar_function`, `upstream_bivar_function`
+and `upstream_bivar_transform` drivers passed once at the same rank counts and
+contexts. Their original sizes and bounds were retained: n=6/logm=8 and
+`n*n*m*1e-6` for indexed FFT, n=16 and 1e-6 component residuals for FFT,
+n=6 and per-element real error below 1e-9 for three-dimensional DFT, and the
+existing exact or 1e-6 transform criteria.
+
+The first multi-rank three-dimensional DFT attempt exposed that a symmetric
+fixture mapped only one of the linked axes. One source-directed diagnostic
+corrected the test distribution to give all linked axes the same virtual
+phase; no tolerance, metric or fixture size changed. The full native Windows
+GNU test and example set then compiled/linked once; native runtime remains
+deferred to D6. DIGIT / PASS; D5 verification closed.
+
 ## D4 shared infrastructure close (2026-09-08)
 
 The low-memory planner now has an explicit process budget derived from the

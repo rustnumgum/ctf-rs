@@ -42,6 +42,39 @@ harness = false
 required-features = ["native-linalg"]
 
 [[test]]
+name = "d5_common"
+path = "tests/d5_common.rs"
+harness = false
+
+[[test]]
+name = "d5_value_interfaces"
+path = "tests/d5_value_interfaces.rs"
+harness = false
+
+[[test]]
+name = "d5_algebra_interfaces"
+path = "tests/d5_algebra_interfaces.rs"
+harness = false
+
+[[test]]
+name = "upstream_fft_with_idx_partition"
+path = "tests/upstream/examples/fft_with_idx_partition.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_fft"
+path = "tests/upstream/examples/fft.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_dft_3d"
+path = "tests/upstream/examples/dft_3D.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
 name = "dgtog_redistribution"
 path = "tests/dgtog_redistribution.rs"
 harness = false

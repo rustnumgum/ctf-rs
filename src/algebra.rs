@@ -96,6 +96,27 @@ macro_rules! arithmetic {
 }
 arithmetic!(f32, f64, i32, i64);
 
+// The pinned Ring default also covers the unsigned 32/64-bit scalar families.
+// Use explicit wrapping operations because C++ unsigned arithmetic is modulo
+// 2^N even when the Rust crate is compiled with overflow checks enabled.
+macro_rules! unsigned_arithmetic {
+    ($($t:ty),*) => {$(
+        impl Monoid for Arithmetic<$t> {
+            type Element = $t;
+            fn zero(&self) -> $t { 0 }
+            fn add(&self, a: &$t, b: &$t) -> $t { a.wrapping_add(*b) }
+        }
+        impl Semiring for Arithmetic<$t> {
+            fn one(&self) -> $t { 1 }
+            fn multiply(&self, a: &$t, b: &$t) -> $t { a.wrapping_mul(*b) }
+        }
+        impl Group for Arithmetic<$t> {
+            fn negate(&self, a: &$t) -> $t { (0 as $t).wrapping_sub(*a) }
+        }
+    )*}
+}
+unsigned_arithmetic!(u32, u64);
+
 // C++ promotes the narrow integers to int before narrowing the result.
 macro_rules! narrow_arithmetic {
     ($($t:ty),*) => {$(

@@ -51,8 +51,8 @@ src/shared/pmpi.h	src/shared	pending
 src/shared/util.cxx	src/util.rs; src/symmetry.rs; src/fold_layout.rs; src/mapping_variants.rs; src/topology_candidates.rs	ported packed size/index recurrences, factorization, choice, permutation and strided/ragged copies; pinned copy-width/coalescing/allocation defects not reproduced
 src/shared/util.h	src/util.rs; typed Rust modules	replaced: slices, Vec, assertions and module constants replace raw-pointer helpers, VLA and dispatch/logging macros
 src/interface/back_comp.h	src/interface	pending
-src/interface/common.cxx	src/random.rs; src/flop_counter.rs	partial: exact MT19937-64 engine, get_rand48 interval conversion and safe process-global flop count; remaining common runtime helpers pending
-src/interface/common.h	src/interface	pending
+src/interface/common.cxx	src/common.rs; src/random.rs; src/flop_counter.rs	ported: native index encode/decode, prefix recurrences, permutations, allocation helpers, exact MT19937-64 engine, interval conversion and process-global flop count; raw C++ diagnostics/ABI helpers excluded
+src/interface/common.h	src/common.rs; src/context.rs; src/runtime.rs	ported: common CPU helpers and communicator ownership have direct typed Rust owners
 src/interface/decomposition.cxx	src/tensor_svd.rs; src/reshape.rs	incomplete upstream HoSVD class and excluded C++ expression machinery, not a working class API to port; indexed tensor SVD exists; working examples/hosvd.cxx algorithm remains pending separately
 src/interface/decomposition.h	Rust direct tensor/matrix APIs	unfinished upstream HoSVD declaration and excluded expression interface; see docs/coverage.md
 src/interface/flop_counter.cxx	src/flop_counter.rs; src/ffi/linalg.rs	ported process-global accumulation, interval snapshot/zero and communicator MPI_SUM; production GEMM instrumentation has exact D4 coverage
@@ -68,22 +68,22 @@ src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
 src/interface/matrix.cxx	src/matrix.rs; src/sparse_svd.rs; src/ffi/scalapack.rs	partial: four-type distributed thin/truncated/randomized SVD, sparse randomized SVD with sparse Gram/projection products and source mutable guess lifecycle, QR, Cholesky, triangular/positive-definite solves and square-subworld symmetric/Hermitian eigh; remaining routines pending
 src/interface/matrix.h	src/matrix.rs	partial direct Rust Tensor matrix APIs
-src/interface/monoid.cxx	src/interface	pending
-src/interface/monoid.h	src/interface	pending
+src/interface/monoid.cxx	src/algebra.rs	ported: native typed Monoid implementations and identities
+src/interface/monoid.h	src/algebra.rs	ported: Monoid trait replaces the C++ interface hierarchy
 src/interface/multilinear.cxx	src/multilinear.rs; src/multilinear_factor.rs; src/multilinear_kernel.rs; src/sparse_multilinear.rs; src/tttp_blocking.rs; src/solve_factor.rs; src/tensor_svd.rs; src/sparse_svd.rs	partial: generic semiring dense/sparse TTTP with factor-fiber broadcast, source auxiliary blocking from explicit rank-local available bytes, fiber-grouped MTTKRP, f64 weighted Solve_Factor, four-type dense/sparse truncated and randomized indexed SVD with sparse permutation/reshape and sparse Gram/projection products; remaining scalar kernels, vector memory diagnostic and process memory accounting pending
 src/interface/multilinear.h	src/multilinear.rs; src/tensor_svd.rs	partial: direct Rust TTTP/MTTKRP/tensor SVD APIs
-src/interface/partition.cxx	src/interface	pending
-src/interface/partition.h	src/interface	pending
-src/interface/ring.cxx	src/interface	pending
-src/interface/ring.h	src/interface	pending
-src/interface/scalar.cxx	src/interface	pending
-src/interface/scalar.h	src/interface	pending
+src/interface/partition.cxx	src/partition.rs	ported: Partition and IdxPartition topology reduction and label-bound distributions
+src/interface/partition.h	src/partition.rs	ported: native partition types replace the C++ interface
+src/interface/ring.cxx	src/algebra.rs	ported: typed arithmetic rings including wrapping u32/u64 operations
+src/interface/ring.h	src/algebra.rs	ported: Ring trait replaces the C++ interface hierarchy
+src/interface/scalar.cxx	src/scalar.rs	ported: root set and broadcast value for zero-order tensors
+src/interface/scalar.h	src/scalar.rs; src/tensor.rs	ported: zero-order Tensor is the native scalar representation
 src/interface/schedule.cxx	src/schedule.rs; src/schedule_graph.rs; src/schedule_partition.rs; tests/schedule.rs	partial: explicit replayable dense task DAG, RAW/WAR/WAW hazards, source cost-window partitioning and child-context execution/timing; source integer-cost/null-clone/root/overwrite defects corrected; automatic operation cost attachment and optimized reshuffle pending
 src/interface/schedule.h	src/schedule.rs	replaced: direct Rust closures, explicit input/output IDs, context and estimated costs; no global recorder or C++ AST compatibility
 src/interface/semiring.cxx	src/algebra.rs; src/linalg.rs; src/ffi/linalg.rs; src/contraction.rs	partial: generic scalar semiring and native four-type GEMM/batched folded kernels; complete sparse/native specialized dispatch pending
 src/interface/semiring.h	src/algebra.rs; src/sparse_formats.rs; src/sparse_coo.rs	partial: algebra, gen_csrmm, gen_csrmultcsr, gen_ccsrmm, native default_coomm and generic beta-one coomm; remaining kernels pending
-src/interface/set.cxx	src/interface	pending
-src/interface/set.h	src/sparse_formats.rs	partial: seq_coo_to_csr, seq_coo_to_ccsr, seq_csr_to_coo; remaining set responsibilities pending
+src/interface/set.cxx	src/algebra.rs	ported: native typed Set and Wire contracts
+src/interface/set.h	src/algebra.rs; src/sparse_formats.rs	ported: algebra traits plus seq_coo_to_csr, seq_coo_to_ccsr and seq_csr_to_coo
 src/interface/sparse_tensor.cxx	src/interface	pending
 src/interface/sparse_tensor.h	src/interface	pending
 src/interface/tensor.cxx	src/tensor.rs; src/sparse.rs; src/random.rs; src/norms.rs; src/subworld.rs; src/symmetric_subworld.rs; src/sparse_text.rs; src/symmetric_unpack.rs; src/pair_read.rs	partial: direct dense operations, ownership dense/sparse conversion, four-type dense random fill, seven-type sparse-pattern random fill, dense/sparse/compressed real norms and complex norm2 plus bool NS norm2/infinity, generic dense/compressed cross-world accumulation, four-type dense/sparse/compressed text MPI-IO, distributed symmetry unpack and explicit all-rank sorted pair/data extraction; optimized cross-world reshuffle pending; pinned bool norm1 and sparse subworld path are type/storage unsafe rather than coherent supported computations (docs/source-runtime-boundaries.md)
@@ -91,10 +91,10 @@ src/interface/tensor.h	src/interface	pending
 src/interface/term.cxx	src/interface	replaced: direct Rust operations replace the expression interface
 src/interface/term.h	src/interface	replaced: direct Rust operations replace the expression interface
 src/interface/timer.h	src/interface	pending
-src/interface/vector.cxx	src/interface	pending
-src/interface/vector.h	src/interface	pending
-src/interface/world.cxx	src/interface	pending
-src/interface/world.h	src/interface	pending
+src/interface/vector.cxx	src/vector.rs; src/tensor.rs	ported: typed distributed arange; rank-one Tensor is the native vector representation
+src/interface/vector.h	src/vector.rs; src/tensor.rs	ported: no redundant Vector subclass or C++ wrapper
+src/interface/world.cxx	src/runtime.rs; src/context.rs	ported: native MPI runtime, contexts, splits and parity worlds
+src/interface/world.h	src/runtime.rs; src/context.rs	ported: native ownership replaces the C++ World wrapper
 src/contraction/contraction_plan.h	src/planning.rs	partial: executable explicit-grid mapping plan; costs, diagnostic steps and packing pending
 src/contraction/contraction_selector.h	src/contraction	pending
 src/contraction/contraction_signature.cxx	src/planning.rs; src/sparse_contract_general.rs	partial: dense and NS sparse-A/dense-B/dense-C structural grid-plan reuse and context-scoped cache; compressed symmetry and automatic sparse candidate assembly pending
@@ -175,7 +175,7 @@ test/ccsdt_t3_to_t2.cxx	tests/upstream_ccsdt_t3_to_t2.rs	ported active AS versus
 test/dft.cxx	tests/upstream_dft.rs	ported SY complex DFT/inverse and active custom scalar reduction at bounded n=8; source factor 0.5 and real-error <1e-9; PASS WSL 1/2/4 world/parity, native compile/link; int/int64 C++ ABI overloads excluded
 test/diag_ctr.cxx	tests/upstream_dense.rs; tests/upstream_diag_ctr.rs	identity ported through dense and compressed tensor APIs; original 1e-10 checks, WSL 1/2/4 pass
 test/diag_sym.cxx	tests/upstream_diag_sym.rs	ported paired-SY diagonal identity, original norm<1e-10, deterministic fixture; WSL 1/2/4 ranks pass
-test/endomorphism_cust_sp.cxx	tests/upstream_endomorphism_cust_sp.rs	ported: stored custom-name length transform, exact criterion; deterministic unique global keys replace random source sparse writes
+test/endomorphism_cust_sp.cxx	tests/upstream_endomorphism_cust_sp.rs	ported: stored custom-name length transform and exact criterion; source-faithful per-rank key writes give min(np,N^4) global nonzeros
 test/endomorphism_cust.cxx	tests/upstream_endomorphism_cust.rs	ported: longest-name monoid and cached-length transform, exact criterion; deterministic global-key fixture
 test/endomorphism.cxx	tests/upstream_endomorphism.rs	ported: original indexed cube transform, n=5 and strict abs(error)<1e-6; deterministic global-key fixture
 test/gemm_4D.cxx	tests/upstream_gemm4d.rs	ported NS/SY/AS/SH associativity at n=7, original per-entry abs<1e-6; PASS WSL 1/2/4 world/parity; native compile/link only
@@ -213,9 +213,9 @@ examples/btwn_central.h	tests/upstream/examples/btwn_central.h	pending
 examples/ccsd.cxx	tests/upstream/examples/ccsd.rs	pending
 examples/checkpoint_sparse.cxx	tests/upstream/examples/checkpoint_sparse.rs	pending
 examples/checkpoint.cxx	tests/upstream/examples/checkpoint.rs	pending
-examples/dft_3D.cxx	tests/upstream/examples/dft_3D.rs	pending
-examples/fft_with_idx_partition.cxx	tests/upstream/examples/fft_with_idx_partition.rs	pending
-examples/fft.cxx	tests/upstream/examples/fft.rs	pending
+examples/dft_3D.cxx	tests/upstream/examples/dft_3D.rs	ported: n=6 distributed three-dimensional DFT with per-element real error below 1e-9
+examples/fft_with_idx_partition.cxx	tests/upstream/examples/fft_with_idx_partition.rs	ported: n=6, logm=8 indexed-partition FFT with source n*n*m*1e-6 bound
+examples/fft.cxx	tests/upstream/examples/fft.rs	ported: n=16 forward/inverse real and imaginary residuals at 1e-6
 examples/force_integration_sparse.cxx	tests/upstream/examples/force_integration_sparse.rs	pending
 examples/force_integration.cxx	tests/upstream/examples/force_integration.rs	pending
 examples/hosvd.cxx	tests/upstream_hosvd.rs	ported: source sequential four-mode SVD/scaling/reconstruction and original residual bound; all four scalar types, dense/sparse, bounded n=2 R=1/2; WSL 1/2/4 world/parity passed; native compile/link only

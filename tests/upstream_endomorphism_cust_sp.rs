@@ -1,6 +1,6 @@
 //! Deterministic port of pinned CTF test/endomorphism_cust_sp.cxx.
 use ctf::{
-    algebra::{CustomMonoid, Wire},
+    algebra::{Arithmetic, CustomMonoid, Wire},
     context::{Context, Runtime},
     mapping::Distribution,
     sparse::SparseTensor,
@@ -15,7 +15,12 @@ struct Name {
 }
 
 impl Name {
-    fn empty() -> Self { Self { bytes: [0; 256], len_name: 0 } }
+    fn empty() -> Self {
+        Self {
+            bytes: [0; 256],
+            len_name: 0,
+        }
+    }
     fn with_length(length: usize) -> Self {
         let mut value = Self::empty();
         value.bytes[..length].fill(b'a');
@@ -42,30 +47,47 @@ impl Wire for Name {
 }
 
 fn longest(a: &Name, b: &Name) -> Name {
-    if a.length() >= b.length() { a.clone() } else { b.clone() }
+    if a.length() >= b.length() {
+        a.clone()
+    } else {
+        b.clone()
+    }
 }
 
 type Names = CustomMonoid<Name, fn(&Name, &Name) -> Name>;
-fn algebra() -> Names { CustomMonoid { identity: Name::empty(), addition: longest } }
+fn algebra() -> Names {
+    CustomMonoid {
+        identity: Name::empty(),
+        addition: longest,
+    }
+}
 
 fn run(context: &Context<'_>) {
     let shape = vec![N + 1, N, N + 2, N + 3];
     let distribution = Distribution::cyclic(shape, context.size());
     let stored = N * N * N * N;
-    let pairs: Vec<_> = (0..stored)
-        .filter(|&key| distribution.owner(key) == context.rank())
-        .map(|key| (key, Name::with_length((key * 97 + 23) % 255)))
-        .collect();
+    let pairs = if context.rank() < stored {
+        vec![(
+            context.rank(),
+            Name::with_length((context.rank() * 97 + 23) % 255),
+        )]
+    } else {
+        Vec::new()
+    };
     let mut a = SparseTensor::new(context, distribution, algebra());
     a.write_add(&pairs);
     let before = a.local_nnz();
+    let global_nnz = context.all_reduce(&Arithmetic::<i64>::new(), &(before as i64));
+    assert_eq!(global_nnz, context.size().min(stored) as i64);
     a.transform_stored(|_, value| value.len_name = value.length() as u32);
     assert_eq!(a.local_nnz(), before);
 
-    let keys: Vec<_> = (0..stored).collect();
-    for (key, value) in a.read(&keys).into_iter().enumerate() {
-        assert_eq!(value.length(), value.len_name as usize,
-            "source sparse custom endomorphism length mismatch at key {key}");
+    for (key, value) in a.local_pairs() {
+        assert_eq!(
+            value.length(),
+            value.len_name as usize,
+            "source sparse custom endomorphism length mismatch at key {key}"
+        );
     }
 }
 
@@ -73,7 +95,9 @@ fn main() {
     let runtime = Runtime::initialize();
     let world = runtime.world();
     run(&world);
-    let parity = world.split(Some((world.rank() % 2) as i32), world.rank() as i32).unwrap();
+    let parity = world
+        .split(Some((world.rank() % 2) as i32), world.rank() as i32)
+        .unwrap();
     run(&parity);
     parity.close();
     if world.rank() == 0 {

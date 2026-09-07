@@ -6,6 +6,7 @@
 
 pub mod algebra;
 mod binary_io;
+pub mod common;
 pub mod context;
 pub mod contraction;
 pub mod cost;
@@ -49,6 +50,7 @@ pub mod pad;
 mod pair_read;
 pub mod partial_fold;
 pub mod partial_fold_kernel;
+pub mod partition;
 mod permuted_io;
 pub mod plan_cost;
 pub mod planning;
@@ -56,6 +58,7 @@ pub mod random;
 pub mod redist;
 pub mod redist_cost;
 pub mod scalar_conversion;
+pub mod scalar;
 pub mod scale_tsr;
 pub mod scaling;
 pub mod schedule;
@@ -97,3 +100,4 @@ pub mod symmetry;
 pub mod tensor;
 pub mod topology_candidates;
 pub mod util;
+pub mod vector;
