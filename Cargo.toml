@@ -812,3 +812,13 @@ harness = false
 name = "upstream_sssp"
 path = "tests/upstream_sssp.rs"
 harness = false
+
+[[test]]
+name = "distributed_mixed_coo"
+path = "tests/distributed_mixed_coo.rs"
+harness = false
+
+[[test]]
+name = "upstream_strassen"
+path = "tests/upstream_strassen.rs"
+harness = false

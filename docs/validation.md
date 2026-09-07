@@ -1,5 +1,29 @@
 # Validation evidence
 
+## Upstream one-level Strassen (2026-09-08)
+
+upstream_strassen passed once at WSL 1/2/4 ranks plus one 7-rank run covering
+the source divisible-by-seven branch. World/parity runs include all four
+NS/AS/SY/SH inputs. Seven half-size products, source quadrant coefficients
+and off-diagonal sign/transpose constructions are checked against the
+ordinary distributed product with the original strict squared-error/n^2
+<1e-10 rule and finite results. Child products run independently after
+explicit parent quadrant transfers; no full input gather is used. The source
+is one level only, not recursive. DIGIT / PASS; no precision study. Native
+Windows compilation/linking passed; missing MPI runtime remains unaccepted.
+
+## Mixed sparse output and typed COO communication (2026-09-08)
+
+mixed_sparse_output passed two local WSL tests once: exact symbolic structure,
+first-product assignment, order-sensitive subsequent accumulation/old merge,
+duplicate old coordinates, stored cancellations and empty product. The updated
+COO 2D executor passed distributed_mixed_coo once at WSL 1/2/4 ranks,
+world/parity, using i32 sparse A, bool dense B and i64 output. Checks cover
+stored zeros, empty A panels, A broadcast and simultaneous B broadcast/C
+cyclic reduction. All comparisons are exact; DIGIT / PASS, no precision
+study. Both targets compiled/linked once on Windows GNU; native runtime
+remains unaccepted due to the previously confirmed missing MPI DLL.
+
 ## Mixed CPU kernels and sparse matricization (2026-09-07)
 
 mixed_kernel passed two local WSL tests once after replacing unsupported

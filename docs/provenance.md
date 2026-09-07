@@ -1,5 +1,19 @@
 # Source provenance
 
+tests/upstream_strassen.rs ports the one-level seven-product example,
+not a recursive Strassen algorithm. Both parent and divisible-by-seven child
+branches are included. Compressed NS/AS/SY/SH input is explicitly expanded
+distributedly; the parent branch retains the source off-diagonal transpose
+and sign rules. Only half-size quadrants cross subworld boundaries; parent
+transfers are serialized by the explicit Rust API, then all child groups
+compute independently. N=8 and seeded MT filling are bounded adaptations.
+
+kernel::csr_sparse ports interface/kernel.h Bivar_Kernel::csrmultcsr and
+sparse_formats/csr.cxx::csr_add composition, with first-product assignment,
+subsequent g updates and old-output merge. execute_coo_dense now preserves
+independent sparse A, dense B and dense output element types across its
+existing source communication sequence, using each type's Wire encoding.
+
 src/kernel.rs ports interface/kernel.h Monoid_Kernel::xpy and Bivar_Kernel
 gemm/csrmm/csrmultd, preserving independent A/B/C types and arbitrary g(f,c).
 src/sparse_matricize.rs ports coo.cxx set_data/get_data: phase-aware reordered

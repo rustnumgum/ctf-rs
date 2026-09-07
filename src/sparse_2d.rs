@@ -465,12 +465,12 @@ fn dense_output_scatter<A: Semiring>(
 
 /// Folded COO/dense/dense source 2D level. COO entry order, duplicates and
 /// stored zeros survive communication unchanged; no CSR conversion is used.
-pub fn execute_coo_dense<A: Semiring>(
+pub fn execute_coo_dense<A: Semiring, T: Wire + Clone, U: Wire + Clone>(
     algebra: &A, edge: usize, layers: Layers,
     a_plan: Panel<'_, '_>, b_plan: Panel<'_, '_>, c_plan: Panel<'_, '_>,
-    a: &[Coo<A::Element>], b: &[Vec<A::Element>], mut c: Vec<Vec<A::Element>>,
+    a: &[Coo<T>], b: &[Vec<U>], mut c: Vec<Vec<A::Element>>,
     beta: A::Element,
-    mut child: impl FnMut(&[Coo<A::Element>], &[Vec<A::Element>], Vec<Vec<A::Element>>,
+    mut child: impl FnMut(&[Coo<T>], &[Vec<U>], Vec<Vec<A::Element>>,
         A::Element, Layers) -> Vec<Vec<A::Element>>,
 ) -> Vec<Vec<A::Element>> where A::Element: Wire {
     assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));

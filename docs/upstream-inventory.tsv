@@ -63,7 +63,7 @@ src/interface/graph_io_aux.cxx	src/sparse_text.rs; src/ffi/mpi_io.rs	implemented
 src/interface/group.h	src/interface	pending
 src/interface/idx_tensor.cxx	src/interface	pending
 src/interface/idx_tensor.h	src/interface	pending
-src/interface/kernel.h	src/sparse_coo.rs; src/kernel.rs	partial: mixed-type Kernel<f,g> COO, dense GEMM, CSR/dense and CSR/CSR dense-output loops plus Monoid strided xpy, arbitrary accumulator and source coefficient restrictions; sparse-output Kernel operations and automatic distributed mixed-type dispatch pending
+src/interface/kernel.h	src/sparse_coo.rs; src/kernel.rs; src/sparse_2d.rs	partial: mixed-type Kernel<f,g> COO, dense GEMM, CSR/dense, CSR/CSR dense/sparse-output loops plus Monoid strided xpy; explicit typed COO 2D communication, arbitrary accumulator and source coefficient restrictions; automatic distributed mixed-type dispatch pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
 src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed thin/truncated/randomized SVD, QR, Cholesky, triangular/positive-definite solves and square-subworld symmetric/Hermitian eigh; remaining routines pending
@@ -236,7 +236,7 @@ examples/sparse_permuted_slice.cxx	pending: source-semantic packed permutation A
 examples/spectral_element.cxx	tests/upstream/examples/spectral_element.rs	pending
 examples/spmv.cxx	tests/upstream_spmv.rs	ported active sparse-A/dense-vector equations with dense and sparse output, both operand orders; bounded n=5 and source sparsity 0.5/n, explicit MT seed adaptation; original initial norm>=1e-6 and residual<=1e-6; PASS WSL 1/2/4 world/parity, native compile/link
 examples/sssp.cxx	tests/upstream_sssp.rs	ported active n=7 tropical Bellman-Ford, source sparsification, ordinary integer-SUM convergence and injected negative-cycle assertions; explicit MT integer RNG adaptation; exact PASS WSL1/2/4 world/parity, native compile/link
-examples/strassen.cxx	tests/upstream/examples/strassen.rs	pending
+examples/strassen.cxx	tests/upstream_strassen.rs	ported one-level seven-product parent and seven-subworld paths, NS/AS/SY/SH transpose/sign equations, strict squared-error/n^2<1e-10; bounded n8 and MT adaptation, explicit quadrant subworld transfers; PASS WSL1/2/4/7 world/parity, native compile/link
 examples/trace.cxx	tests/upstream_trace.rs	ported four cyclic NS ABCD products, diagonal extraction and sum; bounded n=3, source drand48 recurrence and relative<=1e-10 criteria; PASS WSL 1/2/4 world/parity, native compile/link
 scalapack_tests/conj.h	tests/upstream/scalapack_tests/conj.h	pending
 scalapack_tests/eigh.cxx	tests/distributed_eigh.rs; tests/typed_distributed_eigh.rs	partial: four-type symmetric/Hermitian reconstruction and orthogonality at original n*n*1e-6 bounds PASS WSL 1/2/4; degenerate spectra and square subworld covered; full upstream driver pending
