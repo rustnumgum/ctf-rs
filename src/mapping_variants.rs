@@ -30,6 +30,74 @@ pub struct Variant {
     pub bc_labels: Vec<usize>,
 }
 
+impl Variant {
+    /// Source switch_topo_perm: place each folded physical pair consecutively,
+    /// find the first matching topology in the world catalog, then remap axes.
+    /// Conflicting folded pairs reject without modifying the candidate.
+    pub fn canonicalize(&mut self,catalog:&[Topology])->Option<usize>{
+        let topology=&self.distributions[0].topology;
+        assert!(self.distributions.iter().all(|d|&d.topology==topology));
+        let mut order=vec![None;topology.dimensions.len()];let mut next=0;
+        for operand in 0..3 {
+            for map in &self.distributions[operand].mappings {
+                if let Mapping::Physical{axis,child,..}=map {
+                    if let Mapping::Physical{axis:second,..}=child.as_ref(){
+                        if operand!=0&&(order[*axis].is_some()||order[*second].is_some()){
+                            if Some(order[*axis].map_or(0,|first|first+1))!=order[*second]{return None;}
+                        }else{order[*axis]=Some(next);order[*second]=Some(next+1);next+=2;}
+                    }
+                }
+            }
+        }
+        for axis in &mut order {if axis.is_none(){*axis=Some(next);next+=1;}}
+        let order:Vec<usize>=order.into_iter().map(Option::unwrap).collect();
+        let mut shape=vec![0;order.len()];
+        for(old,&new)in order.iter().enumerate(){shape[new]=topology.dimensions[old];}
+        let selected=catalog.iter().position(|candidate|candidate.dimensions==shape)
+            .expect("source topology catalog must contain the canonical permutation");
+        for distribution in &mut self.distributions {
+            distribution.topology=catalog[selected].clone();
+            for mapping in &mut distribution.mappings{
+                let mut current=mapping;
+                while let Mapping::Physical{axis,child,..}=current{*axis=order[*axis];current=child;}
+            }
+        }
+        Some(selected)
+    }
+}
+
+#[derive(Clone,Debug)]
+pub struct ExhaustiveCandidate {
+    pub global_id: usize,
+    pub source_topology_index: usize,
+    pub source_variant_index: usize,
+    pub variant: Variant,
+}
+
+/// Stream this rank's exhaustive candidates in source catalog order. IDs count
+/// all raw variants, including candidates rejected by canonicalization/preflight.
+/// This local enumeration makes no collective calls and performs no cost filter.
+pub fn visit_local_exhaustive(context:&crate::context::Context<'_>,
+    shapes:[&[usize];3],indices:[&str;3],catalog:&[Topology],
+    mut visit:impl FnMut(ExhaustiveCandidate))->Result<usize,Rejected>{
+    let mut offset=0usize;
+    for(source_topology_index,topology)in catalog.iter().enumerate(){
+        assert_eq!(topology.size(),context.size());
+        let space=VariantSpace::new(shapes,indices,topology.clone())?;
+        let next=offset.checked_add(space.len()).ok_or(Rejected::VariantCountOverflow)?;
+        for source_variant_index in 0..space.len(){
+            let global_id=offset+source_variant_index;
+            if global_id%context.size()!=context.rank(){continue;}
+            let mut variant=space.decode(source_variant_index)?;
+            if variant.canonicalize(catalog).is_none(){continue;}
+            if !crate::mapping_preflight::check(variant.distributions.each_ref(),indices){continue;}
+            visit(ExhaustiveCandidate{global_id,source_topology_index,source_variant_index,variant});
+        }
+        offset=next;
+    }
+    Ok(offset)
+}
+
 #[derive(Clone, Debug)]
 pub struct VariantSpace {
     shapes: [Vec<usize>; 3],
@@ -120,12 +188,12 @@ fn get_choice(n: usize, k: usize, choice: usize) -> Vec<usize> {
                 group += 1;
                 factorial *= group;
             }
-            let stride = packed_size(dimension - group + 1, &lengths, &hollow);
+            let stride = packed_size(dimension + 1 - group, &lengths, &hollow);
             let scaled = remainder as f64 * factorial as f64 / stride as f64;
             let mut maximum = scaled.powf(1. / group as f64) as i64 + group as i64 + 1;
             let mut prefix;
             loop {
-                for length in &mut lengths[dimension - group + 1..=dimension] {
+                for length in &mut lengths[dimension + 1 - group..=dimension] {
                     *length = maximum;
                 }
                 prefix = packed_size(dimension + 1, &lengths, &hollow);

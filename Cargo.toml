@@ -431,3 +431,12 @@ path = "tests/mapping_preflight.rs"
 [[test]]
 name = "mapping_variants"
 path = "tests/mapping_variants.rs"
+
+[[test]]
+name = "topology_canonicalization"
+path = "tests/topology_canonicalization.rs"
+
+[[test]]
+name = "distributed_exhaustive_mapping"
+path = "tests/distributed_exhaustive_mapping.rs"
+harness = false

@@ -38,7 +38,7 @@ $mpiTests = @(
     'distributed_sparse_function_output','distributed_sparse_fold_function',
     'upstream_bivar_function','distributed_dense_function',
     'upstream_univar_function','upstream_endomorphism','upstream_bivar_transform',
-    'upstream_endomorphism_cust','upstream_endomorphism_cust_sp'
+    'upstream_endomorphism_cust','upstream_endomorphism_cust_sp','distributed_exhaustive_mapping'
 )
 $arguments = @()
 foreach ($test in $mpiTests) { $arguments += @('--test', $test) }
@@ -50,7 +50,7 @@ foreach ($ranks in 1,2,4) {
 Remove-Item Env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER
 $localTests = @('local_linalg','topology_candidates','node_aware','map_tensor',
     'sequential_sum','virtual_sum','sequential_contraction','folded_contraction',
-    'sparse_formats','sparse_sequential','sparse_function','sparse_function_kernel','cost_models','plan_cost','grid_plan_cost','redist_cost','mapping_preflight','mapping_variants','symmetry_layout','sym_indices',
+    'sparse_formats','sparse_sequential','sparse_function','sparse_function_kernel','cost_models','plan_cost','grid_plan_cost','redist_cost','mapping_preflight','mapping_variants','topology_canonicalization','symmetry_layout','sym_indices',
     'sym_triple','sym_operations','folding')
 $arguments = @()
 foreach ($test in $localTests) { $arguments += @('--test', $test) }

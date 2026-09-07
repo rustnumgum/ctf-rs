@@ -63,8 +63,11 @@ component claims folded/symmetry self-mapping validation or executes a candidate
 Pinned quirks are intentional: hollow get_choice index zero yields repeated zero
 coordinates, and AC orientation case 1 has no assignment because its source break
 precedes the assignment. These are not replaced with textbook combinations/SUMMA.
-Topology-permutation canonicalization and distributed variant enumeration still
-need connection, followed by normal-search alternatives and costed execution.
+Variant::canonicalize now applies source folded-pair topology permutation and
+first matching catalog lookup. visit_local_exhaustive streams decode -> canonicalize
+-> preflight per rank. Raw global IDs include skipped candidates and partition by
+ID modulo communicator size; no survivor renumbering occurs. Remaining integration
+includes size/memory filters, normal-search alternatives and costed execution.
 
 Total candidate evaluation must additionally port folding and sparse redistribution
 costs (2632-2810), then connect existing collective Selector and context cache. Sparse,

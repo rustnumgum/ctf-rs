@@ -1034,6 +1034,18 @@ map equality and singleton rules. No MPI execution or floating tolerance was
 needed. Both targets compiled/linked on Windows GNU. DIGIT / PASS; automatic
 candidate enumeration/selection/execution integration remains incomplete.
 
+## Canonical topology and distributed exhaustive IDs (2026-09-07)
+
+Two topology_canonicalization checks passed once: folded physical-pair reordering
+and conflict rejection without candidate mutation. distributed_exhaustive_mapping
+passed at 1/2 ranks initially; four ranks exposed unsigned intermediate underflow
+in the prior get_choice port's dimension-group+1 expression. Reordering it as
+dimension+1-group preserves the source signed arithmetic result. Only the affected
+four-rank run was repeated and passed, including parity subcommunicators.
+Exact checks cover catalog order, all GEMM raw IDs, modulo rank partitioning and
+singleton rejection holes. DIGIT / PASS; no precision study. Both targets compiled
+and linked on Windows GNU; native runtime acceptance remains outstanding.
+
 ## High-order sparse custom contraction (2026-09-07)
 
 distributed_sparse_fold_function passed once at 1/2/4 WSL ranks, world/parity,

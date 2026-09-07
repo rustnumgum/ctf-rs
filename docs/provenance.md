@@ -979,3 +979,14 @@ require equal total phases, and mismatched physical dimensions must have the
 source corresponding matched coverage. Singleton physical assignments fail the
 same bookkeeping. Symmetric/repeated self-mapping, topology canonicalization and
 automatic candidate execution remain separate unfinished responsibilities.
+
+## Topology canonicalization and rank-local exhaustive enumeration
+
+Variant::canonicalize follows switch_topo_perm (contraction.cxx:2044-2142): place
+folded physical pairs consecutively in A/B/C order, reject conflicts, append unused
+axes, select the first matching catalog topology, then rename physical axes.
+visit_local_exhaustive follows 3031-3105: cumulative raw topology counts define
+global IDs; only global_id % world_size == rank is decoded. Canonicalization and
+preflight rejection leave holes, not renumbered survivors. Enumeration is local
+and streaming; no candidate-array allgather or aligned-only replacement is used.
+Memory/size filtering and selected-plan reconstruction remain separate stages.

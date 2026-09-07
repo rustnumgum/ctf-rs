@@ -37,6 +37,7 @@ mpi_tests+=(distributed_sparse_fold_function)
 mpi_tests+=(upstream_bivar_function distributed_dense_function)
 mpi_tests+=(upstream_univar_function upstream_endomorphism upstream_bivar_transform)
 mpi_tests+=(upstream_endomorphism_cust upstream_endomorphism_cust_sp)
+mpi_tests+=(distributed_exhaustive_mapping)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
@@ -44,4 +45,4 @@ for ranks in 1 2 4; do
 done
 cargo test --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
   --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction \
-  --test sparse_formats --test sparse_sequential --test sparse_function --test sparse_function_kernel --test cost_models --test plan_cost --test grid_plan_cost --test redist_cost --test mapping_preflight --test mapping_variants --test symmetry_layout --test sym_indices --test sym_triple --test sym_operations --test folding -- --nocapture
+  --test sparse_formats --test sparse_sequential --test sparse_function --test sparse_function_kernel --test cost_models --test plan_cost --test grid_plan_cost --test redist_cost --test mapping_preflight --test mapping_variants --test topology_canonicalization --test symmetry_layout --test sym_indices --test sym_triple --test sym_operations --test folding -- --nocapture
