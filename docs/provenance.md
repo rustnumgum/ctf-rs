@@ -1149,3 +1149,10 @@ and source tags as the f64 folded path. A Wire serialization buffer replaces
 the source runtime MPI element datatype, allowing non-Copy/custom Rust values
 without exposing their object representation. Mutable low-memory inputs are
 exchanged back; disposable immutable-input working copies are not.
+
+Typed BLAS calls preserve interface/semiring.cxx's native float/double and
+complex float/double GEMM dispatch. Complex values use the Rust-owned repr(C)
+real/imaginary pair at this internal native boundary; MPI still uses Wire.
+The folded contraction's transpose flag is ordinary T, not conjugate transpose.
+Typed local folding preserves the existing contiguous batch offsets, beta-once
+scaling and residual-index traversal rather than promoting values to f64.

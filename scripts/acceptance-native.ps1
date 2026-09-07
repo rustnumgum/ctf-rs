@@ -48,7 +48,7 @@ foreach ($ranks in 1,2,4) {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 Remove-Item Env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER
-$localTests = @('node_peer_counts','folded_cost','partial_fold_kernel','fold_storage','partial_fold','fold_indices','fold_layout','fold_selection','mapped_cost','local_linalg','topology_candidates','node_aware','map_tensor',
+$localTests = @('scalar_blas','node_peer_counts','folded_cost','partial_fold_kernel','fold_storage','partial_fold','fold_indices','fold_layout','fold_selection','mapped_cost','local_linalg','topology_candidates','node_aware','map_tensor',
     'sequential_sum','virtual_sum','sequential_contraction','folded_contraction',
     'sparse_formats','sparse_sequential','sparse_function','sparse_function_kernel','cost_models','plan_cost','grid_plan_cost','redist_cost','mapping_preflight','mapping_variants','topology_canonicalization','normal_mapping','symmetry_layout','sym_indices',
     'sym_triple','sym_operations','folding')

@@ -1,6 +1,6 @@
 //! Local-kernel tests. Distributed ScaLAPACK validation remains a separate gate.
 #![cfg(feature = "native-linalg")]
-use ctf::linalg::{Gemm, LocalKernels, Native, Transpose};
+use ctf::linalg::{Gemm, GemmKernel, LocalKernels, Native, Transpose};
 
 fn product(m: usize, n: usize, k: usize, a: &[f64], b: &[f64]) -> Vec<f64> {
     let mut c = vec![0.; m*n];

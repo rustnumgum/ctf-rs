@@ -1,6 +1,9 @@
 // Independently written Rust bindings to the standard BLAS/LAPACK interfaces.
 //! Native BLAS/LAPACK LP64 entry points; no CTF compatibility shim.
-use crate::linalg::{Gemm, Svd, Transpose};
+use crate::{
+    algebra::Complex,
+    linalg::{Gemm, Svd, Transpose},
+};
 use std::ffi::c_char;
 
 #[cfg_attr(target_os = "windows", link(name = "openblas"))]
@@ -58,15 +61,66 @@ fn matrix_len(rows: usize, cols: usize, ld: usize) -> usize {
     assert!(ld >= rows.max(1));
     if rows == 0 || cols == 0 { 0 } else { (cols-1)*ld+rows }
 }
-pub(crate) fn gemm(g: Gemm<'_>) {
-    let (ar, ac) = match g.trans_a { Transpose::No => (g.m,g.k), Transpose::Yes => (g.k,g.m) };
-    let (br, bc) = match g.trans_b { Transpose::No => (g.k,g.n), Transpose::Yes => (g.n,g.k) };
+fn validate_gemm<T>(g: &Gemm<'_, T>) {
+    let (ar, ac) = match g.trans_a {
+        Transpose::No => (g.m, g.k),
+        Transpose::Yes => (g.k, g.m),
+    };
+    let (br, bc) = match g.trans_b {
+        Transpose::No => (g.k, g.n),
+        Transpose::Yes => (g.n, g.k),
+    };
     assert!(g.a.len() >= matrix_len(ar, ac, g.lda));
     assert!(g.b.len() >= matrix_len(br, bc, g.ldb));
     assert!(g.c.len() >= matrix_len(g.m, g.n, g.ldc));
-    unsafe { dgemm_(&trans(g.trans_a), &trans(g.trans_b), &int(g.m), &int(g.n), &int(g.k),
-        &g.alpha, g.a.as_ptr(), &int(g.lda), g.b.as_ptr(), &int(g.ldb), &g.beta, g.c.as_mut_ptr(), &int(g.ldc)); }
 }
+pub(crate) fn gemm(g: Gemm<'_, f64>) {
+    validate_gemm(&g);
+    unsafe {
+        dgemm_(
+            &trans(g.trans_a),
+            &trans(g.trans_b),
+            &int(g.m),
+            &int(g.n),
+            &int(g.k),
+            &g.alpha,
+            g.a.as_ptr(),
+            &int(g.lda),
+            g.b.as_ptr(),
+            &int(g.ldb),
+            &g.beta,
+            g.c.as_mut_ptr(),
+            &int(g.ldc),
+        );
+    }
+}
+macro_rules! gemm {
+    ($function:ident, $native:ident, $scalar:ty) => {
+        pub(crate) fn $function(g: Gemm<'_, $scalar>) {
+            validate_gemm(&g);
+            unsafe {
+                $native(
+                    &trans(g.trans_a),
+                    &trans(g.trans_b),
+                    &int(g.m),
+                    &int(g.n),
+                    &int(g.k),
+                    &g.alpha,
+                    g.a.as_ptr(),
+                    &int(g.lda),
+                    g.b.as_ptr(),
+                    &int(g.ldb),
+                    &g.beta,
+                    g.c.as_mut_ptr(),
+                    &int(g.ldc),
+                );
+            }
+        }
+    };
+}
+gemm!(gemm_f32, sgemm_, f32);
+gemm!(gemm_c32, cgemm_, Complex<f32>);
+gemm!(gemm_c64, zgemm_, Complex<f64>);
 pub(crate) fn cholesky(n: usize, a: &mut [f64], lower: bool) -> Result<(), i32> {
     assert_eq!(a.len(), n*n);
     let mut info = 0;

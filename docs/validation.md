@@ -1050,6 +1050,21 @@ Input data/layout restoration and discrete results are exact; existing floating
 additional precision checks. Both targets compiled/linked on Windows GNU;
 native MPI execution remains pending. DIGIT / PASS for this change.
 
+## Four native BLAS scalar types (2026-09-07)
+
+scalar_blas passed native SGEMM/DGEMM/CGEMM/ZGEMM cases: N/T combinations,
+padded leading dimensions with exact untouched padding, zero reduction length,
+complex coefficients and typed partial-fold residual traversal. Every floating
+component must be finite and within the existing absolute 1e-6 bound.
+Affected local_linalg, folded_contraction, partial_fold_kernel, folding and
+fold_selection targets passed once. dense_folded_execution, dense_low_memory
+and distributed_node_fold passed once at WSL 1/2/4 ranks, world/parity.
+Initial compilation caught two missing Monoid imports and one renamed call in
+tensor.rs; these were fixed before numerical execution. There were no numerical
+failures or added precision runs. All nine targets compiled/linked on Windows
+GNU. Native runtime remains pending. DIGIT / PASS for this scalar-kernel stage,
+not a claim of typed distributed folded or f32/complex LAPACK completion.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

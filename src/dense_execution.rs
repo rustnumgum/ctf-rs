@@ -448,7 +448,7 @@ fn folded_virtualized<K: crate::linalg::LocalKernels>(
     let mut visited = vec![false; counts[2]];
     space.for_each(|offsets| {
         let (ia, ib, ic) = (offsets[0], offsets[1], offsets[2]);
-        crate::partial_fold_kernel::execute_packed::<K>(
+        crate::partial_fold_kernel::execute_packed::<f64,K>(
             descriptor,
             block_shapes.each_ref().map(Vec::as_slice),
             links.each_ref().map(Vec::as_slice),

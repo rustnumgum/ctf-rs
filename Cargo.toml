@@ -520,3 +520,7 @@ path = "tests/node_peer_counts.rs"
 name = "dense_low_memory"
 path = "tests/dense_low_memory.rs"
 harness = false
+
+[[test]]
+name = "scalar_blas"
+path = "tests/scalar_blas.rs"

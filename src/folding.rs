@@ -9,7 +9,7 @@
 //! become `k`, `m`, `n`, and independent GEMM batches `l`, respectively.
 
 use crate::{
-    contraction::{Folded, folded_f64},
+    contraction::{Folded, folded},
     linalg::{LocalKernels, Transpose},
 };
 
@@ -312,7 +312,7 @@ impl Plan {
         let packed_a = pack(a, &self.shape_a, &self.order_a);
         let packed_b = pack(b, &self.shape_b, &self.order_b);
         let mut packed_c = pack(c, &self.shape_c, &self.order_c);
-        folded_f64::<K>(
+        folded::<f64,K>(
             Folded {
                 m: self.m,
                 n: self.n,

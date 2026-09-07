@@ -1,11 +1,11 @@
 // Adapted from cc4s contraction/{ctr_tsr,sym_seq_ctr}.cxx and
 // shared/iter_tsr.h. Copyright (c) 2011, Edgar Solomonik. See LICENSE.
-//! CPU f64 residual-index traversal around a selected partial folded GEMM.
+//! Typed CPU residual-index traversal around a selected partial folded GEMM.
 
 use crate::{
-    contraction::{Folded, folded_f64},
+    algebra::{Arithmetic, Monoid, Semiring},
+    contraction::{Folded, folded},
     fold_layout::{Direction,storage_len},
-    linalg::LocalKernels,
     partial_fold::Descriptor,
     symmetry::Symmetry,
 };
@@ -148,17 +148,22 @@ fn inverse(operands: &[Operand; 3]) -> Vec<[Option<usize>; 3]> {
 /// Execute one already-forward-transposed local block. Distributed execution
 /// calls this after panel communication and ctr_virt slicing.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn execute_packed<K: LocalKernels>(
+pub(crate) fn execute_packed<T, K>(
     descriptor: &Descriptor,
     shapes: [&[usize]; 3],
     links: [&[Symmetry]; 3],
     indices: [&str; 3],
-    packed_a: &[f64],
-    packed_b: &[f64],
-    packed_c: &mut [f64],
-    alpha: f64,
-    beta: f64,
-) {
+    packed_a: &[T],
+    packed_b: &[T],
+    packed_c: &mut [T],
+    alpha: T,
+    beta: T,
+)
+where
+    T: Clone + PartialEq,
+    Arithmetic<T>: Semiring<Element = T>,
+    K: crate::linalg::GemmKernel<T>,
+{
     let normalized = normalized(indices);
     let operands: [Operand; 3] = std::array::from_fn(|operand| {
         residual_operand(
@@ -172,11 +177,14 @@ pub(crate) fn execute_packed<K: LocalKernels>(
     assert_eq!(packed_a.len(), storage_len(shapes[0], links[0]));
     assert_eq!(packed_b.len(), storage_len(shapes[1], links[1]));
     assert_eq!(packed_c.len(), storage_len(shapes[2], links[2]));
-    if beta == 0. {
-        packed_c.fill(0.);
-    } else if beta != 1. {
+    let algebra = Arithmetic::<T>::new();
+    let zero = algebra.zero();
+    let one = algebra.one();
+    if beta == zero {
+        packed_c.fill(zero.clone());
+    } else if beta != one {
         for value in packed_c.iter_mut() {
-            *value *= beta;
+            *value = algebra.multiply(&beta, value);
         }
     }
 
@@ -194,7 +202,7 @@ pub(crate) fn execute_packed<K: LocalKernels>(
         // first CHECK_SYM, including for AS/SH residual groups.
         if symmetry_pass {
             let starts: [usize;3] = std::array::from_fn(|operand| offsets[operand] * strides[operand]);
-            folded_f64::<K>(
+            folded::<T, K>(
                 Folded {
                     m: descriptor.m,
                     n: descriptor.n,
@@ -207,8 +215,8 @@ pub(crate) fn execute_packed<K: LocalKernels>(
                 &packed_a[starts[0]..starts[0] + strides[0]],
                 &packed_b[starts[1]..starts[1] + strides[1]],
                 &mut packed_c[starts[2]..starts[2] + strides[2]],
-                alpha,
-                1.,
+                alpha.clone(),
+                one.clone(),
             );
         }
 
@@ -245,24 +253,29 @@ pub(crate) fn execute_packed<K: LocalKernels>(
 /// Pack, execute, and restore one original local partial-fold block. The
 /// distributed path performs these transposes once across all virtual blocks.
 #[allow(clippy::too_many_arguments)]
-pub fn execute<K: LocalKernels>(
+pub fn execute<T, K>(
     descriptor: &Descriptor,
     shapes: [&[usize]; 3],
     links: [&[Symmetry]; 3],
     indices: [&str; 3],
-    a: &[f64],
-    b: &[f64],
-    c: &mut [f64],
-    alpha: f64,
-    beta: f64,
-) {
+    a: &[T],
+    b: &[T],
+    c: &mut [T],
+    alpha: T,
+    beta: T,
+)
+where
+    T: Clone + PartialEq,
+    Arithmetic<T>: Semiring<Element = T>,
+    K: crate::linalg::GemmKernel<T>,
+{
     assert_eq!(a.len(), storage_len(shapes[0], links[0]));
     assert_eq!(b.len(), storage_len(shapes[1], links[1]));
     assert_eq!(c.len(), storage_len(shapes[2], links[2]));
     let packed_a = descriptor.layouts[0].transpose(a, 1, Direction::Forward);
     let packed_b = descriptor.layouts[1].transpose(b, 1, Direction::Forward);
     let mut packed_c = descriptor.layouts[2].transpose(c, 1, Direction::Forward);
-    execute_packed::<K>(
+    execute_packed::<T, K>(
         descriptor,
         shapes,
         links,
@@ -274,5 +287,5 @@ pub fn execute<K: LocalKernels>(
         beta,
     );
     let restored = descriptor.layouts[2].transpose(&packed_c, 1, Direction::Backward);
-    c.copy_from_slice(&restored);
+    c.clone_from_slice(&restored);
 }

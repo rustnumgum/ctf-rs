@@ -80,7 +80,7 @@ src/interface/scalar.cxx	src/interface	pending
 src/interface/scalar.h	src/interface	pending
 src/interface/schedule.cxx	src/interface	pending
 src/interface/schedule.h	src/interface	pending
-src/interface/semiring.cxx	src/interface	pending
+src/interface/semiring.cxx	src/algebra.rs; src/linalg.rs; src/ffi/linalg.rs; src/contraction.rs	partial: generic scalar semiring and native four-type GEMM/batched folded kernels; complete sparse/native specialized dispatch pending
 src/interface/semiring.h	src/algebra.rs; src/sparse_formats.rs	partial: algebra, gen_csrmm, gen_csrmultcsr, gen_ccsrmm; remaining kernels pending
 src/interface/set.cxx	src/interface	pending
 src/interface/set.h	src/sparse_formats.rs	partial: seq_coo_to_csr, seq_coo_to_ccsr, seq_csr_to_coo; remaining set responsibilities pending
@@ -120,7 +120,7 @@ src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
 src/contraction/spctr_tsr.cxx	src/contraction	pending
 src/contraction/spctr_tsr.h	src/contraction	pending
-src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar reference kernels, f64 canonical partial/symmetry folded BLAS residual traversal and distributed NS integration; custom-function folded branch and automatic compressed integration pending
+src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar reference kernels, typed canonical partial/symmetry folded BLAS residual traversal and distributed f64 integration; custom-function folded branch and automatic compressed integration pending
 src/contraction/sym_seq_ctr.h	src/contraction	pending
 src/redistribution/cyclic_reshuffle.cxx	src/redistribution	pending
 src/redistribution/cyclic_reshuffle.h	src/redistribution	pending

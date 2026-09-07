@@ -92,7 +92,7 @@ impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
             Panel {comm:Some(&across_columns),outer:1,inner:ma*kb},
             Panel {comm:Some(&across_rows),outer:1,inner:kb*nb},Panel {comm:None,outer:1,inner:0},
             &aa.data,&bb.data,&mut cc.data,beta,|a,b,c,beta,_| {
-                crate::contraction::folded_f64::<K>(Folded {m:ma,n:nb,k:kb,batches:1,
+                crate::contraction::folded::<f64,K>(Folded {m:ma,n:nb,k:kb,batches:1,
                     trans_a:Transpose::No,trans_b:Transpose::No,transposed_output:false},a,b,c,alpha,beta);
             });
         across_columns.close(); across_rows.close();

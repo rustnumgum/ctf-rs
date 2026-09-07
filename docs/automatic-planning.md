@@ -249,3 +249,15 @@ rank rules as the folded path. Generic values are encoded into one Wire byte
 buffer for MPI_Sendrecv_replace and decoded afterward; Rust object layout is
 never treated as an MPI datatype. This communication workspace is distinct
 from the retained home copies eliminated by low-memory execution.
+
+## Typed native BLAS boundary
+
+`Gemm<T>` and `GemmKernel<T>` carry the scalar type through the local matrix
+kernel, with native SGEMM/DGEMM/CGEMM/ZGEMM implementations. `LocalKernels`
+requires `GemmKernel<f64>` and continues to describe existing f64 LAPACK
+operations; no unimplemented f32/complex decompositions are advertised.
+Local contiguous-batch and partial folded residual kernels now accept typed
+arithmetic values directly. Existing distributed folded orchestration remains
+f64 at this stage; f32/complex distributed tensors still have their generic
+semiring execution until typed folded orchestration is connected.
+The compile-time traits remain the replacement boundary for future faer kernels.
