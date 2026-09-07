@@ -1104,3 +1104,11 @@ option models that source policy; dense custom functions remain ineligible.
 Folded memory affects the same strict filters and weighted objectives as unfolded
 memory. The selected fold descriptor is reconstructed from the winning raw map
 after the existing winner-ID communication, not serialized with tensor contents.
+
+Distributed folded execution preserves map_fold's local virtual-block transpose
+before ctr_replicate/ctr_2d_general communication. Panel outer/inner metadata
+selects whole virtual blocks, so packed leaves must not transpose again.
+The shared recursive executor now accepts a statically typed leaf callback;
+the ordinary semiring leaf remains contraction::virtualized. Folded leaves
+apply beta once per output virtual block and call the packed sym_seq_ctr_inr
+port, then inverse-transpose C before restoring its original distribution.

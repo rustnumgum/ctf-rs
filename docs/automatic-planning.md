@@ -189,3 +189,15 @@ Total candidate evaluation must additionally port folding and sparse redistribut
 costs (2632-2810), then connect existing collective Selector and context cache. Sparse,
 symmetry, node-aware, low-memory and 2D panel alternatives remain in the overall
 scope; cost-tree availability is not proof of integrated candidate execution.
+
+## Selected distributed folded execution
+
+`Tensor<Arithmetic<f64>>::contract_folded_from_mapped<K: LocalKernels>` now
+executes the raw distributions and fold descriptor returned by `SearchCache`.
+Each original local virtual block is transposed once before replication and
+nested 2D panels. Virtual leaves operate directly on packed blocks; output is
+inverse-transposed after reduction and restored to its original distribution.
+This supports dense NS partial folds and batch labels without forcing aligned
+maps or globally gathering tensors. Sparse/compressed automatic execution,
+node-aware and low-memory integration remain unfinished. `LocalKernels` retains
+the compile-time replacement boundary for future faer kernels.

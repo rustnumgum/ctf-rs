@@ -1,11 +1,11 @@
 // Adapted from cc4s contraction/{contraction,ctr_comm,ctr_2d_general}.cxx.
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Dense semiring execution for a preflight-valid raw NS mapping. This is the
-//! unfolded source path: outer replication, general 2D panels, virtualization,
-//! and the sequential reference kernel.
+//! Source paths share outer replication, general 2D panels and virtualization,
+//! with sequential semiring or packed folded BLAS leaves.
 
 use crate::{
-    algebra::{Semiring, Wire},
+    algebra::{Arithmetic, Semiring, Wire},
     context::Context,
     ctr_2d::{Layers, Panel},
     mapping::{Distribution, Mapping},
@@ -366,40 +366,22 @@ fn build_execution<'context>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_levels<A: Semiring>(
+fn execute_levels<A: Semiring, F>(
     algebra: &A,
     levels: &[Level<'_>],
     level: usize,
     layers: Layers,
-    block_shapes: &[Vec<usize>; 3],
-    virtual_phases: &[Vec<usize>; 3],
-    indices: [&str; 3],
     a: &[A::Element],
     b: &[A::Element],
     c: &mut [A::Element],
-    alpha: &A::Element,
     beta: A::Element,
+    leaf: &mut F,
 ) where
     A::Element: Wire,
+    F: FnMut(&[A::Element], &[A::Element], &mut [A::Element], A::Element),
 {
     if level == levels.len() {
-        crate::contraction::virtualized(
-            algebra,
-            &block_shapes[0],
-            &virtual_phases[0],
-            indices[0],
-            a,
-            &block_shapes[1],
-            &virtual_phases[1],
-            indices[1],
-            b,
-            &block_shapes[2],
-            &virtual_phases[2],
-            indices[2],
-            c,
-            alpha,
-            &beta,
-        );
+        leaf(a, b, c, beta);
         return;
     }
     let current = &levels[level];
@@ -425,17 +407,60 @@ fn execute_levels<A: Semiring>(
                 levels,
                 level + 1,
                 layers,
-                block_shapes,
-                virtual_phases,
-                indices,
                 a,
                 b,
                 c,
-                alpha,
                 beta,
+                leaf,
             )
         },
     );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn folded_virtualized<K: crate::linalg::LocalKernels>(
+    descriptor: &crate::partial_fold::Descriptor,
+    block_shapes: &[Vec<usize>; 3],
+    virtual_phases: &[Vec<usize>; 3],
+    indices: [&str; 3],
+    a: &[f64],
+    b: &[f64],
+    c: &mut [f64],
+    alpha: f64,
+    beta: f64,
+) {
+    let block_sizes = descriptor
+        .layouts
+        .each_ref()
+        .map(|layout| layout.group_lengths.iter().product::<usize>());
+    let counts = virtual_phases.each_ref().map(|phases| phases.iter().product::<usize>());
+    assert_eq!(a.len(), block_sizes[0] * counts[0]);
+    assert_eq!(b.len(), block_sizes[1] * counts[1]);
+    assert_eq!(c.len(), block_sizes[2] * counts[2]);
+    let links: [Vec<crate::symmetry::Symmetry>; 3] = std::array::from_fn(|operand| {
+        vec![crate::symmetry::Symmetry::NS; block_shapes[operand].len()]
+    });
+    let space = crate::summation::Indices::new(&[
+        (&virtual_phases[0], indices[0]),
+        (&virtual_phases[1], indices[1]),
+        (&virtual_phases[2], indices[2]),
+    ]);
+    let mut visited = vec![false; counts[2]];
+    space.for_each(|offsets| {
+        let (ia, ib, ic) = (offsets[0], offsets[1], offsets[2]);
+        crate::partial_fold_kernel::execute_packed::<K>(
+            descriptor,
+            block_shapes.each_ref().map(Vec::as_slice),
+            links.each_ref().map(Vec::as_slice),
+            indices,
+            &a[ia * block_sizes[0]..(ia + 1) * block_sizes[0]],
+            &b[ib * block_sizes[1]..(ib + 1) * block_sizes[1]],
+            &mut c[ic * block_sizes[2]..(ic + 1) * block_sizes[2]],
+            alpha,
+            if visited[ic] { 1. } else { beta },
+        );
+        visited[ic] = true;
+    });
 }
 
 impl<A: Semiring + Clone> Tensor<'_, '_, A>
@@ -504,18 +529,36 @@ where
                 }
             }
         }
+        let mut leaf = |a: &[A::Element],
+                        b: &[A::Element],
+                        c: &mut [A::Element],
+                        beta: A::Element| {
+            crate::contraction::virtualized(
+                &algebra,
+                &execution.block_shapes[0],
+                &execution.virtual_phases[0],
+                indices_a,
+                a,
+                &execution.block_shapes[1],
+                &execution.virtual_phases[1],
+                indices_b,
+                b,
+                &execution.block_shapes[2],
+                &execution.virtual_phases[2],
+                indices_c,
+                c,
+                &alpha,
+                &beta,
+            );
+        };
         execute_levels(
             &algebra,
             &execution.levels,
             0,
             Layers { count: 1, index: 0 },
-            &execution.block_shapes,
-            &execution.virtual_phases,
-            [indices_a, indices_b, indices_c],
             &aa.data,
             &bb.data,
             &mut cc.data,
-            &alpha,
             if has_replication {
                 if output_root {
                     algebra.one()
@@ -525,10 +568,152 @@ where
             } else {
                 beta
             },
+            &mut leaf,
         );
         for comm in &execution.replicate[2] {
             comm.reduce_monoid(&algebra, &mut cc.data, false, 0);
         }
+        for group in execution.replicate {
+            for comm in group {
+                comm.close();
+            }
+        }
+        for level in execution.levels {
+            for comm in level.comms.into_iter().flatten() {
+                comm.close();
+            }
+        }
+        cc.redistribute(self.distribution().clone());
+        *self = cc;
+    }
+}
+
+impl Tensor<'_, '_, Arithmetic<f64>> {
+    /// Execute a selected dense folded raw mapping. Every local virtual block is
+    /// transposed once before replication/panels and restored once after output
+    /// reduction, matching map_fold rather than repacking individual panels.
+    #[allow(clippy::too_many_arguments)]
+    pub fn contract_folded_from_mapped<K: crate::linalg::LocalKernels>(
+        &mut self,
+        indices_c: &str,
+        a: &Self,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        mapped: [Distribution; 3],
+        descriptor: &crate::partial_fold::Descriptor,
+        alpha: f64,
+        beta: f64,
+    ) {
+        assert!(std::ptr::eq(self.context(), a.context()));
+        assert!(std::ptr::eq(self.context(), b.context()));
+        assert_eq!(mapped[0].shape, a.distribution().shape);
+        assert_eq!(mapped[1].shape, b.distribution().shape);
+        assert_eq!(mapped[2].shape, self.distribution().shape);
+        assert_eq!(mapped[0].topology.size(), self.context().size());
+        assert!(crate::mapping_preflight::check(
+            mapped.each_ref(),
+            [indices_a, indices_b, indices_c]
+        ));
+
+        let execution = build_execution(
+            self.context(),
+            mapped.each_ref(),
+            [indices_a, indices_b, indices_c],
+        );
+        for operand in 0..3 {
+            assert_eq!(
+                descriptor.layouts[operand]
+                    .group_lengths
+                    .iter()
+                    .product::<usize>(),
+                execution.block_shapes[operand].iter().product::<usize>()
+            );
+        }
+        let virtual_blocks = mapped.each_ref().map(|distribution| {
+            distribution
+                .mappings
+                .iter()
+                .map(|mapping| mapping.phase() / mapping.physical_phase())
+                .product::<usize>()
+        });
+        let mut aa = (*a).clone();
+        let mut bb = (*b).clone();
+        let mut cc = self.clone();
+        aa.redistribute(mapped[0].clone());
+        bb.redistribute(mapped[1].clone());
+        cc.redistribute(mapped[2].clone());
+        aa.data = descriptor.layouts[0].transpose(
+            &aa.data,
+            virtual_blocks[0],
+            crate::fold_layout::Direction::Forward,
+        );
+        bb.data = descriptor.layouts[1].transpose(
+            &bb.data,
+            virtual_blocks[1],
+            crate::fold_layout::Direction::Forward,
+        );
+        cc.data = descriptor.layouts[2].transpose(
+            &cc.data,
+            virtual_blocks[2],
+            crate::fold_layout::Direction::Forward,
+        );
+
+        for comm in &execution.replicate[0] {
+            comm.broadcast(0, &mut aa.data);
+        }
+        for comm in &execution.replicate[1] {
+            comm.broadcast(0, &mut bb.data);
+        }
+        let has_replication = execution.has_replication;
+        let output_root = execution.replicate[2]
+            .iter()
+            .all(|comm| comm.rank() == 0);
+        if has_replication && output_root && beta != 1. {
+            if beta == 0. {
+                cc.data.fill(0.);
+            } else {
+                for value in &mut cc.data {
+                    *value *= beta;
+                }
+            }
+        }
+        let mut leaf = |a: &[f64], b: &[f64], c: &mut [f64], beta: f64| {
+            folded_virtualized::<K>(
+                descriptor,
+                &execution.block_shapes,
+                &execution.virtual_phases,
+                [indices_a, indices_b, indices_c],
+                a,
+                b,
+                c,
+                alpha,
+                beta,
+            );
+        };
+        execute_levels(
+            self.algebra(),
+            &execution.levels,
+            0,
+            Layers { count: 1, index: 0 },
+            &aa.data,
+            &bb.data,
+            &mut cc.data,
+            if has_replication {
+                if output_root { 1. } else { 0. }
+            } else {
+                beta
+            },
+            &mut leaf,
+        );
+        for comm in &execution.replicate[2] {
+            comm.reduce_f64(0, &mut cc.data);
+        }
+        cc.data = descriptor.layouts[2].transpose(
+            &cc.data,
+            virtual_blocks[2],
+            crate::fold_layout::Direction::Backward,
+        );
         for group in execution.replicate {
             for comm in group {
                 comm.close();

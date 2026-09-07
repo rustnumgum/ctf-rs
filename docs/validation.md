@@ -967,6 +967,20 @@ scales and merges old entries. Output distribution is unchanged. DIGIT / PASS,
 no failures or extra numerical runs. Both targets compiled/linked on Windows GNU;
 native runtime remains unaccepted.
 
+## Raw distributed folded execution (2026-09-07)
+
+`dense_folded_execution`, `dense_execution`, and `dense_execution_algebra`
+passed at WSL 1/2/4 ranks, including world and parity subcommunicators.
+New coverage connects actual folded SearchCache selections to BLAS with fresh
+values on reuse, six normal mapping permutations, partial residual indices,
+virtual batches, tiny padded fragments and nested input/output panel levels.
+Output distributions and cache hit/miss counts are exact; finite f64 results
+retain abs(error)<1e-6. The four affected local partial_fold_kernel tests passed.
+An initial Rust slice-iterator compilation error was fixed before numerical
+execution; there were no numerical failures or extra precision runs.
+All four targets compiled and linked on Windows GNU once. Native MPI runtime
+acceptance remains outstanding. DIGIT / PASS for this bounded WSL change only.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

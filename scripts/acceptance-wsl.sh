@@ -43,6 +43,7 @@ mpi_tests+=(selected_mapping)
 mpi_tests+=(dense_search)
 mpi_tests+=(dense_execution)
 mpi_tests+=(dense_execution_algebra)
+mpi_tests+=(dense_folded_execution)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \

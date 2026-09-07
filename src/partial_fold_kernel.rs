@@ -145,18 +145,17 @@ fn inverse(operands: &[Operand; 3]) -> Vec<[Option<usize>; 3]> {
     result
 }
 
-/// Execute one packed local partial fold. `a`, `b`, and `c` each contain one
-/// original local block (not multiple virtual blocks). The descriptor must be
-/// the eligible result for the supplied shapes/links/indices.
+/// Execute one already-forward-transposed local block. Distributed execution
+/// calls this after panel communication and ctr_virt slicing.
 #[allow(clippy::too_many_arguments)]
-pub fn execute<K: LocalKernels>(
+pub(crate) fn execute_packed<K: LocalKernels>(
     descriptor: &Descriptor,
     shapes: [&[usize]; 3],
     links: [&[Symmetry]; 3],
     indices: [&str; 3],
-    a: &[f64],
-    b: &[f64],
-    c: &mut [f64],
+    packed_a: &[f64],
+    packed_b: &[f64],
+    packed_c: &mut [f64],
     alpha: f64,
     beta: f64,
 ) {
@@ -170,19 +169,13 @@ pub fn execute<K: LocalKernels>(
             operand,
         )
     });
-    let original_sizes: [usize; 3] = std::array::from_fn(|operand| {
-        storage_len(shapes[operand],links[operand])
-    });
-    assert_eq!(a.len(), original_sizes[0]);
-    assert_eq!(b.len(), original_sizes[1]);
-    assert_eq!(c.len(), original_sizes[2]);
-    let packed_a = descriptor.layouts[0].transpose(a, 1, Direction::Forward);
-    let packed_b = descriptor.layouts[1].transpose(b, 1, Direction::Forward);
-    let mut packed_c = descriptor.layouts[2].transpose(c, 1, Direction::Forward);
+    assert_eq!(packed_a.len(), storage_len(shapes[0], links[0]));
+    assert_eq!(packed_b.len(), storage_len(shapes[1], links[1]));
+    assert_eq!(packed_c.len(), storage_len(shapes[2], links[2]));
     if beta == 0. {
         packed_c.fill(0.);
     } else if beta != 1. {
-        for value in &mut packed_c {
+        for value in packed_c.iter_mut() {
             *value *= beta;
         }
     }
@@ -247,6 +240,39 @@ pub fn execute<K: LocalKernels>(
             offsets = std::array::from_fn(|operand| reset_offset(&operands[operand], &global));
         }
     }
+}
+
+/// Pack, execute, and restore one original local partial-fold block. The
+/// distributed path performs these transposes once across all virtual blocks.
+#[allow(clippy::too_many_arguments)]
+pub fn execute<K: LocalKernels>(
+    descriptor: &Descriptor,
+    shapes: [&[usize]; 3],
+    links: [&[Symmetry]; 3],
+    indices: [&str; 3],
+    a: &[f64],
+    b: &[f64],
+    c: &mut [f64],
+    alpha: f64,
+    beta: f64,
+) {
+    assert_eq!(a.len(), storage_len(shapes[0], links[0]));
+    assert_eq!(b.len(), storage_len(shapes[1], links[1]));
+    assert_eq!(c.len(), storage_len(shapes[2], links[2]));
+    let packed_a = descriptor.layouts[0].transpose(a, 1, Direction::Forward);
+    let packed_b = descriptor.layouts[1].transpose(b, 1, Direction::Forward);
+    let mut packed_c = descriptor.layouts[2].transpose(c, 1, Direction::Forward);
+    execute_packed::<K>(
+        descriptor,
+        shapes,
+        links,
+        indices,
+        &packed_a,
+        &packed_b,
+        &mut packed_c,
+        alpha,
+        beta,
+    );
     let restored = descriptor.layouts[2].transpose(&packed_c, 1, Direction::Backward);
     c.copy_from_slice(&restored);
 }

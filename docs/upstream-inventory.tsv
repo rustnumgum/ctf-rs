@@ -101,13 +101,13 @@ src/contraction/contraction_signature.cxx	src/planning.rs	partial: dense structu
 src/contraction/contraction_signature.h	src/planning.rs	partial: dense structural signature, full collision-safe equality
 src/contraction/contraction.cxx	src/folding.rs; src/sparse_fold.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs; src/normal_mapping.rs; src/mapping_variants.rs; src/dense_search.rs	partial: NS fold/BLAS, sparse input-only pre-reduction, explicit packed mapping, symmetry orchestration, dense-unfolded normal/exhaustive cost selection and ID reconstruction; full cached automatic execution, optimized symmetric plans and sparse output-only indices pending
 src/contraction/contraction.h	src/contraction	pending
-src/contraction/ctr_2d_general.cxx	src/ctr_2d.rs; src/mapped_cost.rs; src/plan_cost.rs; src/dense_execution.rs	partial: raw NS unfolded panel cost trees and f64 nested panel execution connected to selected layouts; folded/sparse/custom-type integration pending
+src/contraction/ctr_2d_general.cxx	src/ctr_2d.rs; src/mapped_cost.rs; src/plan_cost.rs; src/dense_execution.rs	partial: raw NS generic semiring and selected f64 folded nested panel execution; sparse integration pending
 src/contraction/ctr_2d_general.h	src/contraction	pending
 src/contraction/ctr_comm.cxx	src/contraction	pending
 src/contraction/ctr_comm.h	src/contraction	pending
 src/contraction/ctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/ctr_offload.h	excluded: CUDA/offload	excluded
-src/contraction/ctr_tsr.cxx	src/contraction.rs; src/symmetric_contraction_comm.rs	partial: NS/packed virtual and explicit broadcast/root-Reduce execution; automatic symmetric plan integration pending
+src/contraction/ctr_tsr.cxx	src/contraction.rs; src/symmetric_contraction_comm.rs; src/dense_execution.rs; src/partial_fold_kernel.rs	partial: NS/packed virtual, selected dense folded virtual leaves and explicit broadcast/root-Reduce execution; automatic symmetric plan integration pending
 src/contraction/ctr_tsr.h	src/contraction	pending
 src/contraction/Makefile	Cargo/build tooling	replaced
 src/contraction/sp_seq_ctr.cxx	src/sparse_sequential.rs; src/sparse_fold.rs; src/sparse_diagonal.rs; src/sparse_gemm.rs; src/sparse_formats.rs	partial: general NS sparse-A/dense-B/dense-C recursion including pinned limited custom-function branch; folded sparse/mixed children and input pre-reduction; folded custom functions and other general sparse combinations pending
@@ -120,7 +120,7 @@ src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
 src/contraction/spctr_tsr.cxx	src/contraction	pending
 src/contraction/spctr_tsr.h	src/contraction	pending
-src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar reference kernels, f64 canonical partial/symmetry folded BLAS residual traversal; custom-function folded branch and distributed integration pending
+src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar reference kernels, f64 canonical partial/symmetry folded BLAS residual traversal and distributed NS integration; custom-function folded branch and automatic compressed integration pending
 src/contraction/sym_seq_ctr.h	src/contraction	pending
 src/redistribution/cyclic_reshuffle.cxx	src/redistribution	pending
 src/redistribution/cyclic_reshuffle.h	src/redistribution	pending

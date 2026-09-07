@@ -501,3 +501,8 @@ path = "tests/partial_fold_kernel.rs"
 [[test]]
 name = "folded_cost"
 path = "tests/folded_cost.rs"
+
+[[test]]
+name = "dense_folded_execution"
+path = "tests/dense_folded_execution.rs"
+harness = false
