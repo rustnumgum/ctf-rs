@@ -1,9 +1,10 @@
 // Adapted from cc4s CTF interface/{common,tensor}.cxx.
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
-//! MT19937-64 generation and source-compatible dense tensor random filling.
+//! MT19937-64 generation and source-compatible dense/sparse random filling.
 
 use crate::{
-    algebra::{Arithmetic, Complex, Group, Monoid, Semiring},
+    algebra::{Arithmetic, Complex, Group, Monoid, Semiring, Wire},
+    sparse::SparseTensor,
     tensor::Tensor,
 };
 
@@ -97,3 +98,161 @@ fill_random!(Complex<f32>, |value: f64| Complex::new(
     0.0
 ));
 fill_random!(Complex<f64>, |value: f64| Complex::new(value, 0.0));
+
+fn local_generation_count(
+    total_size: usize,
+    fraction: f64,
+    processes: usize,
+    rank: usize,
+) -> usize {
+    let mut series = total_size as f64 * fraction;
+    let mut expected = 0.0;
+    for divisor in 2..20 {
+        expected += series;
+        series *= fraction / divisor as f64;
+    }
+    let generated = (expected + 0.5) as usize;
+    generated / processes + usize::from(generated % processes > rank)
+}
+
+fn fill_dense_sparse<A>(
+    tensor: &mut Tensor<'_, '_, A>,
+    fraction: f64,
+    generator: &mut Generator,
+    mut sample: impl FnMut(bool, f64) -> A::Element,
+) where
+    A: Semiring + Clone,
+    A::Element: Wire,
+{
+    let algebra = tensor.algebra().clone();
+    let total_size = tensor.distribution().shape.iter().product::<usize>();
+    let generated = local_generation_count(
+        total_size,
+        fraction,
+        tensor.context().size(),
+        tensor.context().rank(),
+    );
+    tensor.data.fill(algebra.zero());
+    let mut candidates = Vec::with_capacity(generated);
+    for _ in 0..generated {
+        let key = (generator.unit_interval() * total_size as f64) as usize;
+        candidates.push((key, algebra.one()));
+    }
+    tensor.write_add(&candidates);
+    let zero = algebra.zero();
+    tensor.transform(|_, value| {
+        let draw = generator.unit_interval();
+        *value = sample(*value != zero, draw);
+    });
+}
+
+fn fill_sparse_sparse<A>(
+    tensor: &mut SparseTensor<'_, '_, A>,
+    fraction: f64,
+    generator: &mut Generator,
+    mut sample: impl FnMut(bool, f64) -> A::Element,
+) where
+    A: Semiring + Clone,
+    A::Element: Wire,
+{
+    let algebra = tensor.algebra().clone();
+    let total_size = tensor.distribution().shape.iter().product::<usize>();
+    let generated = local_generation_count(
+        total_size,
+        fraction,
+        tensor.context().size(),
+        tensor.context().rank(),
+    );
+    tensor.sparsify(|_| false);
+    let mut candidates = Vec::with_capacity(generated);
+    for _ in 0..generated {
+        let key = (generator.unit_interval() * total_size as f64) as usize;
+        candidates.push((key, algebra.one()));
+    }
+    tensor.write_add(&candidates);
+    let zero = algebra.zero();
+    tensor.transform_stored(|_, value| {
+        let draw = generator.unit_interval();
+        *value = sample(*value != zero, draw);
+    });
+}
+
+macro_rules! fill_random_sparse_numeric {
+    ($scalar:ty, $cast:expr) => {
+        impl Tensor<'_, '_, Arithmetic<$scalar>> {
+            pub fn fill_random_sparse(
+                &mut self,
+                minimum: $scalar,
+                maximum: $scalar,
+                fraction: f64,
+                generator: &mut Generator,
+            ) {
+                let algebra = Arithmetic::<$scalar>::new();
+                let span = algebra.add(&maximum, &algebra.negate(&minimum));
+                fill_dense_sparse(self, fraction, generator, move |present, draw| {
+                    let random: $scalar = ($cast)(draw);
+                    let value = algebra.add(&algebra.multiply(&random, &span), &minimum);
+                    let indicator = if present { algebra.one() } else { algebra.zero() };
+                    algebra.multiply(&indicator, &value)
+                });
+            }
+        }
+
+        impl SparseTensor<'_, '_, Arithmetic<$scalar>> {
+            pub fn fill_random_sparse(
+                &mut self,
+                minimum: $scalar,
+                maximum: $scalar,
+                fraction: f64,
+                generator: &mut Generator,
+            ) {
+                let algebra = Arithmetic::<$scalar>::new();
+                let span = algebra.add(&maximum, &algebra.negate(&minimum));
+                fill_sparse_sparse(self, fraction, generator, move |present, draw| {
+                    let random: $scalar = ($cast)(draw);
+                    let value = algebra.add(&algebra.multiply(&random, &span), &minimum);
+                    let indicator = if present { algebra.one() } else { algebra.zero() };
+                    algebra.multiply(&indicator, &value)
+                });
+            }
+        }
+    };
+}
+
+fill_random_sparse_numeric!(f32, |value: f64| value as f32);
+fill_random_sparse_numeric!(f64, |value: f64| value);
+fill_random_sparse_numeric!(Complex<f32>, |value: f64| Complex::new(
+    value as f32,
+    0.0
+));
+fill_random_sparse_numeric!(Complex<f64>, |value: f64| Complex::new(value, 0.0));
+fill_random_sparse_numeric!(i32, |value: f64| value as i32);
+fill_random_sparse_numeric!(i64, |value: f64| value as i64);
+
+impl Tensor<'_, '_, Arithmetic<bool>> {
+    pub fn fill_random_sparse(
+        &mut self,
+        minimum: bool,
+        maximum: bool,
+        fraction: f64,
+        generator: &mut Generator,
+    ) {
+        fill_dense_sparse(self, fraction, generator, move |present, draw| {
+            present && if draw != 0.0 { maximum } else { minimum }
+        });
+    }
+}
+
+impl SparseTensor<'_, '_, Arithmetic<bool>> {
+    pub fn fill_random_sparse(
+        &mut self,
+        minimum: bool,
+        maximum: bool,
+        fraction: f64,
+        generator: &mut Generator,
+    ) {
+        fill_sparse_sparse(self, fraction, generator, move |present, draw| {
+            present && if draw != 0.0 { maximum } else { minimum }
+        });
+    }
+}

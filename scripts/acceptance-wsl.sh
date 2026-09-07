@@ -58,6 +58,7 @@ mpi_tests+=(typed_distributed_eigh typed_tensor_svd)
 mpi_tests+=(typed_multilinear)
 mpi_tests+=(tttp_memory)
 mpi_tests+=(tensor_norms)
+mpi_tests+=(storage_conversion sparse_random_fill)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \

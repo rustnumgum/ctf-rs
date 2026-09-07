@@ -602,3 +602,13 @@ path = "tests/narrow_algebra.rs"
 name = "tensor_norms"
 path = "tests/tensor_norms.rs"
 harness = false
+
+[[test]]
+name = "storage_conversion"
+path = "tests/storage_conversion.rs"
+harness = false
+
+[[test]]
+name = "sparse_random_fill"
+path = "tests/sparse_random_fill.rs"
+harness = false

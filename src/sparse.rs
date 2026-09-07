@@ -1,7 +1,8 @@
 // Adapted from cc4s CTF sparse key storage and redistribution/sparse_rw.cxx.
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Distributed sparse tensor storage: sorted keys inside each virtual block.
-use crate::{algebra::{Monoid, Semiring, Wire}, context::Context, mapping::Distribution};
+use crate::{algebra::{Monoid, Semiring, Wire}, context::Context, mapping::{Distribution, Mapping},
+    tensor::Tensor};
 
 #[path = "sparse_sum.rs"]
 mod summation;
@@ -28,6 +29,30 @@ pub struct SparseTensor<'c, 'r, A: Monoid> {
     distribution: Distribution,
     algebra: A,
     blocks: Vec<Vec<(usize, A::Element)>>,
+}
+
+fn mapping_uses_axis(mapping: &Mapping, used: &mut [bool]) {
+    match mapping {
+        Mapping::Unmapped => {}
+        Mapping::Physical { axis, child, .. } => {
+            used[*axis] = true;
+            mapping_uses_axis(child, used);
+        }
+        Mapping::Virtual { child, .. } => mapping_uses_axis(child, used),
+    }
+}
+
+fn is_primary_layer(distribution: &Distribution, rank: usize) -> bool {
+    let mut used = vec![false; distribution.topology.dimensions.len()];
+    for mapping in &distribution.mappings {
+        mapping_uses_axis(mapping, &mut used);
+    }
+    distribution
+        .topology
+        .coordinates(rank)
+        .into_iter()
+        .zip(used)
+        .all(|(coordinate, mapped)| mapped || coordinate == 0)
 }
 
 impl<'c, 'r, A: Monoid> SparseTensor<'c, 'r, A> {
@@ -58,6 +83,56 @@ impl<'c, 'r, A: Monoid> SparseTensor<'c, 'r, A> {
     fn block(&self, key: usize) -> usize {
         self.distribution.local_offset(self.context.rank(), key)
             / self.distribution.block_shape().iter().product::<usize>()
+    }
+}
+
+impl<'c, 'r, A: Monoid + Clone> Tensor<'c, 'r, A> {
+    /// Convert the dense local storage to primary sparse storage without a
+    /// collective write. Padding is examined by `keep` like the source
+    /// sparsifier, then discarded because it has no global key.
+    pub fn into_sparse(self, mut keep: impl FnMut(&A::Element) -> bool) -> SparseTensor<'c, 'r, A> {
+        let context = self.context();
+        let distribution = self.distribution().clone();
+        let algebra = self.algebra().clone();
+        let rank = context.rank();
+        let mut sparse = SparseTensor::new(context, distribution.clone(), algebra);
+        if is_primary_layer(&distribution, rank) {
+            for (offset, value) in self.data.into_iter().enumerate() {
+                if !keep(&value) {
+                    continue;
+                }
+                let Some(key) = distribution.global_key(rank, offset) else { continue; };
+                if distribution.owner(key) != rank {
+                    continue;
+                }
+                let block = sparse.block(key);
+                sparse.blocks[block].push((key, value));
+            }
+        }
+        for block in &mut sparse.blocks {
+            block.sort_by_key(|pair| pair.0);
+        }
+        sparse
+    }
+}
+
+impl<'c, 'r, A: Monoid + Clone> SparseTensor<'c, 'r, A>
+where
+    A::Element: Wire,
+{
+    /// Convert primary sparse storage to dense storage through the existing
+    /// collective write path, which restores all mapped replicas.
+    pub fn into_dense(self) -> Tensor<'c, 'r, A> {
+        let context = self.context;
+        let distribution = self.distribution.clone();
+        let algebra = self.algebra.clone();
+        let rank = context.rank();
+        let pairs: Vec<_> = self.blocks.into_iter().flatten()
+            .filter(|(key, _)| distribution.owner(*key) == rank)
+            .collect();
+        let mut dense = Tensor::new(context, distribution, algebra);
+        dense.write_add(&pairs);
+        dense
     }
 }
 

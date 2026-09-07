@@ -1142,6 +1142,25 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## Ownership storage conversion and sparse random fill (2026-09-07)
+
+storage_conversion and sparse_random_fill passed once at WSL 1/2/4 ranks,
+world/parity, with exact keys, values, RNG progression and filter call order.
+into_sparse consumes dense values, evaluates the predicate over primary-layer
+storage including padding, then discards padding and orders retained virtual
+blocks. Nonzero, signed/absolute strict thresholds and zero-retaining predicates
+are covered. into_dense is explicitly collective and writes canonical source
+pairs to restore all mapped dense replicas; no communicating destructor exists.
+
+Sparse-pattern random fill supports both dense and sparse storage for all seven
+pinned scalar families. Tests cover the literal exponential candidate count,
+distributed candidate-key union, duplicate coalescing before value draws,
+pre-scaling casts, retained sampled zeros, reverse bool bounds and zero-density
+clearing. Dense value sampling includes unselected valid entries, but not padding;
+sparse sampling visits only stored post-dedup entries. No statistical density or
+extra precision study. Both targets compiled and linked on Windows GNU once.
+DIGIT / PASS; native MPI runtime and full-port acceptance remain outstanding.
+
 ## Dense/sparse source norms and narrow scalar algebra (2026-09-07)
 
 tensor_norms passed once at WSL 1/2/4 ranks, world/parity: norm1/norm_infty/
