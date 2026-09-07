@@ -3,9 +3,9 @@
 Reference: cc4s/ctf, f69cbb46e23bc2f39cda5722ce096f56301dab4f.
 Statuses below describe implementation, not acceptance passes.
 
-Packed `SymmetricTensor::fill_random` now implements the four real/complex
-types with source allocation-order draws and post-fill padding cleanup;
-integer packed random filling remains outside that implemented subset.
+Dense and packed `fill_random` implement all six source specializations:
+f32/f64/complex32/complex64/i32/i64. They retain allocation-order draws and
+post-fill padding cleanup; integers truncate after double-precision scaling.
 
 | Phase | Upstream responsibility | Rust destination | Required validation | Status |
 |---|---|---|---|---|

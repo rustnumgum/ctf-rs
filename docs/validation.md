@@ -1,5 +1,16 @@
 # Validation evidence
 
+## Integer dense/packed random filling (2026-09-07)
+
+integer_random passed once at WSL 1/2/4 ranks, world/parity. Exact i32/i64
+checks cover dense, SY/AS/SH packed storage, virtual padding, empty local
+fragments, scalar/zero extents, reversed and constant intervals. Expected values
+use the source order: double sample times integer span, integer truncation,
+then integer minimum. The subsequent generator value confirms every allocated
+slot consumes a draw before padding cleanup. No floating tolerance is used.
+Windows GNU compile/link passed once; native runtime acceptance is pending.
+DIGIT / PASS; no failed checks or extra numerical runs.
+
 ## Compressed custom-function CPU/MPI contraction (2026-09-07)
 
 The new function path shares ordinary packed symmetry/diagonal orchestration,

@@ -81,3 +81,28 @@ macro_rules! complex_fill_random {
 
 complex_fill_random!(f32);
 complex_fill_random!(f64);
+
+macro_rules! integer_fill_random {
+    ($scalar:ty) => {
+        impl SymmetricTensor<'_, '_, Arithmetic<$scalar>> {
+            /// Source integer sampling truncates after multiplying the double
+            /// draw by the integer span, then adds the integer minimum.
+            pub fn fill_random(
+                &mut self,
+                minimum: $scalar,
+                maximum: $scalar,
+                generator: &mut Generator,
+            ) {
+                let span = maximum.wrapping_sub(minimum);
+                for value in &mut self.data {
+                    let scaled = (generator.unit_interval() * span as f64) as $scalar;
+                    *value = scaled.wrapping_add(minimum);
+                }
+                zero_out_padding(self);
+            }
+        }
+    };
+}
+
+integer_fill_random!(i32);
+integer_fill_random!(i64);

@@ -99,6 +99,37 @@ fill_random!(Complex<f32>, |value: f64| Complex::new(
 ));
 fill_random!(Complex<f64>, |value: f64| Complex::new(value, 0.0));
 
+// Source integer filling casts only after the double sample is multiplied
+// by the integer span; casting the sample first would almost always give zero.
+macro_rules! fill_random_integer {
+    ($scalar:ty) => {
+        impl Tensor<'_, '_, Arithmetic<$scalar>> {
+            pub fn fill_random(
+                &mut self,
+                minimum: $scalar,
+                maximum: $scalar,
+                generator: &mut Generator,
+            ) {
+                let span = maximum.wrapping_sub(minimum);
+                for value in &mut self.data {
+                    let scaled = (generator.unit_interval() * span as f64) as $scalar;
+                    *value = scaled.wrapping_add(minimum);
+                }
+                let rank = self.context().rank();
+                let distribution = self.distribution().clone();
+                for (offset, value) in self.data.iter_mut().enumerate() {
+                    if distribution.global_key(rank, offset).is_none() {
+                        *value = 0;
+                    }
+                }
+            }
+        }
+    };
+}
+
+fill_random_integer!(i32);
+fill_random_integer!(i64);
+
 fn local_generation_count(
     total_size: usize,
     fraction: f64,

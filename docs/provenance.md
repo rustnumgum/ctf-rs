@@ -1,5 +1,11 @@
 # Source provenance
 
+Integer `fill_random` in random.rs and symmetric_random.rs ports the int/int64_t
+specializations at interface/tensor.cxx:1612-1620. Unlike the real scalar sample
+cast, the integer cast occurs after multiplying by the span in double precision.
+Checks use representable integer spans/results; no claim is made to reproduce
+C++ undefined signed-overflow or out-of-range floating-to-integer conversions.
+
 Packed custom function dispatch follows contraction/{contraction,ctr_tsr,
 sym_seq_ctr}.cxx, with source evidence and symmetry quirks in
 compressed-functions.md. Ordinary and custom functions share existing Rust
