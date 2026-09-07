@@ -1093,6 +1093,18 @@ No numerical failures or further precision runs. All three targets compiled and
 linked on Windows GNU once; native MPI runtime remains pending. DIGIT / PASS.
 Typed QR/SVD/eigenvalue decomposition and whole-port acceptance remain unfinished.
 
+## Four-type distributed thin QR (2026-09-07)
+
+typed_distributed_qr passed once at WSL 1/2/4 ranks, world/parity, with all four
+native scalar types and tall 13x7, wide 5x8, and scalar 1x1 cases. Inputs remain
+exactly unchanged. Finite QR reconstruction uses the existing Frobenius bound
+m*n*n*1e-6; finite Q^H Q-I uses m*n*1e-6. Complex tests use genuine imaginary
+entries and conjugate adjoints. Factor elements are not directly compared.
+There were no failures or additional precision runs. The new target and the
+existing combined distributed_qr_svd target compiled/linked on Windows GNU;
+unchanged SVD numerical checks were not rerun. Native MPI runtime is pending.
+DIGIT / PASS for typed QR; typed SVD/eigh and full-port acceptance remain open.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

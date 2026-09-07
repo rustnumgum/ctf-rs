@@ -1175,3 +1175,10 @@ cyclic read_mat descriptors and triangle extraction, and the existing paired
 prime-grid/virtual-column/identity-padding POSV path. Complex positive-definite
 factorization is Hermitian; solve_tri's transpose boolean remains the source
 plain N/T operation, not implicit conjugation. QR/SVD/eigensolver code is unchanged.
+
+Distributed thin QR now uses S/D GEQRF+ORGQR and C/Z GEQRF+UNGQR. The
+matrix.cxx sequence is unchanged: cyclic read_mat, native factorization,
+retained packed R, explicit Q generation, and triangle extraction into thin
+distributed factors. Reflector tau uses the source column-distributed numroc
+layout. Both native workspace queries are honored; complex query sizes are
+read from the real component without converting matrix data to a real type.

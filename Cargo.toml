@@ -534,3 +534,8 @@ harness = false
 name = "typed_matrix_factors"
 path = "tests/typed_matrix_factors.rs"
 harness = false
+
+[[test]]
+name = "typed_distributed_qr"
+path = "tests/typed_distributed_qr.rs"
+harness = false

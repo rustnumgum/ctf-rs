@@ -36,7 +36,7 @@ src/shared/init_models.h	src/initial_models.rs	Rust static CPU model table repla
 src/shared/int_timer.cxx	src/shared	pending
 src/shared/int_timer.h	src/shared	pending
 src/shared/iter_tsr.h	src/shared	pending
-src/shared/lapack_symbs.cxx	src/ffi/linalg.rs; src/ffi/scalapack.rs	partial: four-type native GEMM and distributed POTRF/POSV/TRSM, existing f64 decomposition bindings; remaining scalar/routine families pending
+src/shared/lapack_symbs.cxx	src/ffi/linalg.rs; src/ffi/scalapack.rs	partial: four-type native GEMM and distributed POTRF/POSV/TRSM/GEQRF/ORGQR/UNGQR, existing f64 decomposition bindings; remaining scalar/routine families pending
 src/shared/lapack_symbs.h	src/shared	pending
 src/shared/Makefile	Cargo/build tooling	replaced
 src/shared/memcontrol.cxx	src/shared	pending
@@ -66,7 +66,7 @@ src/interface/idx_tensor.h	src/interface	pending
 src/interface/kernel.h	src/interface	pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
-src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed Cholesky and triangular/positive-definite solves; f64 QR, full/truncated/randomized SVD and square-subworld eigh; typed QR/SVD/eigh and remaining routines pending
+src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed thin QR, Cholesky and triangular/positive-definite solves; f64 full/truncated/randomized SVD and square-subworld eigh; typed SVD/eigh and remaining routines pending
 src/interface/matrix.h	src/matrix.rs	partial direct Rust Tensor matrix APIs
 src/interface/monoid.cxx	src/interface	pending
 src/interface/monoid.h	src/interface	pending

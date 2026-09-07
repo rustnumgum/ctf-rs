@@ -203,51 +203,6 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         left.gemm_2d::<crate::linalg::Native>(&u, &rotation, grid, 1., 0.);
         Ok((left, s, vt))
     }
-    /// Collective thin QR: Q has shape m*min(m,n), R has min(m,n)*n.
-    /// Householder QR and explicit Q generation execute in ScaLAPACK; output
-    /// tensors retain the selected grid and are not gathered to a single rank.
-    pub fn qr(&self, grid: [usize; 2]) -> Result<(Self, Self), i32> {
-        assert_eq!(self.distribution().shape.len(), 2);
-        let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
-        let k = m.min(n);
-        let mut source = self.clone();
-        source.redistribute(distribution(&[m, n], grid));
-        let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
-        let operation = (|| {
-            let desc = blacs.descriptor(m, n, 1, 1, m.div_ceil(grid[0]).max(1))?;
-            let mut input = source.local_storage().to_vec();
-            input.resize(
-                (m.div_ceil(grid[0]).max(1) * n.div_ceil(grid[1])).max(1),
-                0.,
-            );
-            let (q_values, r_values) = blacs.qr(m, n, &input, &desc)?;
-            let mut q = Self::new(
-                self.context(),
-                distribution(&[m, k], grid),
-                Arithmetic::new(),
-            );
-            let mut r = Self::new(
-                self.context(),
-                distribution(&[k, n], grid),
-                Arithmetic::new(),
-            );
-            let dist = source.distribution();
-            let rank = self.context().rank();
-            q.transform(|key, value| *value = q_values[dist.local_offset(rank, key)]);
-            r.transform(|key, value| {
-                let row = key % k;
-                let col = key / k;
-                *value = if row <= col {
-                    r_values[dist.local_offset(rank, row + col * m)]
-                } else {
-                    0.
-                };
-            });
-            Ok((q, r))
-        })();
-        blacs.close();
-        operation
-    }
     /// Collective thin SVD returning distributed U, singular-value vector, VT.
     /// Native replicated singular values are assigned directly to their owners;
     /// matrix factors stay distributed throughout PDGESVD and reconstruction.
@@ -313,7 +268,7 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
 }
 
 macro_rules! matrix_factor_methods {
-    ($scalar:ty, $cholesky:ident, $solve_tri:ident, $solve_spd:ident) => {
+    ($scalar:ty, $cholesky:ident, $solve_tri:ident, $solve_spd:ident, $qr:ident) => {
         impl<'c, 'r> Tensor<'c, 'r, Arithmetic<$scalar>> {
             /// Solve A X = self for positive definite A (lower triangle):
             /// symmetric for real scalars, Hermitian for complex scalars.
@@ -486,11 +441,71 @@ macro_rules! matrix_factor_methods {
                 result.redistribute(self.distribution().clone());
                 Ok(result)
             }
+
+            /// Collective thin QR: Q has shape m*min(m,n), R has min(m,n)*n.
+            /// Householder QR and explicit Q generation execute in ScaLAPACK; output
+            /// tensors retain the selected grid and are not gathered to a single rank.
+            pub fn qr(&self, grid: [usize; 2]) -> Result<(Self, Self), i32> {
+                assert_eq!(self.distribution().shape.len(), 2);
+                let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
+                let k = m.min(n);
+                let mut source = self.clone();
+                source.redistribute(distribution(&[m, n], grid));
+                let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
+                let operation = (|| {
+                    let desc =
+                        blacs.descriptor(m, n, 1, 1, m.div_ceil(grid[0]).max(1))?;
+                    let mut input = source.local_storage().to_vec();
+                    let zero = Arithmetic::<$scalar>::new().zero();
+                    input.resize(
+                        (m.div_ceil(grid[0]).max(1) * n.div_ceil(grid[1])).max(1),
+                        zero,
+                    );
+                    let (q_values, r_values) = blacs.$qr(m, n, &input, &desc)?;
+                    let mut q = Self::new(
+                        self.context(),
+                        distribution(&[m, k], grid),
+                        Arithmetic::new(),
+                    );
+                    let mut r = Self::new(
+                        self.context(),
+                        distribution(&[k, n], grid),
+                        Arithmetic::new(),
+                    );
+                    let dist = source.distribution();
+                    let rank = self.context().rank();
+                    q.transform(|key, value| *value = q_values[dist.local_offset(rank, key)]);
+                    r.transform(|key, value| {
+                        let row = key % k;
+                        let col = key / k;
+                        *value = if row <= col {
+                            r_values[dist.local_offset(rank, row + col * m)]
+                        } else {
+                            zero
+                        };
+                    });
+                    Ok((q, r))
+                })();
+                blacs.close();
+                operation
+            }
         }
     };
 }
 
-matrix_factor_methods!(f64, cholesky, solve_tri, solve_spd);
-matrix_factor_methods!(f32, cholesky_f32, solve_tri_f32, solve_spd_f32);
-matrix_factor_methods!(Complex<f32>, cholesky_c32, solve_tri_c32, solve_spd_c32);
-matrix_factor_methods!(Complex<f64>, cholesky_c64, solve_tri_c64, solve_spd_c64);
+matrix_factor_methods!(f64, cholesky, solve_tri, solve_spd, qr);
+matrix_factor_methods!(f32, cholesky_f32, solve_tri_f32, solve_spd_f32, qr_f32);
+matrix_factor_methods!(
+    Complex<f32>,
+    cholesky_c32,
+    solve_tri_c32,
+    solve_spd_c32,
+    qr_c32
+);
+matrix_factor_methods!(
+    Complex<f64>,
+    cholesky_c64,
+    solve_tri_c64,
+    solve_spd_c64,
+    qr_c64
+);

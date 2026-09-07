@@ -359,6 +359,170 @@ typed_spd_family!(
     Complex::new(1.0, 0.0)
 );
 
+macro_rules! typed_qr_family {
+    (
+        $scalar:ty,
+        $geqrf:ident,
+        $generate_q:ident,
+        $qr:ident,
+        $zero:expr,
+        $query_len:expr
+    ) => {
+        unsafe extern "C" {
+            fn $geqrf(
+                m: *const i32,
+                n: *const i32,
+                a: *mut $scalar,
+                ia: *const i32,
+                ja: *const i32,
+                desc: *const i32,
+                tau: *mut $scalar,
+                work: *mut $scalar,
+                lwork: *const i32,
+                info: *mut i32,
+            );
+            fn $generate_q(
+                m: *const i32,
+                n: *const i32,
+                k: *const i32,
+                a: *mut $scalar,
+                ia: *const i32,
+                ja: *const i32,
+                desc: *const i32,
+                tau: *const $scalar,
+                work: *mut $scalar,
+                lwork: *const i32,
+                info: *mut i32,
+            );
+        }
+
+        impl Grid {
+            pub(crate) fn $qr(
+                &self,
+                m: usize,
+                n: usize,
+                a: &[$scalar],
+                desc: &[i32; 9],
+            ) -> Result<(Vec<$scalar>, Vec<$scalar>), i32> {
+                self.validate_matrix(desc, a.len());
+                let (m, n) = (int(m), int(n));
+                assert!(m <= desc[2] && n <= desc[3]);
+
+                let k = m.min(n);
+                let tau_len = numroc(
+                    k as usize,
+                    desc[5] as usize,
+                    self.col,
+                    desc[7] as usize,
+                    self.cols,
+                );
+                let mut tau = vec![$zero; tau_len];
+                let mut q = a.to_vec();
+                let one = 1;
+                let query = -1;
+                let mut work_query = [$zero];
+                let mut info = 0;
+                unsafe {
+                    $geqrf(
+                        &m,
+                        &n,
+                        q.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        tau.as_mut_ptr(),
+                        work_query.as_mut_ptr(),
+                        &query,
+                        &mut info,
+                    );
+                }
+                result(info)?;
+
+                let lwork = int(($query_len)(work_query[0]));
+                let mut work = vec![$zero; lwork as usize];
+                unsafe {
+                    $geqrf(
+                        &m,
+                        &n,
+                        q.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        tau.as_mut_ptr(),
+                        work.as_mut_ptr(),
+                        &lwork,
+                        &mut info,
+                    );
+                }
+                result(info)?;
+
+                let r = q.clone();
+                work_query[0] = $zero;
+                unsafe {
+                    $generate_q(
+                        &m,
+                        &k,
+                        &k,
+                        q.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        tau.as_ptr(),
+                        work_query.as_mut_ptr(),
+                        &query,
+                        &mut info,
+                    );
+                }
+                result(info)?;
+
+                let lwork = int(($query_len)(work_query[0]));
+                let mut work = vec![$zero; lwork as usize];
+                unsafe {
+                    $generate_q(
+                        &m,
+                        &k,
+                        &k,
+                        q.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        tau.as_ptr(),
+                        work.as_mut_ptr(),
+                        &lwork,
+                        &mut info,
+                    );
+                }
+                result(info).map(|()| (q, r))
+            }
+        }
+    };
+}
+
+typed_qr_family!(
+    f32,
+    psgeqrf_,
+    psorgqr_,
+    qr_f32,
+    0.0,
+    |value: f32| value as usize
+);
+typed_qr_family!(
+    Complex<f32>,
+    pcgeqrf_,
+    pcungqr_,
+    qr_c32,
+    Complex::new(0.0, 0.0),
+    |value: Complex<f32>| value.re as usize
+);
+typed_qr_family!(
+    Complex<f64>,
+    pzgeqrf_,
+    pzungqr_,
+    qr_c64,
+    Complex::new(0.0, 0.0),
+    |value: Complex<f64>| value.re as usize
+);
+
 fn int(value: usize) -> i32 {
     value.try_into().unwrap()
 }
