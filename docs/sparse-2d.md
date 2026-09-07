@@ -5,6 +5,11 @@ CSR/CSR/CSR and CCSR/dense/CCSR branches of pinned spctr_2d_general.cxx.
 `execute_csr_dense` and `execute_csr_sparse_dense` cover its folded mixed
 CSR/dense/dense and CSR/CSR/dense branches. Sparse inputs remain CSR; dense
 output uses native MPI Reduce rather than sparse structural reduction.
+`execute_pairs_dense` covers the nonfolded raw sparse-A/dense-B/dense-C
+branch. Each A block is a sorted local-key/value list; byte sizes precede
+the concatenated pair payload. Keys, ordering and explicitly stored zeros
+are preserved without matrix conversion. The child supplies local shapes
+and labels to sparse_sequential::sequential (or its custom-function variant).
 They accept an explicit edge, Layers, A/B/C Panels and a child contraction.
 The child returns resized sparse blocks and can invoke another 2D level or
 a native sparse leaf; this matches the source recursive child, not a backend
@@ -33,6 +38,6 @@ owner and restores the local strip order. No full-input gather is used.
   remaining layers to the child. If the layer count divides the edge, each
   layer executes its step subset. Otherwise all steps retain the child layers.
 
-These are explicit recursive folded sparse/mixed levels. Automatic sparse plan
-assembly, raw nonfolded sparse-pair integration
-and sparse node-aware execution remain unfinished.
+These are explicit recursive folded and raw sparse/mixed levels. Automatic
+tensor-to-plan assembly and sparse node-aware execution remain unfinished;
+the raw executor does not infer a SparseTensor's mappings or local key space.

@@ -1,5 +1,16 @@
 # Validation evidence
 
+## Raw sparse-pair 2D communication (2026-09-07)
+
+distributed_sparse_2d_pairs passed once at WSL 1/2/4 ranks, world/parity.
+It connects raw pair blocks directly to the 3D A[ikl]*B[kj]->C[ijl] local
+kernel: non-matrix local keys, empty panels, explicit zeros, A/B broadcast,
+strided stationary and cyclic moving dense output, beta=0/2, stationary
+beta-once, layer subsets and nested levels. Exact i64 results agree with
+the stated indexed products and source accumulation rules. The target
+compiled and linked once on Windows GNU. DIGIT / PASS; no additional
+precision runs. Native MPI runtime acceptance remains pending.
+
 ## Mixed sparse 2D dense output (2026-09-07)
 
 distributed_sparse_2d_dense passed once at WSL 1/2/4 ranks, world/parity.

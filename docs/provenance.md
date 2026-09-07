@@ -1,5 +1,12 @@
 # Source provenance
 
+src/sparse_2d.rs::execute_pairs_dense ports the raw nonfolded sparse-A
+broadcast and dense-output branches of spctr_2d_general.cxx: per-block byte
+lengths and concatenated key/value payloads, unchanged local keys, fixed
+dense panels, cyclic reduction, source beta and recursive layer behavior.
+tests/distributed_sparse_2d_pairs.rs composes it with the existing
+sp_seq_ctr.cxx-derived sparse_sequential::sequential for a 3D local A.
+
 The dense-output branches of src/sparse_2d.rs follow spctr_2d_general.cxx
 reduce_step_pre/post and run: zero child beta for moving/strided output,
 cyclic native Reduce and new + beta*old scatter. The folded sparse inputs

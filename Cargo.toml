@@ -797,3 +797,8 @@ harness = false
 name = "distributed_sparse_2d_dense"
 path = "tests/distributed_sparse_2d_dense.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_2d_pairs"
+path = "tests/distributed_sparse_2d_pairs.rs"
+harness = false

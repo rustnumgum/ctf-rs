@@ -222,6 +222,71 @@ fn dense_operand<T: Wire + Clone>(
     blocks
 }
 
+fn broadcast_pairs<T: Wire + Clone>(
+    context: &Context<'_>,
+    owner: usize,
+    blocks: &mut Vec<Vec<(usize, T)>>,
+) {
+    let width = 8 + T::WIDTH;
+    let mut sizes = vec![0u64; blocks.len()];
+    if context.rank() == owner {
+        for (size, block) in sizes.iter_mut().zip(blocks.iter()) {
+            *size = u64::try_from(block.len() * width).unwrap();
+        }
+    }
+    context.broadcast(owner, &mut sizes);
+    let total = sizes
+        .iter()
+        .map(|size| usize::try_from(*size).unwrap())
+        .sum();
+    let mut bytes = Vec::with_capacity(total);
+    if context.rank() == owner {
+        for (key, value) in blocks.iter().flatten() {
+            u64::try_from(*key).unwrap().encode(&mut bytes);
+            value.encode(&mut bytes);
+        }
+    } else {
+        bytes.resize(total, 0);
+    }
+    context.inner.broadcast(owner, &mut bytes);
+    if context.rank() != owner {
+        let mut offset = 0;
+        *blocks = sizes
+            .into_iter()
+            .map(|size| {
+                let size = usize::try_from(size).unwrap();
+                assert_eq!(size % width, 0);
+                let end = offset + size;
+                let block = bytes[offset..end]
+                    .chunks_exact(width)
+                    .map(|pair| {
+                        (
+                            usize::try_from(u64::decode(&pair[..8])).unwrap(),
+                            T::decode(&pair[8..]),
+                        )
+                    })
+                    .collect();
+                offset = end;
+                block
+            })
+            .collect();
+    }
+}
+
+fn pairs_operand<T: Wire + Clone>(
+    plan: Panel<'_, '_>,
+    data: &[Vec<(usize, T)>],
+    step: usize,
+    edge: usize,
+) -> Vec<Vec<(usize, T)>> {
+    let positions = plan.operand_positions(data.len(), step, edge);
+    let mut blocks: Vec<_> = positions.iter().map(|&position| data[position].clone()).collect();
+    if let Some(context) = plan.comm {
+        broadcast_pairs(context, step % context.size(), &mut blocks);
+    }
+    blocks
+}
+
 /// Execute a CSR/CSR -> CSR 2D level. The callback is the next contraction
 /// level (or the native sparse leaf) and returns its possibly resized sparse
 /// output blocks. Sparse moving output follows source ownership: each panel is
@@ -505,6 +570,82 @@ where
     for step in (index..edge).step_by(count) {
         let op_a = csr_operand(a_plan, a, step, edge);
         let op_b = csr_operand(b_plan, b, step, edge);
+        if let Some(context) = c_plan.comm {
+            assert_eq!(edge % context.size(), 0);
+            let positions = c_plan.operand_positions(c.len(), step, edge);
+            let work: Vec<_> = positions
+                .iter()
+                .map(|&position| vec![algebra.zero(); c[position].len()])
+                .collect();
+            let mut work = child(&op_a, &op_b, work, algebra.zero(), next);
+            assert_eq!(work.len(), positions.len());
+            let owner = step % context.size();
+            for block in &mut work {
+                context.reduce_monoid(algebra, block, false, owner);
+            }
+            if context.rank() == owner {
+                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
+            }
+        } else if c_plan.inner == 0 {
+            c = child(&op_a, &op_b, c, child_beta, next);
+            child_beta = algebra.one();
+        } else {
+            let positions = c_plan.operand_positions(c.len(), step, edge);
+            if c_plan.outer == 1 {
+                let work: Vec<_> = positions.iter().map(|&position| c[position].clone()).collect();
+                let work = child(&op_a, &op_b, work, beta.clone(), next);
+                assert_eq!(work.len(), positions.len());
+                for (position, block) in positions.into_iter().zip(work) {
+                    assert_eq!(block.len(), c[position].len());
+                    c[position] = block;
+                }
+            } else {
+                let work: Vec<_> = positions
+                    .iter()
+                    .map(|&position| vec![algebra.zero(); c[position].len()])
+                    .collect();
+                let work = child(&op_a, &op_b, work, algebra.zero(), next);
+                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
+            }
+        }
+    }
+    c
+}
+
+/// Execute the source nonfolded sparse-pair-A/dense-B/dense-C 2D level.
+/// Pair keys and ordering are copied byte-for-byte between panel owners and
+/// receivers; interpreting their local key space remains the child leaf's
+/// responsibility. Sparse blocks broadcast their individual payload sizes
+/// before the concatenated key/value payload.
+pub fn execute_pairs_dense<A: Semiring>(
+    algebra: &A,
+    edge: usize,
+    layers: Layers,
+    a_plan: Panel<'_, '_>,
+    b_plan: Panel<'_, '_>,
+    c_plan: Panel<'_, '_>,
+    a: &[Vec<(usize, A::Element)>],
+    b: &[Vec<A::Element>],
+    mut c: Vec<Vec<A::Element>>,
+    beta: A::Element,
+    mut child: impl FnMut(
+        &[Vec<(usize, A::Element)>],
+        &[Vec<A::Element>],
+        Vec<Vec<A::Element>>,
+        A::Element,
+        Layers,
+    ) -> Vec<Vec<A::Element>>,
+) -> Vec<Vec<A::Element>>
+where
+    A::Element: Wire,
+{
+    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
+    let (count, index, next) = schedule(edge, layers);
+    let mut child_beta = beta.clone();
+
+    for step in (index..edge).step_by(count) {
+        let op_a = pairs_operand(a_plan, a, step, edge);
+        let op_b = dense_operand(b_plan, b, step, edge);
         if let Some(context) = c_plan.comm {
             assert_eq!(edge % context.size(), 0);
             let positions = c_plan.operand_positions(c.len(), step, edge);
