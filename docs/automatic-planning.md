@@ -53,6 +53,19 @@ distributed enumeration at 3031-3105. Exhaustive search is a refinement, not a
 fallback after failure: it is skipped below the source 0.01-second threshold and
 wins only when strictly faster (3311-3338).
 
+VariantSpace now implements the NS unique-label count and raw decode stages,
+including all three 2D orientation values and shared-label LCM virtualization.
+Candidates retain differing physical maps across operands. The separate
+mapping_preflight::check ports source phase and physical-mismatch validation for
+unique-label NS distributions, including physical-chain self checks. Neither
+component claims folded/symmetry self-mapping validation or executes a candidate.
+
+Pinned quirks are intentional: hollow get_choice index zero yields repeated zero
+coordinates, and AC orientation case 1 has no assignment because its source break
+precedes the assignment. These are not replaced with textbook combinations/SUMMA.
+Topology-permutation canonicalization and distributed variant enumeration still
+need connection, followed by normal-search alternatives and costed execution.
+
 Total candidate evaluation must additionally port folding and sparse redistribution
 costs (2632-2810), then connect existing collective Selector and context cache. Sparse,
 symmetry, node-aware, low-memory and 2D panel alternatives remain in the overall

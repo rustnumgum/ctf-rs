@@ -45,3 +45,5 @@ mod dense_function;
 mod dense_transform;
 pub mod grid_plan_cost;
 pub mod redist_cost;
+pub mod mapping_preflight;
+pub mod mapping_variants;

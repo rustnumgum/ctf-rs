@@ -1024,6 +1024,16 @@ measured wall times or RSS. DIGIT / PASS; no failed checks or extra numerical ru
 The test compiled and linked on Windows GNU. No MPI execution was required for
 this pure model stage; full automatic planning remains incomplete.
 
+## Exhaustive raw mappings and preflight (2026-09-07)
+
+mapping_variants and mapping_preflight passed once in WSL (four local tests).
+Exact checks cover the six GEMM variants on a 2x2 topology, source choice-zero
+duplication, all three 2D orientations including the empty AC case, rectangular
+2x3 shared-phase LCM=6, legal 2D mismatches, phase mismatch rejection, three-way
+map equality and singleton rules. No MPI execution or floating tolerance was
+needed. Both targets compiled/linked on Windows GNU. DIGIT / PASS; automatic
+candidate enumeration/selection/execution integration remains incomplete.
+
 ## High-order sparse custom contraction (2026-09-07)
 
 distributed_sparse_fold_function passed once at 1/2/4 WSL ranks, world/parity,

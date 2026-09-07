@@ -966,3 +966,16 @@ invented physical-permutation transpose surcharge. GridPlan::estimate_unfolded
 adds these costs with the exact A/B residency, C roundtrip and maximum workspace
 rule of contraction.cxx:2750-2810. These are source model estimates; actual Rust
 key-routing and measured process memory remain separately documented.
+
+## Exhaustive NS mapping variants and preflight
+
+mapping_variants.rs ports get_num_map_variants, mapping construction and phase
+equalization from contraction.cxx:2008-2041,2143-2388, plus get_choice/calc_idx_arr
+from shared/util.cxx. It preserves raw discovery order and source quirks instead
+of restricting candidates to aligned maps. mapping_preflight.rs ports the unique-
+label NS part of check_mapping (1339-1572) and physical-chain self checks from
+mapping.cxx:338-390. Three-way labels require identical maps; pair-only labels
+require equal total phases, and mismatched physical dimensions must have the
+source corresponding matched coverage. Singleton physical assignments fail the
+same bookkeeping. Symmetric/repeated self-mapping, topology canonicalization and
+automatic candidate execution remain separate unfinished responsibilities.

@@ -423,3 +423,11 @@ path = "tests/grid_plan_cost.rs"
 [[test]]
 name = "redist_cost"
 path = "tests/redist_cost.rs"
+
+[[test]]
+name = "mapping_preflight"
+path = "tests/mapping_preflight.rs"
+
+[[test]]
+name = "mapping_variants"
+path = "tests/mapping_variants.rs"
