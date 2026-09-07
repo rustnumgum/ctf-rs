@@ -544,3 +544,8 @@ harness = false
 name = "typed_distributed_svd"
 path = "tests/typed_distributed_svd.rs"
 harness = false
+
+[[test]]
+name = "typed_svd_truncation"
+path = "tests/typed_svd_truncation.rs"
+harness = false

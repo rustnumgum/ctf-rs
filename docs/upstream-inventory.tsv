@@ -66,7 +66,7 @@ src/interface/idx_tensor.h	src/interface	pending
 src/interface/kernel.h	src/interface	pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
-src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed thin QR/SVD, Cholesky and triangular/positive-definite solves; f64 truncated/randomized SVD and square-subworld eigh; typed truncated/randomized SVD/eigh and remaining routines pending
+src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed thin/truncated SVD, QR, Cholesky and triangular/positive-definite solves; f64 randomized SVD and square-subworld eigh; typed randomized SVD/eigh and remaining routines pending
 src/interface/matrix.h	src/matrix.rs	partial direct Rust Tensor matrix APIs
 src/interface/monoid.cxx	src/interface	pending
 src/interface/monoid.h	src/interface	pending

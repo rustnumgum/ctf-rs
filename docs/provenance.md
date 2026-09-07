@@ -1190,3 +1190,11 @@ values have zero imaginary part. Rust uses separate owned buffers instead of
 the source's overlapping real/complex pointer aliases. The right factor is V^H
 for complex scalars. The established one-row native grid adjustment and
 requested-grid restoration remain, without gathering either matrix factor.
+
+Four-type SVD rank/threshold postprocessing retains matrix.cxx:1103-1138's
+inclusive magnitude boundary and computed-zero-rank/full-factor behavior.
+The public threshold is converted to the scalar's real precision before
+comparison, matching the source dtype threshold conversion. Complex singular
+values have zero imaginary part, so real-component absolute value avoids
+unnecessary squaring/overflow. Only the singular-value vector is read; factors
+are sliced collectively in their existing distributed layouts.

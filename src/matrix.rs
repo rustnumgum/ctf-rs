@@ -100,38 +100,6 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         values.write_add(&value_pairs);
         Ok((vectors, values))
     }
-    /// Source rank/threshold postprocessing: keep singular values >= threshold.
-    /// A computed zero rank returns the full factors in this pinned version.
-    pub fn svd_truncated(
-        &self,
-        grid: [usize; 2],
-        rank: Option<usize>,
-        threshold: f64,
-    ) -> Result<(Self, Self, Self), i32> {
-        let (u, s, vt) = self.svd(grid)?;
-        let k = s.distribution().shape[0];
-        let mut retained = rank.unwrap_or(k);
-        if threshold > 0. {
-            let values = s.read(&(0..k).collect::<Vec<_>>());
-            let cutoff = values.partition_point(|value| value.abs() >= threshold);
-            retained = if retained > 0 {
-                retained.min(cutoff)
-            } else {
-                cutoff
-            };
-        }
-        if retained > 0 && retained < k {
-            let m = u.distribution().shape[0];
-            let n = vt.distribution().shape[1];
-            Ok((
-                u.slice(&[0..m, 0..retained]),
-                s.slice(&[0..retained]),
-                vt.slice(&[0..retained, 0..n]),
-            ))
-        } else {
-            Ok((u, s, vt))
-        }
-    }
     /// Source svd_rand: initialize/QR (unless a guess is supplied), apply A*A^T
     /// and QR, retain requested columns, SVD U^T*A, and rotate the left factor.
     /// All matrix intermediates remain distributed; seed is explicitly supplied.
@@ -504,6 +472,52 @@ macro_rules! matrix_factor_methods {
         }
     };
 }
+
+macro_rules! matrix_svd_truncated_methods {
+    ($scalar:ty, $real:ty, $magnitude:expr) => {
+        impl<'c, 'r> Tensor<'c, 'r, Arithmetic<$scalar>> {
+            /// Source rank/threshold postprocessing: keep singular values >= threshold.
+            /// A computed zero rank returns the full factors in this pinned version.
+            pub fn svd_truncated(
+                &self,
+                grid: [usize; 2],
+                rank: Option<usize>,
+                threshold: f64,
+            ) -> Result<(Self, Self, Self), i32> {
+                let threshold = threshold as $real;
+                let (u, s, vt) = self.svd(grid)?;
+                let k = s.distribution().shape[0];
+                let mut retained = rank.unwrap_or(k);
+                if threshold > 0. {
+                    let values = s.read(&(0..k).collect::<Vec<_>>());
+                    let cutoff =
+                        values.partition_point(|value| ($magnitude)(value) >= threshold);
+                    retained = if retained > 0 {
+                        retained.min(cutoff)
+                    } else {
+                        cutoff
+                    };
+                }
+                if retained > 0 && retained < k {
+                    let m = u.distribution().shape[0];
+                    let n = vt.distribution().shape[1];
+                    Ok((
+                        u.slice(&[0..m, 0..retained]),
+                        s.slice(&[0..retained]),
+                        vt.slice(&[0..retained, 0..n]),
+                    ))
+                } else {
+                    Ok((u, s, vt))
+                }
+            }
+        }
+    };
+}
+
+matrix_svd_truncated_methods!(f64, f64, |value: &f64| value.abs());
+matrix_svd_truncated_methods!(f32, f32, |value: &f32| value.abs());
+matrix_svd_truncated_methods!(Complex<f32>, f32, |value: &Complex<f32>| value.re.abs());
+matrix_svd_truncated_methods!(Complex<f64>, f64, |value: &Complex<f64>| value.re.abs());
 
 matrix_factor_methods!(f64, cholesky, solve_tri, solve_spd, qr, svd);
 matrix_factor_methods!(

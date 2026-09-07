@@ -1118,6 +1118,18 @@ The new target and existing distributed_qr_svd/distributed_svd_paths compiled
 and linked once on Windows GNU. Native MPI runtime is pending. DIGIT / PASS;
 typed truncated/randomized SVD, eigensolve and full-port acceptance remain open.
 
+## Typed SVD truncation semantics (2026-09-07)
+
+typed_svd_truncation passed once at WSL 1/2/4 ranks, world/parity, for all four
+native scalar types. Exact dimensions cover rank-only, inclusive threshold,
+combined rank/threshold, rank-zero, oversized rank and above-spectrum threshold
+branches, retaining the source zero-rank/full-factor quirk. A fixed threshold
+3+1e-8 checks source f32 conversion versus f64 comparison; it is a discrete
+branch test, not an accuracy refinement. Distributed sliced reconstruction uses
+the existing m*n*n*1e-6 Frobenius bound and finite results. No failures or extra
+precision runs. New target and existing distributed_svd_paths compiled/linked
+on Windows GNU once. Native MPI runtime remains pending. DIGIT / PASS.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,
