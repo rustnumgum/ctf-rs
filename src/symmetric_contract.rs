@@ -169,8 +169,8 @@ fn mapping_supported(
 
     let mut maps = vec![Mapping::Unmapped; union.len()];
     for (topology_axis, &label) in physical_labels.iter().enumerate() {
-        let axis = position(&union, label)
-            .expect("each physical topology axis must name a union label");
+        let axis =
+            position(&union, label).expect("each physical topology axis must name a union label");
         maps[axis].augment_physical(topology, topology_axis);
     }
 
@@ -254,17 +254,11 @@ fn prescale_masks(
         let original_c = position(c_indices, v_indices[axis]);
         let mut current_t = position(t_indices, v_indices[axis]);
         let mut count = 0;
-        while v_links[axis + count] == Symmetry::SY
-            && original_c.is_none()
-            && current_t.is_none()
-        {
+        while v_links[axis + count] == Symmetry::SY && original_c.is_none() && current_t.is_none() {
             count += 1;
             current_t = position(t_indices, v_indices[axis + count]);
         }
-        if v_links[axis + count] == Symmetry::NS
-            && original_c.is_none()
-            && current_t.is_none()
-        {
+        if v_links[axis + count] == Symmetry::NS && original_c.is_none() && current_t.is_none() {
             count += 1;
         }
         if count > 1 {
@@ -371,8 +365,7 @@ where
                 false,
             )
         };
-        let (t_masks, v_masks) =
-            prescale_masks(t_indices, t_links, v_indices, v_links, c_indices);
+        let (t_masks, v_masks) = prescale_masks(t_indices, t_links, v_indices, v_links, c_indices);
 
         if t_masks.is_empty() && v_masks.is_empty() {
             return self.contract_canonical_function_on(
@@ -415,6 +408,121 @@ where
             labels(b_indices),
             topology.clone(),
             labels(physical_labels),
+            alpha,
+            beta,
+            commutative,
+            function,
+        )
+    }
+
+    /// Automatically select a compressed aligned grid plan and execute the
+    /// complete symmetry-aware contraction. Candidate topology and physical
+    /// label order follow the pinned source mapping order.
+    pub fn contract_from(
+        &mut self,
+        indices_c: &str,
+        a: &Self,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        alpha: A::Element,
+        beta: A::Element,
+        commutative: bool,
+    ) -> Result<(), crate::map_tensor::Rejected> {
+        let algebra = self.algebra.clone();
+        self.contract_function_from(
+            indices_c,
+            a,
+            indices_a,
+            b,
+            indices_b,
+            alpha,
+            beta,
+            commutative,
+            |a, b| algebra.multiply(a, b),
+        )
+    }
+
+    /// Automatic-plan variant of `contract_function_from_on`.
+    pub fn contract_function_from(
+        &mut self,
+        indices_c: &str,
+        a: &Self,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        alpha: A::Element,
+        beta: A::Element,
+        commutative: bool,
+        function: impl Fn(&A::Element, &A::Element) -> A::Element,
+    ) -> Result<(), crate::map_tensor::Rejected> {
+        assert!(std::ptr::eq(self.context, a.context));
+        assert!(std::ptr::eq(self.context, b.context));
+        validate_indices(indices_a, &a.distribution.distribution().shape);
+        validate_indices(indices_b, &b.distribution.distribution().shape);
+        validate_indices(indices_c, &self.distribution.distribution().shape);
+
+        let repeated = [indices_a, indices_b, indices_c].iter().any(|indices| {
+            indices
+                .bytes()
+                .enumerate()
+                .any(|(axis, label)| indices.as_bytes()[..axis].contains(&label))
+        });
+        if repeated {
+            let (a, indices_a) = a.extract_diagonal(indices_a);
+            let (b, indices_b) = b.extract_diagonal(indices_b);
+            let (mut c, reduced_indices_c) = self.extract_diagonal(indices_c);
+            c.contract_function_from(
+                &reduced_indices_c,
+                &a,
+                &indices_a,
+                &b,
+                &indices_b,
+                alpha,
+                beta,
+                commutative,
+                function,
+            )?;
+            self.replace_diagonal(indices_c, &c);
+            return Ok(());
+        }
+
+        if indices_a.is_empty() && indices_b.is_empty() && indices_c.is_empty() {
+            let product = function(&a.data[0], &b.data[0]);
+            let scaled = self.algebra.multiply(&product, &alpha);
+            let old = self.algebra.multiply(&self.data[0], &beta);
+            self.data[0] = self.algebra.add(&scaled, &old);
+            return Ok(());
+        }
+
+        let mut planned_indices_b = indices_b.as_bytes().to_vec();
+        let mut planned_indices_c = indices_c.as_bytes().to_vec();
+        align_triple(
+            indices_a.as_bytes(),
+            a.distribution.links(),
+            &mut planned_indices_b,
+            b.distribution.links(),
+            &mut planned_indices_c,
+            self.distribution.links(),
+        );
+        let planned_indices_b = labels(&planned_indices_b);
+        let planned_indices_c = labels(&planned_indices_c);
+        let plan = super::contraction::automatic_plan(
+            self.context.size(),
+            &[
+                (indices_a, &a.distribution),
+                (planned_indices_b, &b.distribution),
+                (planned_indices_c, &self.distribution),
+            ],
+        )?;
+        self.contract_function_from_on(
+            indices_c,
+            a,
+            indices_a,
+            b,
+            indices_b,
+            plan.topology,
+            &plan.physical_labels,
             alpha,
             beta,
             commutative,

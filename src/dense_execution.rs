@@ -5,9 +5,10 @@
 //! with sequential semiring or packed folded BLAS leaves.
 
 use crate::{
-    algebra::{Arithmetic, Monoid, Semiring, Wire},
+    algebra::{Arithmetic, Semiring, Wire},
     context::Context,
     ctr_2d::{Layers, Panel},
+    ctr_comm::Replication,
     mapping::{Distribution, Mapping},
     tensor::Tensor,
 };
@@ -36,8 +37,18 @@ struct Execution<'context> {
     levels: Vec<Level<'context>>,
     block_shapes: [Vec<usize>; 3],
     virtual_phases: [Vec<usize>; 3],
-    replicate: [Vec<Context<'context>>; 3],
-    has_replication: bool,
+    replication: Replication<'context>,
+}
+
+impl Execution<'_> {
+    fn close(self) {
+        self.replication.close();
+        for level in self.levels {
+            for comm in level.comms.into_iter().flatten() {
+                comm.close();
+            }
+        }
+    }
 }
 
 fn gcd(mut a: usize, mut b: usize) -> usize {
@@ -123,17 +134,6 @@ fn source_equal(left: &Mapping, right: &Mapping) -> bool {
     }
 }
 
-fn mark_physical(mapping: &Mapping, used: &mut [bool]) {
-    match mapping {
-        Mapping::Unmapped => {}
-        Mapping::Physical { axis, child, .. } => {
-            used[*axis] = true;
-            mark_physical(child, used);
-        }
-        Mapping::Virtual { child, .. } => mark_physical(child, used),
-    }
-}
-
 fn panel_parts(
     state: &OperandState,
     dimension: usize,
@@ -153,12 +153,7 @@ fn panel_parts(
     (outer, inner)
 }
 
-fn update_panel_state(
-    state: &mut OperandState,
-    dimension: usize,
-    mapping: &Mapping,
-    steps: usize,
-) {
+fn update_panel_state(state: &mut OperandState, dimension: usize, mapping: &Mapping, steps: usize) {
     if let Some((_, processes)) = head_physical(mapping) {
         state.block_size = state.block_size * processes / steps;
         state.block_lengths[dimension] = state.block_lengths[dimension] * processes / steps;
@@ -241,7 +236,9 @@ fn build_execution<'context>(
             .map(|mapping| mapping.phase() / mapping.physical_phase())
             .collect()
     });
-    let block_shapes = distributions.each_ref().map(|distribution| distribution.block_shape());
+    let block_shapes = distributions
+        .each_ref()
+        .map(|distribution| distribution.block_shape());
     let mut states: [OperandState; 3] = std::array::from_fn(|operand| OperandState {
         block_size: distributions[operand].local_len(),
         block_lengths: block_shapes[operand]
@@ -252,26 +249,7 @@ fn build_execution<'context>(
         virtual_block_lengths: block_shapes[operand].clone(),
     });
 
-    let mut physical: [Vec<bool>; 3] =
-        std::array::from_fn(|_| vec![false; topology.dimensions.len()]);
-    for operand in 0..3 {
-        for mapping in &distributions[operand].mappings {
-            mark_physical(mapping, &mut physical[operand]);
-        }
-    }
-    let has_replication = (0..topology.dimensions.len())
-        .any(|axis| (0..3).any(|operand| !physical[operand][axis]));
-    let mut replicate: [Vec<Context<'context>>; 3] = std::array::from_fn(|_| Vec::new());
-    for axis in 0..topology.dimensions.len() {
-        if !(physical[0][axis] || physical[1][axis] || physical[2][axis]) {
-            continue;
-        }
-        for operand in 0..3 {
-            if !physical[operand][axis] {
-                replicate[operand].push(topology.fiber(context, axis));
-            }
-        }
-    }
+    let replication = Replication::new(context, distributions);
 
     let mut phases = vec![1usize; labels.len()];
     let mut raw_levels = Vec::new();
@@ -354,14 +332,17 @@ fn build_execution<'context>(
             specs,
         })
         .collect();
-    let virtual_phases =
-        std::array::from_fn(|operand| normalized[operand].iter().map(|&label| phases[label]).collect());
+    let virtual_phases = std::array::from_fn(|operand| {
+        normalized[operand]
+            .iter()
+            .map(|&label| phases[label])
+            .collect()
+    });
     Execution {
         levels,
         block_shapes,
         virtual_phases,
-        replicate,
-        has_replication,
+        replication,
     }
 }
 
@@ -402,17 +383,7 @@ fn execute_levels<A: Semiring, F>(
         c,
         beta,
         |a, b, c, beta, layers| {
-            execute_levels(
-                algebra,
-                levels,
-                level + 1,
-                layers,
-                a,
-                b,
-                c,
-                beta,
-                leaf,
-            )
+            execute_levels(algebra, levels, level + 1, layers, a, b, c, beta, leaf)
         },
     );
 }
@@ -428,8 +399,7 @@ fn folded_virtualized<T, K>(
     c: &mut [T],
     alpha: T,
     beta: T,
-)
-where
+) where
     T: Clone + PartialEq + Wire,
     Arithmetic<T>: Semiring<Element = T> + Clone,
     K: crate::linalg::GemmKernel<T>,
@@ -438,7 +408,9 @@ where
         .layouts
         .each_ref()
         .map(|layout| layout.group_lengths.iter().product::<usize>());
-    let counts = virtual_phases.each_ref().map(|phases| phases.iter().product::<usize>());
+    let counts = virtual_phases
+        .each_ref()
+        .map(|phases| phases.iter().product::<usize>());
     assert_eq!(a.len(), block_sizes[0] * counts[0]);
     assert_eq!(b.len(), block_sizes[1] * counts[1]);
     assert_eq!(c.len(), block_sizes[2] * counts[2]);
@@ -547,72 +519,49 @@ where
             }
         }
 
-        for comm in &execution.replicate[0] {
-            comm.broadcast(0, &mut a.data);
-        }
-        for comm in &execution.replicate[1] {
-            comm.broadcast(0, &mut b.data);
-        }
-        // construct_dense_ctr installs ctr_replicate when any topology axis is
-        // missing from any operand, even when an entirely unused axis gives
-        // that layer no actual communicator.
-        let has_replication = execution.has_replication;
-        let output_root = execution.replicate[2]
-            .iter()
-            .all(|comm| comm.rank() == 0);
-        if has_replication && output_root && beta != algebra.one() {
-            if beta == algebra.zero() {
-                c.data.fill(algebra.zero());
-            } else {
-                for value in &mut c.data {
-                    *value = algebra.multiply(&beta, value);
-                }
-            }
-        }
-        let mut leaf = |a: &[A::Element],
-                        b: &[A::Element],
-                        c: &mut [A::Element],
-                        beta: A::Element| {
-            crate::contraction::virtualized(
-                &algebra,
-                &execution.block_shapes[0],
-                &execution.virtual_phases[0],
-                indices_a,
-                a,
-                &execution.block_shapes[1],
-                &execution.virtual_phases[1],
-                indices_b,
-                b,
-                &execution.block_shapes[2],
-                &execution.virtual_phases[2],
-                indices_c,
-                c,
-                &alpha,
-                &beta,
-            );
-        };
-        execute_levels(
+        let block_shapes = &execution.block_shapes;
+        let virtual_phases = &execution.virtual_phases;
+        let levels = &execution.levels;
+        let mut leaf =
+            |a: &[A::Element], b: &[A::Element], c: &mut [A::Element], beta: A::Element| {
+                crate::contraction::virtualized(
+                    &algebra,
+                    &block_shapes[0],
+                    &virtual_phases[0],
+                    indices_a,
+                    a,
+                    &block_shapes[1],
+                    &virtual_phases[1],
+                    indices_b,
+                    b,
+                    &block_shapes[2],
+                    &virtual_phases[2],
+                    indices_c,
+                    c,
+                    &alpha,
+                    &beta,
+                );
+            };
+        execution.replication.execute(
             &algebra,
-            &execution.levels,
-            0,
-            Layers { count: 1, index: 0 },
-            &a.data,
-            &b.data,
+            &mut a.data,
+            &mut b.data,
             &mut c.data,
-            if has_replication {
-                if output_root {
-                    algebra.one()
-                } else {
-                    algebra.zero()
-                }
-            } else {
-                beta
+            beta,
+            |a, b, c, beta| {
+                execute_levels(
+                    &algebra,
+                    levels,
+                    0,
+                    Layers { count: 1, index: 0 },
+                    a,
+                    b,
+                    c,
+                    beta,
+                    &mut leaf,
+                )
             },
-            &mut leaf,
         );
-        for comm in &execution.replicate[2] {
-            comm.reduce_monoid(&algebra, &mut c.data, false, 0);
-        }
         if let Some((send, recv)) = exchange {
             if send != context.rank() {
                 context.inner.replace_wire(&mut c.data, recv, send, 1327);
@@ -622,16 +571,7 @@ where
                 }
             }
         }
-        for group in execution.replicate {
-            for comm in group {
-                comm.close();
-            }
-        }
-        for level in execution.levels {
-            for comm in level.comms.into_iter().flatten() {
-                comm.close();
-            }
-        }
+        execution.close();
         if let Some(context) = reordered {
             context.close();
         }
@@ -829,30 +769,14 @@ where
             }
         }
 
-        for comm in &execution.replicate[0] {
-            comm.broadcast(0, &mut a.data);
-        }
-        for comm in &execution.replicate[1] {
-            comm.broadcast(0, &mut b.data);
-        }
-        let has_replication = execution.has_replication;
-        let output_root = execution.replicate[2]
-            .iter()
-            .all(|comm| comm.rank() == 0);
-        if has_replication && output_root && beta != algebra.one() {
-            if beta == algebra.zero() {
-                c.data.fill(algebra.zero());
-            } else {
-                for value in &mut c.data {
-                    *value = algebra.multiply(&beta, value);
-                }
-            }
-        }
+        let block_shapes = &execution.block_shapes;
+        let virtual_phases = &execution.virtual_phases;
+        let levels = &execution.levels;
         let mut leaf = |a: &[T], b: &[T], c: &mut [T], beta: T| {
             folded_virtualized::<T, K>(
                 descriptor,
-                &execution.block_shapes,
-                &execution.virtual_phases,
+                block_shapes,
+                virtual_phases,
                 [indices_a, indices_b, indices_c],
                 a,
                 b,
@@ -861,28 +785,26 @@ where
                 beta,
             );
         };
-        execute_levels(
+        execution.replication.execute(
             &algebra,
-            &execution.levels,
-            0,
-            Layers { count: 1, index: 0 },
-            &a.data,
-            &b.data,
+            &mut a.data,
+            &mut b.data,
             &mut c.data,
-            if has_replication {
-                if output_root {
-                    algebra.one()
-                } else {
-                    algebra.zero()
-                }
-            } else {
-                beta
+            beta,
+            |a, b, c, beta| {
+                execute_levels(
+                    &algebra,
+                    levels,
+                    0,
+                    Layers { count: 1, index: 0 },
+                    a,
+                    b,
+                    c,
+                    beta,
+                    &mut leaf,
+                )
             },
-            &mut leaf,
         );
-        for comm in &execution.replicate[2] {
-            comm.reduce_monoid(&algebra, &mut c.data, false, 0);
-        }
         if let Some((send, recv)) = exchange {
             if send != context.rank() {
                 context.inner.replace_wire(&mut c.data, recv, send, 1327);
@@ -909,16 +831,7 @@ where
                 crate::fold_layout::Direction::Backward,
             );
         }
-        for group in execution.replicate {
-            for comm in group {
-                comm.close();
-            }
-        }
-        for level in execution.levels {
-            for comm in level.comms.into_iter().flatten() {
-                comm.close();
-            }
-        }
+        execution.close();
         if let Some(context) = reordered {
             context.close();
         }

@@ -151,6 +151,48 @@ harness = false
 required-features = ["native-linalg"]
 
 [[test]]
+name = "upstream_fast_3mm"
+path = "tests/upstream/studies/fast_3mm.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_fast_diagram"
+path = "tests/upstream/studies/fast_diagram.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_fast_sym_4d"
+path = "tests/upstream/studies/fast_sym_4D.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_fast_sym"
+path = "tests/upstream/studies/fast_sym.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_fast_as_as_sy_tensor_ctr"
+path = "tests/upstream/studies/fast_as_as_sy_tensor_ctr.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_fast_sy_as_as_tensor_ctr"
+path = "tests/upstream/studies/fast_sy_as_as_tensor_ctr.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
+name = "upstream_fast_tensor_ctr"
+path = "tests/upstream/studies/fast_tensor_ctr.rs"
+harness = false
+required-features = ["native-linalg"]
+
+[[test]]
 name = "distributed_matrix"
 path = "tests/distributed_matrix.rs"
 harness = false

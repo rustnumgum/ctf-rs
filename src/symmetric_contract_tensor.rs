@@ -10,6 +10,183 @@ use crate::{
 
 use super::SymmetricTensor;
 
+#[derive(Clone, Debug)]
+pub(super) struct AutomaticPlan {
+    pub topology: Topology,
+    pub physical_labels: String,
+}
+
+fn union_space(operands: &[(&str, &SymmetricDistribution)]) -> (Vec<u8>, Vec<usize>, Vec<bool>) {
+    let mut labels = Vec::new();
+    let mut dimensions = Vec::new();
+    for &(indices, distribution) in operands {
+        assert!(indices.is_ascii());
+        assert_eq!(indices.len(), distribution.links().len());
+        for (axis, label) in indices.bytes().enumerate() {
+            let dimension = distribution.distribution().shape[axis];
+            if let Some(union_axis) = labels.iter().position(|&old| old == label) {
+                assert_eq!(dimensions[union_axis], dimension);
+            } else {
+                labels.push(label);
+                dimensions.push(dimension);
+            }
+        }
+    }
+
+    let mut symmetry = vec![false; labels.len() * labels.len()];
+    for &(indices, distribution) in operands {
+        for axis in 0..distribution.links().len().saturating_sub(1) {
+            if distribution.links()[axis] == Symmetry::NS {
+                continue;
+            }
+            let left = labels
+                .iter()
+                .position(|&label| label == indices.as_bytes()[axis])
+                .unwrap();
+            let right = labels
+                .iter()
+                .position(|&label| label == indices.as_bytes()[axis + 1])
+                .unwrap();
+            symmetry[left * labels.len() + right] = true;
+            symmetry[right * labels.len() + left] = true;
+        }
+    }
+    (labels, dimensions, symmetry)
+}
+
+fn physical_label_map(mappings: &[Mapping], labels: &[u8], order: usize) -> Vec<u8> {
+    fn visit(mapping: &Mapping, label: u8, physical: &mut [Option<u8>]) {
+        match mapping {
+            Mapping::Unmapped => {}
+            Mapping::Physical { axis, child, .. } => {
+                assert!(physical[*axis].replace(label).is_none());
+                visit(child, label, physical);
+            }
+            Mapping::Virtual { child, .. } => visit(child, label, physical),
+        }
+    }
+
+    let mut physical = vec![None; order];
+    for (mapping, &label) in mappings.iter().zip(labels) {
+        visit(mapping, label, &mut physical);
+    }
+    physical
+        .into_iter()
+        .map(|label| label.expect("automatic symmetric mapping must use every topology axis"))
+        .collect()
+}
+
+pub(super) fn mapped_distributions<const N: usize>(
+    operands: [(&str, &SymmetricDistribution); N],
+    topology: &Topology,
+    physical_labels: &str,
+) -> Result<[SymmetricDistribution; N], crate::map_tensor::Rejected> {
+    let (labels, _, symmetry) = union_space(&operands);
+    assert!(physical_labels.is_ascii());
+    assert_eq!(physical_labels.len(), topology.dimensions.len());
+
+    let mut mappings = vec![Mapping::Unmapped; labels.len()];
+    for (topology_axis, label) in physical_labels.bytes().enumerate() {
+        let union_axis = labels
+            .iter()
+            .position(|&candidate| candidate == label)
+            .expect("each physical topology axis must name a union label");
+        mappings[union_axis].augment_physical(topology, topology_axis);
+    }
+    crate::map_tensor::coordinate_symmetry(&mut mappings, &symmetry)?;
+
+    Ok(std::array::from_fn(|operand| {
+        let (indices, original) = operands[operand];
+        let axis_mappings = indices
+            .bytes()
+            .map(|label| {
+                mappings[labels
+                    .iter()
+                    .position(|&candidate| candidate == label)
+                    .unwrap()]
+                .clone()
+            })
+            .collect();
+        SymmetricDistribution::new(
+            Distribution::new(
+                original.distribution().shape.clone(),
+                topology.clone(),
+                axis_mappings,
+            ),
+            original.links().to_vec(),
+        )
+    }))
+}
+
+/// Select the smallest packed aligned layout. Topologies and greedy physical
+/// assignments are visited in the pinned source order; equal sizes retain the
+/// first plan. This is the dense compressed counterpart of map_tensor, not the
+/// nonsymmetric 2D/exhaustive contraction search.
+pub(super) fn automatic_plan(
+    context_size: usize,
+    operands: &[(&str, &SymmetricDistribution)],
+) -> Result<AutomaticPlan, crate::map_tensor::Rejected> {
+    let (labels, dimensions, symmetry) = union_space(operands);
+    let mut selected: Option<(usize, AutomaticPlan)> = None;
+
+    for topology in crate::topology_candidates::all_shapes(context_size) {
+        let mut mappings = vec![Mapping::Unmapped; labels.len()];
+        let axes: Vec<_> = (0..topology.dimensions.len()).collect();
+        if crate::map_tensor::assign(
+            &dimensions,
+            &topology,
+            &axes,
+            &symmetry,
+            &mut vec![false; labels.len()],
+            &mut mappings,
+            true,
+        )
+        .is_err()
+        {
+            continue;
+        }
+        let physical = physical_label_map(&mappings, &labels, topology.dimensions.len());
+        let physical_labels = String::from_utf8(physical).unwrap();
+        let mapped: Vec<_> = operands
+            .iter()
+            .map(|&(indices, original)| {
+                let axis_mappings = indices
+                    .bytes()
+                    .map(|label| {
+                        mappings[labels
+                            .iter()
+                            .position(|&candidate| candidate == label)
+                            .unwrap()]
+                        .clone()
+                    })
+                    .collect();
+                SymmetricDistribution::new(
+                    Distribution::new(
+                        original.distribution().shape.clone(),
+                        topology.clone(),
+                        axis_mappings,
+                    ),
+                    original.links().to_vec(),
+                )
+            })
+            .collect();
+        let size = mapped.iter().map(SymmetricDistribution::local_len).sum();
+        if selected.as_ref().map_or(true, |(best, _)| size < *best) {
+            selected = Some((
+                size,
+                AutomaticPlan {
+                    topology,
+                    physical_labels,
+                },
+            ));
+        }
+    }
+
+    selected
+        .map(|(_, plan)| plan)
+        .ok_or(crate::map_tensor::Rejected::NoAssignableDimension)
+}
+
 impl<'c, 'r, A: Group + Semiring + Clone> SymmetricTensor<'c, 'r, A>
 where
     A::Element: Wire,
@@ -155,7 +332,11 @@ where
             let mappings = indices
                 .bytes()
                 .map(|label| {
-                    maps[labels.iter().position(|&candidate| candidate == label).unwrap()].clone()
+                    maps[labels
+                        .iter()
+                        .position(|&candidate| candidate == label)
+                        .unwrap()]
+                    .clone()
                 })
                 .collect();
             SymmetricDistribution::new(

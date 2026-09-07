@@ -99,16 +99,16 @@ src/contraction/contraction_plan.h	src/planning.rs	partial: executable explicit-
 src/contraction/contraction_selector.h	src/contraction	pending
 src/contraction/contraction_signature.cxx	src/planning.rs; src/sparse_contract_general.rs	partial: dense and NS sparse-A/dense-B/dense-C structural grid-plan reuse and context-scoped cache; compressed symmetry and automatic sparse candidate assembly pending
 src/contraction/contraction_signature.h	src/planning.rs	partial: dense structural signature, full collision-safe equality
-src/contraction/contraction.cxx	src/folding.rs; src/sparse_fold.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs; src/normal_mapping.rs; src/mapping_variants.rs; src/dense_search.rs; src/dense_execution.rs; src/sparse_mapped_cost.rs; src/sparse_cost.rs; src/redist_cost.rs; src/sparse_search.rs; src/sparse_contract_general.rs	partial: dense folded/unfolded cached normal/exhaustive selection and raw execution, node-aware and low-memory ownership, explicit sparse/symmetry/custom dispatch; unfolded sparse-A original-density/redistribution/tree costs now feed normal/weighted/exhaustive selection and executable raw pin/replication/panel/virtual/k0 mappings; folded/sparse-output/compressed automatic candidates and raw sparse search cache pending
-src/contraction/contraction.h	src/contraction	pending
-src/contraction/ctr_2d_general.cxx	src/ctr_2d.rs; src/mapped_cost.rs; src/plan_cost.rs; src/dense_execution.rs	partial: raw NS generic semiring and selected f64 folded nested panel execution; sparse integration pending
+src/contraction/contraction.cxx	src/folding.rs; src/sparse_fold.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs; src/normal_mapping.rs; src/mapping_variants.rs; src/dense_search.rs; src/dense_execution.rs; src/sparse_mapped_cost.rs; src/sparse_cost.rs; src/redist_cost.rs; src/sparse_search.rs; src/sparse_contract_general.rs	partial: dense folded/unfolded cached normal/exhaustive selection, raw execution, replication and automatic compressed symmetry planning; unfolded sparse-A original-density/redistribution/tree costs feed executable raw pin/replication/panel/virtual/k0 mappings; folded/sparse-output automatic candidates and raw sparse search cache pending
+src/contraction/contraction.h	src/contraction.rs; src/symmetric_contract.rs	replaced: direct typed Rust contraction functions and tensor methods replace C++ polymorphic execution trees
+src/contraction/ctr_2d_general.cxx	src/ctr_2d.rs; src/mapped_cost.rs; src/plan_cost.rs; src/dense_execution.rs	partial: raw NS generic semiring and selected f32/f64/complex32/complex64 folded nested panel execution; sparse integration pending
 src/contraction/ctr_2d_general.h	src/contraction	pending
-src/contraction/ctr_comm.cxx	src/contraction	pending
-src/contraction/ctr_comm.h	src/contraction	pending
+src/contraction/ctr_comm.cxx	src/ctr_comm.rs; src/dense_execution.rs	ported physical-fiber derivation, input broadcasts, root-only beta, recursive child, output-root reduction, replica cleanup and communicator release
+src/contraction/ctr_comm.h	src/ctr_comm.rs	replaced: owned Replication schedule replaces cloneable raw communicator arrays
 src/contraction/ctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/ctr_offload.h	excluded: CUDA/offload	excluded
-src/contraction/ctr_tsr.cxx	src/contraction.rs; src/symmetric_contraction_comm.rs; src/dense_execution.rs; src/partial_fold_kernel.rs	partial: NS/packed virtual, selected dense folded virtual leaves and explicit broadcast/root-Reduce execution; automatic symmetric plan integration pending
-src/contraction/ctr_tsr.h	src/contraction	pending
+src/contraction/ctr_tsr.cxx	src/contraction.rs; src/symmetric_contraction_comm.rs; src/dense_execution.rs; src/partial_fold_kernel.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs	ported dense NS/packed virtual execution, four-type folded nested panels, replication and automatic compressed symmetric plan integration
+src/contraction/ctr_tsr.h	src/contraction.rs; src/symmetric_contract.rs	replaced: direct typed Tensor and SymmetricTensor contraction methods replace execution-tree ownership
 src/contraction/Makefile	Cargo/build tooling	replaced
 src/contraction/sp_seq_ctr.cxx	src/sparse_sequential.rs; src/sparse_fold.rs; src/sparse_diagonal.rs; src/sparse_gemm.rs; src/sparse_formats.rs	partial: general NS sparse-A/dense-B/dense-C recursion including pinned limited custom-function branch; folded sparse/mixed children and input pre-reduction; folded custom functions and other general sparse combinations pending
 src/contraction/sp_seq_ctr.h	src/contraction	pending
@@ -120,8 +120,8 @@ src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
 src/contraction/spctr_tsr.cxx	src/sparse_virtual.rs; src/sparse_contract_general.rs; src/sparse_gemm.rs; src/sparse_fold.rs; src/sparse_cost.rs; src/sparse_cost_local.rs; src/sparse_keys.rs	partial: source virtual strides/order, repeated-index offsets and per-output beta-first tracking, mapped sparse-A pinning and virtual blocks, native krnl5 CCSR output; virtual and pin time/memory plus all twelve CPU leaf models; explicit output depin avoids invalid source null-pointer orchestration; automatic sparse-output/nested panel assembly pending; non-inner sparse-output is a source assertion, not a working leaf
 src/contraction/spctr_tsr.h	src/contraction	pending
-src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar/custom-function reference kernels, packed custom MPI orchestration, typed canonical partial/symmetry folded BLAS residual traversal and four-type distributed integration; custom-function folded branch and automatic compressed integration pending
-src/contraction/sym_seq_ctr.h	src/contraction	pending
+src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs; src/symmetric_contract.rs	partial: NS/folded and packed scalar/custom-function kernels, four-type distributed folded integration and automatic compressed orchestration; standalone custom-function folded BLAS specialization remains pending
+src/contraction/sym_seq_ctr.h	src/contraction.rs; src/symmetric_contraction.rs	replaced: typed slice kernels replace raw virtual-block execution objects
 src/redistribution/cyclic_reshuffle.cxx	src/cyclic_reshuffle.rs; src/symmetric_reshuffle.rs; src/subworld.rs; src/symmetric_subworld.rs; src/tensor.rs; src/symmetric_tensor.rs	ported dense high-order legacy and value-only subworld paths; low-order dense dispatches to DGTOG and symmetric arbitrary-phase traffic to global reshuffle
 src/redistribution/cyclic_reshuffle.h	src/cyclic_reshuffle.rs; src/glb_cyclic_reshuffle.rs	replaced: owned exact plans replace raw offset/count buffers
 src/redistribution/dgtog_bucket.h	src/dgtog_bucket.rs	ported source ROR traversal, padding exclusion, virtual placement and value-only pack/unpack
@@ -153,10 +153,10 @@ src/summation/spr_seq_sum.cxx	src/sparse_sum.rs	partial: NS sparse/mixed indexed
 src/summation/spr_seq_sum.h	src/summation	pending
 src/summation/spsum_tsr.cxx	src/sparse_sum.rs	partial: distributed canonical-key sum routing; optimized sparse summation planner/communication pending
 src/summation/spsum_tsr.h	src/summation	pending
-src/summation/sum_tsr.cxx	src/summation.rs; src/symmetric_sum_comm.rs	partial: explicit NS/packed virtual blocks and input-broadcast/output-reduce execution; automatic symmetry plan construction pending
-src/summation/sum_tsr.h	src/summation	pending
-src/summation/summation.cxx	src/symmetric_sum_tensor.rs; src/symmetric_hollow_sum.rs; src/symmetric_sy_sum.rs; src/symmetric_diagonal.rs; src/summation.rs	partial: canonical and symmetry-aware sums, generic SY recursion and source run_diag stack; automatic mapper and full upstream coverage pending
-src/summation/summation.h	src/summation	pending
+src/summation/sum_tsr.cxx	src/summation.rs; src/symmetric_sum_comm.rs; src/symmetric_sum_tensor.rs	ported dense NS/packed virtual blocks, input-broadcast/output-reduce execution and automatic compressed symmetry plan construction
+src/summation/sum_tsr.h	src/summation.rs; src/symmetric_sum_tensor.rs	replaced: direct typed indexed-sum methods replace execution-tree ownership
+src/summation/summation.cxx	src/symmetric_sum_tensor.rs; src/symmetric_hollow_sum.rs; src/symmetric_sy_sum.rs; src/symmetric_diagonal.rs; src/summation.rs	partial: canonical and symmetry-aware sums, generic SY recursion, source run_diag stack and automatic dense mapper; remaining upstream driver coverage pending
+src/summation/summation.h	src/summation.rs; src/symmetric_sum_tensor.rs	replaced: direct typed Rust summation functions and tensor methods replace C++ execution objects
 src/summation/sym_seq_sum.cxx	src/summation.rs; src/symmetric_sum.rs	partial: NS and physical packed scalar reference kernels; optimized folded/custom-function branches pending
 src/summation/sym_seq_sum.h	src/summation	pending
 src/scaling/Makefile	Cargo/build tooling	replaced
@@ -178,7 +178,7 @@ test/diag_sym.cxx	tests/upstream_diag_sym.rs	ported paired-SY diagonal identity,
 test/endomorphism_cust_sp.cxx	tests/upstream_endomorphism_cust_sp.rs	ported: stored custom-name length transform, exact criterion; deterministic unique global keys replace random source sparse writes
 test/endomorphism_cust.cxx	tests/upstream_endomorphism_cust.rs	ported: longest-name monoid and cached-length transform, exact criterion; deterministic global-key fixture
 test/endomorphism.cxx	tests/upstream_endomorphism.rs	ported: original indexed cube transform, n=5 and strict abs(error)<1e-6; deterministic global-key fixture
-test/gemm_4D.cxx	tests/upstream_gemm4d.rs	NS associativity port PASS WSL 1/2/4; SY/AS branches pending
+test/gemm_4D.cxx	tests/upstream_gemm4d.rs	ported NS/SY/AS/SH associativity at n=7, original per-entry abs<1e-6; PASS WSL 1/2/4 world/parity; native compile/link only
 test/Makefile	Cargo/build tooling	replaced
 test/multi_tsr_sym.cxx	tests/upstream_multi_tsr_sym.rs	ported NS/SY Gram equality, original norm<1e-6; WSL 1/2/4 pass
 test/permute_multiworld.cxx	tests/upstream_permute_multiworld.rs; tests/symmetric_permuted_io.rs; tests/sparse_permuted_io.rs	partial: Rust NS driver PASS WSL1/2/4; mixed-storage source-semantic fixtures PASS; unmodified pinned C++ n3/rank1 passed NS then FAILED SY copy assertion (docs/upstream-known-failures.md), AS/SH not reached
@@ -254,11 +254,11 @@ bench/python/bench_solve.py	Rust semantic tests (no Python interface)	pending
 bench/python/bench_sttm.py	Rust semantic tests (no Python interface)	pending
 bench/python/bench_stttp.py	Rust semantic tests (no Python interface)	pending
 bench/python/sbench_args.py	Rust semantic tests (no Python interface)	pending
-studies/fast_3mm.cxx	tests/upstream/studies/fast_3mm.rs	pending
-studies/fast_as_as_sy_tensor_ctr.cxx	tests/upstream/studies/fast_as_as_sy_tensor_ctr.rs	pending
-studies/fast_diagram.cxx	tests/upstream/studies/fast_diagram.rs	pending
-studies/fast_sy_as_as_tensor_ctr.cxx	tests/upstream/studies/fast_sy_as_as_tensor_ctr.rs	pending
-studies/fast_sym_4D.cxx	tests/upstream/studies/fast_sym_4D.rs	pending
-studies/fast_sym.cxx	tests/upstream/studies/fast_sym.rs	pending
-studies/fast_tensor_ctr.cxx	tests/upstream/studies/fast_tensor_ctr.rs	pending
+studies/fast_3mm.cxx	tests/upstream/studies/fast_3mm.rs	ported n=5 SY/AS decomposition with packed SY coincidence normalization, original norm<=1e-10; PASS WSL 1/2/4 world/parity; native compile/link only
+studies/fast_as_as_sy_tensor_ctr.cxx	tests/upstream/studies/fast_as_as_sy_tensor_ctr.rs	ported n=4,s=t=v=1 AS/AS/SY study with chi/sign and V/W corrections, internal<=1e-6 and final<=1e-3; PASS WSL 1/2/4 world/parity; native compile/link only
+studies/fast_diagram.cxx	tests/upstream/studies/fast_diagram.rs	ported n=5 AS/SH/diagonal decomposition with packed orbit normalization, original norm<=1e-10; PASS WSL 1/2/4 world/parity; native compile/link only
+studies/fast_sy_as_as_tensor_ctr.cxx	tests/upstream/studies/fast_sy_as_as_tensor_ctr.rs	ported n=4,s=t=v=1 SY/AS/AS study with chi/sign and V/W corrections, internal<=1e-6 and final<=1e-3; PASS WSL 1/2/4 world/parity; native compile/link only
+studies/fast_sym_4D.cxx	tests/upstream/studies/fast_sym_4D.rs	ported n=6 fast symmetric 4D identity, original norm<=1e-10; PASS WSL 1/2/4 world/parity; native compile/link only
+studies/fast_sym.cxx	tests/upstream/studies/fast_sym.rs	ported n=13 fast symmetric matrix identity, original norm<=1e-10; PASS WSL 1/2/4 world/parity; native compile/link only
+studies/fast_tensor_ctr.cxx	tests/upstream/studies/fast_tensor_ctr.rs	ported n=4,s=t=v=1 tensor study with C/Z symmetry reporting and final<=1e-3; PASS WSL 1/2/4 world/parity; native compile/link only
 studies/Makefile	Cargo/build tooling	replaced

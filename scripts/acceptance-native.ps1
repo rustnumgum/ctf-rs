@@ -24,6 +24,8 @@ $mpiTests = @(
     'tensor_gemm','algebra_contraction','tensor_contract','contract_remap',
     'dense_semantics','upstream_dense','subcomm_dense','plan_cache','model_training',
     'selector','selection_objective','tensor_blas_fold','upstream_gemm4d',
+    'upstream_fast_3mm','upstream_fast_diagram','upstream_fast_sym_4d','upstream_fast_sym',
+    'upstream_fast_as_as_sy_tensor_ctr','upstream_fast_sy_as_as_tensor_ctr','upstream_fast_tensor_ctr',
     'distributed_matrix','distributed_qr_svd','distributed_svd_paths','distributed_eigh',
     'distributed_spd','distributed_tttp','distributed_mttkrp','distributed_tensor_svd',
     'distributed_solve_factor','distributed_sparse_io','distributed_sparse_sum',

@@ -1,5 +1,36 @@
 # Validation evidence
 
+## D3 dense contraction close (2026-09-08)
+
+Dense mapped contractions now derive the source replication fibers from all
+three operands, broadcast missing A/B axes, apply beta only on the C root,
+execute the recursive 2D/virtual child, reduce C to its roots and clear input
+replicas before communicator release. The ordinary and folded paths share this
+wrapper; nested packed panels retain f32/f64/complex32/complex64 dispatch and
+the transposed-C operand swap. Automatic symmetric contraction and canonical
+sum planning select a compressed aligned topology in pinned candidate order,
+then use packed broadcast/reduce execution without gathering.
+
+`upstream_gemm4d` (NS/SY/AS/SH), `upstream_weigh4d`,
+`upstream_sy_times_ns`, `upstream_ccsdt_t3_to_t2`, `upstream_ccsdt_map`,
+`upstream_multi_tsr_sym`, and all seven `upstream_fast_*` studies passed once
+at WSL 1/2/4 ranks with world/parity contexts. Fixture sizes and source bounds
+were unchanged: n=7 for gemm_4D, n=6 for fast_sym_4D, n=13 for fast_sym,
+n=5 for fast_3mm/fast_diagram, and n=4,s=t=v=1 for the tensor studies.
+
+The largest reported fast-driver residuals were 4.865e-15 (fast_3mm),
+2.990e-13 (fast_diagram), 6.882e-14 (fast_sym_4D), 5.169e-14 (fast_sym),
+2.665e-15 for the tensor-study internal symmetry checks, and 1.876e-14 for
+their final residuals. `sy_times_ns` reported at most 2.260e-16 and
+`multi_tsr_sym` reported zero. The first fast_3mm and fast_diagram attempts
+exposed packed coincidence normalization differences; one source-directed
+diagnostic per driver identified the diagonal-only SY factor and whole packed
+AS/SH factor respectively, after which their prescribed metrics passed. No
+tolerance, metric or fixture changed.
+
+The full native Windows GNU test and example set compiled/linked once; native
+runtime remains deferred to D6. DIGIT / PASS; D3 numerical verification closed.
+
 ## D2 optimized dense redistribution close (2026-09-08)
 
 Dense orders through twelve now use the pinned default DGTOG ROR path: closed-
