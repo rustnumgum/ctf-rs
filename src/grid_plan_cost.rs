@@ -10,7 +10,8 @@ use crate::{
 };
 
 /// Pinned unfolded dense candidate estimate. This is source model memory, not
-/// a Rust allocator peak; folded and 2D-panel alternatives are not represented.
+/// a Rust allocator peak. Folding is excluded; mapped_cost also uses this result
+/// type for unfolded 2D-panel trees.
 #[derive(Clone,Debug)]
 pub struct UnfoldedEstimate {
     pub inner: crate::plan_cost::Estimate,

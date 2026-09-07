@@ -980,6 +980,19 @@ by previously unrun ranks 2/4. No floating-point tolerance study was involved.
 Both targets compiled/linked on Windows GNU; MPI runtime execution remains
 pending the missing MS-MPI runtime, not a claimed native pass.
 
+## Selected map reconstruction and raw 2D cost trees (2026-09-07)
+
+selected_mapping passed once with WSL 1/2/4 ranks, world/parity. Every rank
+independently reconstructed every accepted normal/exhaustive ID announced by its
+owning rank; topology, shapes and complete mapping chains compared exactly.
+mapped_cost passed two local tests with source-derived fixed integer/formula
+oracles: 2x2 input-moving GEMM, output-moving custom reduction, and 2x3 LCM
+virtualized GEMM. Unit model coefficients isolate local work and communicated
+bytes; these are model checks, not measured seconds. The 2x2 inner estimate is
+208 model units/128 workspace bytes and dense redistribution total is 560 model
+units/272 bytes. No failures or extra precision checks. Both new targets compiled
+and linked once on Windows GNU; native MPI execution remains pending.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each

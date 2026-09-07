@@ -49,3 +49,4 @@ pub mod mapping_preflight;
 pub mod mapping_variants;
 pub mod normal_mapping;
 pub mod normal_search;
+pub mod mapped_cost;

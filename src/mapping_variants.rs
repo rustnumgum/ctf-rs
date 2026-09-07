@@ -74,6 +74,28 @@ pub struct ExhaustiveCandidate {
     pub variant: Variant,
 }
 
+/// Source final exhaustive-map reconstruction (contraction.cxx:3397-3417).
+/// Counts retain rejected-ID holes. Reconstruct only the selected raw variant,
+/// then apply its topology permutation; no scan or collective is needed.
+pub fn reconstruct_exhaustive(global_id:usize,shapes:[&[usize];3],indices:[&str;3],
+    catalog:&[Topology])->Result<ExhaustiveCandidate,Rejected>{
+    let mut offset=0usize;
+    for(source_topology_index,topology)in catalog.iter().enumerate(){
+        let space=VariantSpace::new(shapes,indices,topology.clone())?;
+        let next=offset.checked_add(space.len()).ok_or(Rejected::VariantCountOverflow)?;
+        if global_id<next{
+            let source_variant_index=global_id-offset;
+            let mut variant=space.decode(source_variant_index)?;
+            assert!(variant.canonicalize(catalog).is_some(),"selected exhaustive topology conflict");
+            assert!(crate::mapping_preflight::check(variant.distributions.each_ref(),indices),
+                "selected exhaustive mapping failed final preflight");
+            return Ok(ExhaustiveCandidate{global_id,source_topology_index,source_variant_index,variant});
+        }
+        offset=next;
+    }
+    Err(Rejected::VariantOutOfRange{variant:global_id,count:offset})
+}
+
 /// Stream this rank's exhaustive candidates in source catalog order. IDs count
 /// all raw variants, including candidates rejected by canonicalization/preflight.
 /// This local enumeration makes no collective calls and performs no cost filter.

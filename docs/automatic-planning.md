@@ -81,7 +81,21 @@ preserves source ID 6*template+permutation and rejects failed mappings/preflight
 without renumbering. This enumeration does not yet perform cost/memory selection
 or replace GridPlan's aligned-only preparation.
 
+Selected-ID reconstruction is available for both searches. Normal IDs decode
+template/permutation and remap the chosen retained subset or catalog topology.
+Exhaustive IDs locate the raw cumulative-count interval, decode just that variant
+and apply canonical topology permutation. Neither path requires enumerating other
+maps or broadcasting tensor contents. Final preflight is mandatory, matching the
+source assertion for a previously accepted selected ID.
+
+mapped_cost::dense_unfolded now builds raw NS mapping cost trees, including
+label-ordered 2D panels with input broadcasts or output reductions, source
+per-operand block-state updates, residual virtualization and outer replication.
+estimate_dense_unfolded adds dense redistribution and temporary/resident memory
+terms. The stationary panel operand has zero panel-buffer bytes; it is not counted
+as a copied full tensor. Communicator node counts are explicit inputs.
+
 Total candidate evaluation must additionally port folding and sparse redistribution
 costs (2632-2810), then connect existing collective Selector and context cache. Sparse,
 symmetry, node-aware, low-memory and 2D panel alternatives remain in the overall
-scope; the aligned-only tree does not substitute for those branches.
+scope; cost-tree availability is not proof of integrated candidate execution.

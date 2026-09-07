@@ -1001,3 +1001,17 @@ adapts 2834-2913 through mapping preflight: six source permutations, seven retai
 old-layout subsets, fresh catalog choices, rank partitioning and original IDs.
 The source permits invalid intermediate maps; preflight, rather than a validated
 Distribution constructor, rejects these before candidate emission.
+
+normal_search::reconstruct and mapping_variants::reconstruct_exhaustive adapt
+contraction.cxx:3364-3427. Normal IDs retain 6*template+permutation encoding;
+exhaustive IDs retain cumulative raw counts and rejected holes. Both rebuild the
+selected map locally, with final preflight rather than a fallback candidate.
+
+mapped_cost.rs adapts dense unfolded build_ctr (contraction.cxx:3557-3911),
+ctr_2d_gen_build (ctr_2d_general.cxx:13-167), panel buffer/cost formulas (225-317),
+and local scalar work (ctr_tsr.cxx:407-441). Source pair order is BC, CA or AB
+according to the missing operand, with panels nested in normalized-label order.
+Physical head communicator selection, total-phase LCM step counts, zero stationary
+panel buffers and residual virtual-phase assignment retain source semantics.
+The total estimate adds contraction.cxx:2739-2810 dense unfolded redistribution
+terms. Folded/sparse estimates and actual candidate execution are not claimed.

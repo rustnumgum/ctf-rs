@@ -449,3 +449,12 @@ path = "tests/normal_mapping.rs"
 name = "distributed_normal_mapping"
 path = "tests/distributed_normal_mapping.rs"
 harness = false
+
+[[test]]
+name = "selected_mapping"
+path = "tests/selected_mapping.rs"
+harness = false
+
+[[test]]
+name = "mapped_cost"
+path = "tests/mapped_cost.rs"

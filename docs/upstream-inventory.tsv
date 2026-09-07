@@ -101,7 +101,7 @@ src/contraction/contraction_signature.cxx	src/planning.rs	partial: dense structu
 src/contraction/contraction_signature.h	src/planning.rs	partial: dense structural signature, full collision-safe equality
 src/contraction/contraction.cxx	src/folding.rs; src/sparse_fold.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs	partial: NS fold/BLAS, sparse input-only pre-reduction, explicit packed mapping, symmetry unfolding/factors and general diagonal stack; automatic selection/optimized symmetric plans and sparse output-only indices pending
 src/contraction/contraction.h	src/contraction	pending
-src/contraction/ctr_2d_general.cxx	src/contraction	pending
+src/contraction/ctr_2d_general.cxx	src/ctr_2d.rs; src/mapped_cost.rs; src/plan_cost.rs	partial: explicit dense panels and raw NS unfolded panel cost-tree construction; full automatic execution integration pending
 src/contraction/ctr_2d_general.h	src/contraction	pending
 src/contraction/ctr_comm.cxx	src/contraction	pending
 src/contraction/ctr_comm.h	src/contraction	pending
