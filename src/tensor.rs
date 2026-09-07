@@ -594,22 +594,13 @@ impl<'c, 'r, A: Monoid> Tensor<'c, 'r, A> {
     /// Apply only where equal index labels have equal coordinates. This is the
     /// diagonal selection used by upstream sequential scaling/endomorphisms.
     pub fn transform_indexed(&mut self, labels: &str, mut function: impl FnMut(&mut A::Element)) {
-        assert!(labels.is_ascii());
-        let labels = labels.as_bytes();
-        assert_eq!(labels.len(), self.distribution.shape.len());
-        for i in 0..labels.len() {
-            for j in 0..i {
-                if labels[i] == labels[j] { assert_eq!(self.distribution.shape[i], self.distribution.shape[j]); }
-            }
-        }
-        for (offset, value) in self.data.iter_mut().enumerate() {
-            if let Some(key) = self.distribution.global_key(self.context.rank(), offset) {
-                let coordinates = self.distribution.decode_key(key);
-                if (0..labels.len()).all(|i| (0..i).all(|j| labels[i] != labels[j] || coordinates[i] == coordinates[j])) {
-                    function(value);
-                }
-            }
-        }
+        crate::scaling::transform_dense(
+            &self.distribution,
+            self.context.rank(),
+            labels,
+            &mut self.data,
+            |value| function(value),
+        );
     }
 }
 
@@ -696,12 +687,26 @@ impl<'c, 'r, A: Monoid + Clone> Tensor<'c, 'r, A> where A::Element: Wire {
 }
 
 impl<A: Semiring> Tensor<'_, '_, A> {
+    /// Right-scale entries selected by repeated labels.
+    pub fn scale_indexed(&mut self, labels: &str, alpha: &A::Element) {
+        crate::scaling::scale_dense(
+            &self.algebra,
+            &self.distribution,
+            self.context.rank(),
+            labels,
+            &mut self.data,
+            alpha,
+        );
+    }
+
     pub fn scale(&mut self, alpha: &A::Element) {
-        for (offset, value) in self.data.iter_mut().enumerate() {
-            if self.distribution.global_key(self.context.rank(), offset).is_some() {
-                *value = self.algebra.multiply(alpha, value);
-            }
-        }
+        crate::scaling::scale_all_dense(
+            &self.algebra,
+            &self.distribution,
+            self.context.rank(),
+            &mut self.data,
+            alpha,
+        );
     }
 }
 

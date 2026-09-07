@@ -160,14 +160,14 @@ src/summation/summation.h	src/summation	pending
 src/summation/sym_seq_sum.cxx	src/summation.rs; src/symmetric_sum.rs	partial: NS and physical packed scalar reference kernels; optimized folded/custom-function branches pending
 src/summation/sym_seq_sum.h	src/summation	pending
 src/scaling/Makefile	Cargo/build tooling	replaced
-src/scaling/scale_tsr.cxx	src/scaling	pending
-src/scaling/scale_tsr.h	src/scaling	pending
-src/scaling/scaling.cxx	src/scaling	pending
-src/scaling/scaling.h	src/scaling	pending
-src/scaling/strp_tsr.cxx	src/scaling	pending
-src/scaling/strp_tsr.h	src/scaling	pending
-src/scaling/sym_seq_scl.cxx	src/symmetry.rs; src/symmetric_operations.rs	partial: local and distributed packed indexed right scaling and transforms; automatic scaling remapping pending
-src/scaling/sym_seq_scl.h	src/scaling	pending
+src/scaling/scale_tsr.cxx	src/scale_tsr.rs	ported dense virtual tuple order, repeated-label stride aggregation and recursive block traversal; exact D1 checks pass
+src/scaling/scale_tsr.h	src/scale_tsr.rs	replaced: owned Rust slices and closures replace the cloneable C++ execution node
+src/scaling/scaling.cxx	src/scaling.rs; src/tensor.rs; src/symmetric_operations.rs	ported dense mapped/indexed right scaling and zero-edge no-op without gather; source sparse branch deferred beyond dense D1
+src/scaling/scaling.h	src/scaling.rs; src/tensor.rs; src/symmetric_operations.rs	replaced: direct typed Rust scaling operations replace the C++ expression executor
+src/scaling/strp_tsr.cxx	src/strp_tsr.rs	ported physical/virtual diagonal strip detection, source-order compact copy/restore and metadata reduction; sum/contraction ownership stays in their direct Rust operations
+src/scaling/strp_tsr.h	src/strp_tsr.rs	replaced: owned StripPlan replaces raw buffers and recursive wrapper ownership
+src/scaling/sym_seq_scl.cxx	src/sym_seq_scl.rs; src/scaling.rs; src/symmetric_operations.rs	ported packed canonical reference/custom traversal, repeated-index selection and right-multiply-then-transform order
+src/scaling/sym_seq_scl.h	src/sym_seq_scl.rs	replaced: generic typed functions replace scalar-specific C++ entry points
 test/bivar_function.cxx	tests/upstream_bivar_function.rs	ported: original four-dimensional beta=.5 bivariate identity and strict abs(error)<1e-6; deterministic global-key fixture replaces rank-seeded random initialization
 test/bivar_transform.cxx	tests/upstream_bivar_transform.rs; src/dense_transform.rs	ported: original mutable-output identity, n=5 and strict abs(error)<1e-6; deterministic global-key fixtures; extra typed/diagonal Rust coverage
 test/ccsdt_map_test.cxx	tests/upstream_ccsdt_map.rs	ported source n=4 zero-input six-order contraction mapping smoke via native BLAS grid planning; PASS WSL 1/2/4 world/parity; native compile/link only; source has no nonzero numerical assertion and niter is unused

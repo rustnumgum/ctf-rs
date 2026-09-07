@@ -1,5 +1,23 @@
 # Validation evidence
 
+## D1 dense scaling and strip close (2026-09-08)
+
+The `scaling` target passed four exact local checks once in WSL. It preserves
+source right-multiplication before a custom transform, packed canonical
+SY/AS/SH traversal, repeated-label virtual strides, physical-rank strip
+selection, compact strip copy and restore, and the corresponding block-size
+reductions. Fixtures remain bounded at n=3/4/5 and use exact String/i64,
+index, offset and layout comparisons.
+
+`upstream_scalar`, `upstream_diag_sym`, `upstream_weigh4d` and `upstream_dft`
+then passed once at WSL 1/2/4 ranks with their existing world/parity contexts.
+Their source criteria remain unchanged: scalar zero-edge/norm inequalities,
+diag_sym norm <1e-10, weigh_4D's signed relative 1e-10 rule after the 1e-10
+cutoff, and DFT real error <1e-9. All observed values were within those bounds;
+no failure, diagnostic computation, tolerance change or repeated passing run
+occurred. The full native Windows GNU test set compiled and linked once; native
+runtime remains deferred to D6. DIGIT / PASS; D1 numerical verification closed.
+
 ## Generic BLAS declarations and fractional node costs (2026-09-08)
 
 The existing four-type local GEMM dispatch now declares the s/c/z BLAS symbols

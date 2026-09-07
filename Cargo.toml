@@ -22,6 +22,10 @@ path = "tests/foundation.rs"
 harness = false
 
 [[test]]
+name = "scaling"
+path = "tests/scaling.rs"
+
+[[test]]
 name = "dense_views"
 path = "tests/dense_views.rs"
 harness = false

@@ -146,16 +146,7 @@ impl<A:Group+crate::algebra::Semiring> Packed<A> {
     /// sym_seq_scl ordering: multiply the value by alpha on the right, then
     /// invoke the optional custom endomorphism.
     pub fn scale_indexed(&mut self,indices:&str,alpha:&A::Element) {
-        // Borrow fields separately so closures never need an alias of self.
-        let algebra=&self.algebra;
-        assert!(indices.is_ascii());assert_eq!(indices.len(),self.layout.shape.len());
-        for (i,label) in indices.bytes().enumerate() {for j in 0..i {
-            if indices.as_bytes()[j]==label {assert_eq!(self.layout.shape[i],self.layout.shape[j]);}
-        }}
-        for (coordinates,value) in self.layout.coordinates().zip(&mut self.values) {
-            if (0..indices.len()).all(|i|(0..i).all(|j|indices.as_bytes()[i]!=indices.as_bytes()[j]||coordinates[i]==coordinates[j])) {
-                *value=algebra.multiply(value,alpha);
-            }
-        }
+        let indices=crate::scaling::normalize_indices(indices);
+        crate::sym_seq_scl::scale(&self.algebra,&self.layout,&indices,&mut self.values,alpha);
     }
 }

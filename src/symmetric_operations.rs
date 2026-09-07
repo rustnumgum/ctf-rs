@@ -32,39 +32,17 @@ where A::Element: Wire {
     }
 }
 
-fn validate_indices<A: Group>(tensor: &SymmetricTensor<'_, '_, A>, indices: &str) {
-    assert!(indices.is_ascii());
-    let labels = indices.as_bytes();
-    let shape = &tensor.distribution.distribution().shape;
-    assert_eq!(labels.len(), shape.len());
-    for (i, &label) in labels.iter().enumerate() {
-        for j in 0..i {
-            if label == labels[j] {
-                assert_eq!(shape[i], shape[j]);
-            }
-        }
-    }
-}
-
-fn selected(labels: &[u8], coordinates: &[usize]) -> bool {
-    (0..labels.len()).all(|i| {
-        (0..i).all(|j| labels[i] != labels[j] || coordinates[i] == coordinates[j])
-    })
-}
-
 impl<'c, 'r, A: Group> SymmetricTensor<'c, 'r, A> {
     /// Apply an endomorphism to canonical local entries selected by repeated
     /// labels. AS/SH structural zeros and packed holes are never visited.
     pub fn transform_indexed(&mut self, indices: &str, mut function: impl FnMut(&mut A::Element)) {
-        validate_indices(self, indices);
-        let labels = indices.as_bytes();
-        let pairs = self.distribution.local_pairs(self.context.rank());
-        for (offset, key) in pairs {
-            let coordinates = self.distribution.distribution().decode_key(key);
-            if selected(labels, &coordinates) {
-                function(&mut self.data[offset]);
-            }
-        }
+        crate::scaling::transform_packed(
+            &self.distribution,
+            self.context.rank(),
+            indices,
+            &mut self.data,
+            |value| function(value),
+        );
     }
 }
 
@@ -72,26 +50,25 @@ impl<'c, 'r, A: Group + Semiring> SymmetricTensor<'c, 'r, A> {
     /// Right-scale canonical local entries selected by repeated labels, as in
     /// `scaling/sym_seq_scl.cxx`. The multiplication order is value * alpha.
     pub fn scale_indexed(&mut self, indices: &str, alpha: &A::Element) {
-        validate_indices(self, indices);
-        let labels = indices.as_bytes();
-        let algebra = &self.algebra;
-        let pairs = self.distribution.local_pairs(self.context.rank());
-        for (offset, key) in pairs {
-            let coordinates = self.distribution.distribution().decode_key(key);
-            if selected(labels, &coordinates) {
-                let value = &mut self.data[offset];
-                *value = algebra.multiply(value, alpha);
-            }
-        }
+        crate::scaling::scale_packed(
+            &self.algebra,
+            &self.distribution,
+            self.context.rank(),
+            indices,
+            &mut self.data,
+            alpha,
+        );
     }
 
     /// Right-scale canonical local entries only, following sym_seq_scl.
     pub fn scale(&mut self, alpha: &A::Element) {
-        let algebra = &self.algebra;
-        for (offset, _) in self.distribution.local_pairs(self.context.rank()) {
-            let value = &mut self.data[offset];
-            *value = algebra.multiply(value, alpha);
-        }
+        crate::scaling::scale_all_packed(
+            &self.algebra,
+            &self.distribution,
+            self.context.rank(),
+            &mut self.data,
+            alpha,
+        );
     }
 }
 
