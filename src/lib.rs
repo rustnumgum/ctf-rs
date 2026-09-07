@@ -77,3 +77,5 @@ pub mod sparse_2d;
 pub mod sparse_cost;
 pub mod sparse_keys;
 mod sparse_coo;
+pub mod kernel;
+pub mod sparse_matricize;

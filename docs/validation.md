@@ -1,5 +1,18 @@
 # Validation evidence
 
+## Mixed CPU kernels and sparse matricization (2026-09-07)
+
+mixed_kernel passed two local WSL tests once after replacing unsupported
+Transpose equality at compile time with variant matching. Exact integer
+checks cover both operand transposes, mixed scalar types, order-sensitive
+accumulation, CSR dense/sparse structure, zeros, duplicates and strided xpy.
+sparse_matricize passed three local WSL tests once for phase-aware reordered
+coordinates, sorted reverse keys, folded SY binomial rank, phased folded
+groups, scalar and empty inputs. Both new targets compiled/linked once on
+Windows GNU. DIGIT / PASS; no numerical failures or precision studies.
+These local kernels/layout transforms introduce no collectives, so no MPI
+rank sweep was added; full native runtime remains blocked as previously noted.
+
 ## Upstream sparse shortest paths (2026-09-07)
 
 upstream_sssp passed once at WSL 1/2/4 ranks, world/parity. It keeps source

@@ -41,5 +41,7 @@ owner and restores the local strip order. No full-input gather is used.
   layer executes its step subset. Otherwise all steps retain the child layers.
 
 These are explicit recursive folded and raw sparse/mixed levels. Automatic
-tensor-to-plan assembly and sparse node-aware execution remain unfinished;
+tensor-to-plan assembly remains unfinished;
 the raw executor does not infer a SparseTensor's mappings or local key space.
+The pinned source disables sparse node-aware reordering; this is not a
+missing executable source branch (source-node-aware-boundary.md).

@@ -2,19 +2,19 @@ source	rust_destination	status
 src/Makefile	Cargo/build tooling	replaced
 src/sparse_formats/ccsr.cxx	src/sparse_formats.rs	partial: row encoding, partition/assemble, addition; local exact tests pass
 src/sparse_formats/ccsr.h	src/sparse_formats	pending
-src/sparse_formats/coo.cxx	src/sparse_formats.rs; src/sparse_coo.rs; src/sparse_2d.rs	partial: native default/generic/Kernel COO dense-output leaves and explicit order-preserving 2D panels, duplicate/stored-zero behavior; remaining format responsibilities and automatic selection pending
+src/sparse_formats/coo.cxx	src/sparse_formats.rs; src/sparse_coo.rs; src/sparse_2d.rs; src/sparse_matricize.rs	partial: native default/generic/Kernel COO leaves, order-preserving 2D panels, phase/permutation-aware tensor matricization with source folded binomial ranking and defined unfolded reverse; automatic folding-route assembly/selection pending
 src/sparse_formats/coo.h	src/sparse_formats	pending
 src/sparse_formats/csr.cxx	src/sparse_formats.rs	partial: partition/assemble, addition; local exact tests pass
 src/sparse_formats/csr.h	src/sparse_formats	pending
 src/sparse_formats/Makefile	Cargo/build tooling	replaced
-src/sparse_formats/sparse_matrix.cxx	src/sparse_formats	pending
-src/sparse_formats/sparse_matrix.h	src/sparse_formats	pending
+src/sparse_formats/sparse_matrix.cxx	src/sparse_formats.rs	replaced: assertion-only abstract methods are not executable CPU algorithms; concrete CSR/CCSR implementations ported
+src/sparse_formats/sparse_matrix.h	src/sparse_formats.rs	replaced: C++ virtual base and packed-buffer ABI replaced by concrete owned Rust sparse types
 src/mapping/distribution.cxx	src/mapping	pending
 src/mapping/distribution.h	src/mapping	pending
 src/mapping/Makefile	Cargo/build tooling	replaced
 src/mapping/mapping.cxx	src/mapping	pending
 src/mapping/mapping.h	src/mapping	pending
-src/mapping/node_aware_dist.cxx	src/node_aware.rs; src/node_reordering.rs; src/dense_execution.rs	partial: source candidate order, strict fractional-peer volume selection and generic/folded rank-reordered execution; sparse integration pending
+src/mapping/node_aware_dist.cxx	src/node_aware.rs; src/node_reordering.rs; src/dense_execution.rs	partial: source candidate order, strict fractional-peer volume selection and generic/folded rank-reordered execution; direct sparse node-aware branch disabled upstream, see source-node-aware-boundary.md
 src/mapping/node_aware_dist.h	src/mapping	pending
 src/mapping/topology.cxx	src/mapping.rs; src/node_reordering.rs	partial: explicit topology fibers, forward/inverse node rank permutations and fractional communicator peer averages; source CPU topology uses explicit ppn (default 1 / CTF_PPN override), not automatic hardware discovery; full responsibility audit pending
 src/mapping/topology.h	src/mapping	pending
@@ -63,7 +63,7 @@ src/interface/graph_io_aux.cxx	src/sparse_text.rs; src/ffi/mpi_io.rs	implemented
 src/interface/group.h	src/interface	pending
 src/interface/idx_tensor.cxx	src/interface	pending
 src/interface/idx_tensor.h	src/interface	pending
-src/interface/kernel.h	src/sparse_coo.rs	partial: mixed-type Kernel<f,g> COO leaf with arbitrary accumulator and source alpha/beta restrictions; remaining Kernel operations pending
+src/interface/kernel.h	src/sparse_coo.rs; src/kernel.rs	partial: mixed-type Kernel<f,g> COO, dense GEMM, CSR/dense and CSR/CSR dense-output loops plus Monoid strided xpy, arbitrary accumulator and source coefficient restrictions; sparse-output Kernel operations and automatic distributed mixed-type dispatch pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
 src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed thin/truncated/randomized SVD, QR, Cholesky, triangular/positive-definite solves and square-subworld symmetric/Hermitian eigh; remaining routines pending
@@ -112,7 +112,7 @@ src/contraction/ctr_tsr.h	src/contraction	pending
 src/contraction/Makefile	Cargo/build tooling	replaced
 src/contraction/sp_seq_ctr.cxx	src/sparse_sequential.rs; src/sparse_fold.rs; src/sparse_diagonal.rs; src/sparse_gemm.rs; src/sparse_formats.rs	partial: general NS sparse-A/dense-B/dense-C recursion including pinned limited custom-function branch; folded sparse/mixed children and input pre-reduction; folded custom functions and other general sparse combinations pending
 src/contraction/sp_seq_ctr.h	src/contraction	pending
-src/contraction/spctr_2d_general.cxx	src/sparse_gemm.rs; src/sparse_2d.rs; src/sparse_cost.rs	partial: stationary-output matrix LCM panels plus explicit CSR/CSR/CSR, CCSR/dense/CCSR, CSR/dense/dense, CSR/CSR/dense and raw pairs/dense/dense moving A/B/C, strip packing, cyclic output reduction/reassembly, literal beta and layer scheduling, recursive children; direct source time/memory formulas; automatic tensor-to-plan assembly and sparse node-aware integration pending
+src/contraction/spctr_2d_general.cxx	src/sparse_gemm.rs; src/sparse_2d.rs; src/sparse_cost.rs	partial: stationary-output matrix LCM panels plus explicit CSR/CSR/CSR, CCSR/dense/CCSR, CSR/dense/dense, CSR/CSR/dense, COO/dense/dense and raw pairs/dense/dense moving A/B/C, strip packing, cyclic output reduction/reassembly, literal beta and layer scheduling, recursive children; direct source time/memory formulas; automatic tensor-to-plan assembly pending; sparse node-aware reordering disabled upstream
 src/contraction/spctr_2d_general.h	src/contraction	pending
 src/contraction/spctr_comm.cxx	src/sparse_contract_general.rs; src/sparse_contraction_comm.rs; src/sparse_cost.rs	partial: mapped sparse-A/dense-B/dense-C broadcasts/root beta/reduction and owner restore; explicit CSR/CSR/CSR and CCSR/dense/CCSR replicated virtual blocks, sparse output-fiber reductions and input cleanup; direct source replication time/memory formulas; automatic plan assembly pending
 src/contraction/spctr_comm.h	src/contraction	pending

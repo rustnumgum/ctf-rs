@@ -26,6 +26,7 @@ Caller-owned fibers are borrowed, not freed by this operation. Temporary
 subcommunicators inside sparse matrix reduction are explicitly closed.
 
 This implements the explicit replicated/virtual sparse-output layer. The full
-automatic sparse plan builder and sparse node-aware integration remain
-unfinished. Explicit CSR/CCSR nested moving-output levels are now available
+automatic sparse plan builder remains unfinished. Sparse node-aware reordering
+is disabled by the pinned source (source-node-aware-boundary.md).
+Explicit CSR/CCSR nested moving-output levels are now available
 separately in sparse-2d.md; full automatic composition is not claimed.

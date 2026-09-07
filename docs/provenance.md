@@ -1,5 +1,13 @@
 # Source provenance
 
+src/kernel.rs ports interface/kernel.h Monoid_Kernel::xpy and Bivar_Kernel
+gemm/csrmm/csrmultd, preserving independent A/B/C types and arbitrary g(f,c).
+src/sparse_matricize.rs ports coo.cxx set_data/get_data: phase-aware reordered
+COO coordinates, source binomial folding, and unfolded-only sorted reverse.
+Source-disabled sparse node-aware reordering and abstract sparse_matrix stubs
+are distinguished from missing working algorithms in the updated inventory.
+See mixed-kernel.md, sparse-matricize.md and source-node-aware-boundary.md.
+
 tests/upstream_sssp.rs ports examples/sssp.cxx Bellman-Ford, retaining its
 tropical algebra, sparsification, injected negative cycle and integer-SUM
 convergence rule. Scalar conversion follows idx_tensor.cxx index copying and
