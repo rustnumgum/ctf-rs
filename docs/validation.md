@@ -1,5 +1,19 @@
 # Validation evidence
 
+## B0 sparse WIP disposition and expression inventory (2026-09-08)
+
+After syncing `f22da3a` to the Linux work copy, the single prescribed
+`distributed_sparse_search_cache` acceptance attempt stopped during compilation
+before any 1/2/4-rank execution. The library lacked the `sgemm_`, `cgemm_` and
+`zgemm_` declarations and passed `f64` node counts to five `usize` fields. Per
+the B0 fallback, the commit is retained on `wip/sparse-search-cache` and the
+delivery branch returned to `da5354b`; no tolerance or fixture was changed.
+
+The six `term`, `idx_tensor` and `fun_term` source/header inventory rows are now
+`replaced`: direct Rust operations replace the expression interface, matching
+the README contract. Native compile/link is not applicable because B0 retained
+no source batch. DIGIT / FAIL for the rejected WIP only; B0 bookkeeping closed.
+
 ## Unfolded sparse raw execution and automatic selection (2026-09-08)
 
 sparse_mapped_cost passed its three local WSL checks once after adding shared
