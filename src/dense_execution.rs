@@ -592,6 +592,9 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
     /// Execute a selected dense folded raw mapping. Every local virtual block is
     /// transposed once before replication/panels and restored once after output
     /// reduction, matching map_fold rather than repacking individual panels.
+    /// Optional intra-node dimensions reorder the communicator and local blocks
+    /// using the source node-aware permutation. Pass select_dense's chosen lens
+    /// or an explicitly requested node grid; None leaves rank order unchanged.
     #[allow(clippy::too_many_arguments)]
     pub fn contract_folded_from_mapped<K: crate::linalg::LocalKernels>(
         &mut self,
@@ -602,6 +605,7 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         indices_b: &str,
         mapped: [Distribution; 3],
         descriptor: &crate::partial_fold::Descriptor,
+        intra_node_lens: Option<&[usize]>,
         alpha: f64,
         beta: f64,
     ) {
@@ -616,9 +620,12 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
             [indices_a, indices_b, indices_c]
         ));
 
+        let reordered = intra_node_lens.map(|intra| {
+            let rank = crate::node_reordering::reorder_rank(&mapped[0].topology.dimensions, intra, self.context().rank());
+            self.context().split(Some(0), rank.try_into().unwrap()).unwrap()
+        });
         let execution = build_execution(
-            self.context(),
-            mapped.each_ref(),
+            reordered.as_ref().unwrap_or(self.context()), mapped.each_ref(),
             [indices_a, indices_b, indices_c],
         );
         for operand in 0..3 {
@@ -658,6 +665,19 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
             virtual_blocks[2],
             crate::fold_layout::Direction::Forward,
         );
+
+        let exchange = intra_node_lens.map(|intra| {
+            let lens = &mapped[0].topology.dimensions;
+            (crate::node_reordering::inverse_rank(lens, intra, self.context().rank()),
+             crate::node_reordering::reorder_rank(lens, intra, self.context().rank()))
+        });
+        if let Some((send, recv)) = exchange {
+            if send != self.context().rank() {
+                self.context().inner.replace_f64(&mut aa.data, send, recv, 1322);
+                self.context().inner.replace_f64(&mut bb.data, send, recv, 1323);
+                self.context().inner.replace_f64(&mut cc.data, send, recv, 1324);
+            }
+        }
 
         for comm in &execution.replicate[0] {
             comm.broadcast(0, &mut aa.data);
@@ -709,6 +729,12 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         for comm in &execution.replicate[2] {
             comm.reduce_f64(0, &mut cc.data);
         }
+        if let Some((send, recv)) = exchange {
+            if send != self.context().rank() {
+                // A/B are private disposable copies; only C needs backmapping.
+                self.context().inner.replace_f64(&mut cc.data, recv, send, 1327);
+            }
+        }
         cc.data = descriptor.layouts[2].transpose(
             &cc.data,
             virtual_blocks[2],
@@ -724,6 +750,7 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
                 comm.close();
             }
         }
+        if let Some(context) = reordered { context.close(); }
         cc.redistribute(self.distribution().clone());
         *self = cc;
     }

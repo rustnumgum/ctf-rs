@@ -14,9 +14,9 @@ src/mapping/distribution.h	src/mapping	pending
 src/mapping/Makefile	Cargo/build tooling	replaced
 src/mapping/mapping.cxx	src/mapping	pending
 src/mapping/mapping.h	src/mapping	pending
-src/mapping/node_aware_dist.cxx	src/mapping	pending
+src/mapping/node_aware_dist.cxx	src/node_aware.rs; src/node_reordering.rs; src/dense_execution.rs	partial: source candidate order, strict integer-peer volume selection and f64 folded rank-reordered execution; fractional node facts and generic/sparse integration pending
 src/mapping/node_aware_dist.h	src/mapping	pending
-src/mapping/topology.cxx	src/mapping	pending
+src/mapping/topology.cxx	src/mapping.rs; src/node_reordering.rs	partial: explicit topology fibers and forward/inverse node rank permutations; hardware node discovery and fractional communicator peer averages pending
 src/mapping/topology.h	src/mapping	pending
 src/scripts/expand_includes.sh	Cargo/build tooling	replaced
 src/scripts/license.sh	Cargo/build tooling	replaced

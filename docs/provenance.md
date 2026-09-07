@@ -1112,3 +1112,14 @@ The shared recursive executor now accepts a statically typed leaf callback;
 the ordinary semiring leaf remains contraction::virtualized. Folded leaves
 apply beta once per output virtual block and call the packed sym_seq_ctr_inr
 port, then inverse-transpose C before restoring its original distribution.
+
+Node reordering ports topology.cxx:22-53's forward/inverse rank recurrences
+and contraction.cxx:4690-4739,4841-4861's strict volume selection and local block
+exchange. Reordered communicator peer counts are inter_node_lens-1, as in
+topology.cxx:199-203, not the number of nodes including self. Packed f64 block
+exchange retains source tags 1322/1323/1324 and C backmapping tag 1327.
+
+Pinned replication-layer audit: ctr_comm.cxx:22-29 initializes layers to 1/0;
+the only assignment from wholly unused topology axes at :61-70 is commented.
+Consequently the raw executor must not activate speculative 2.5D splitting on
+unused axes. The empty replication wrapper and its coefficient semantics remain.

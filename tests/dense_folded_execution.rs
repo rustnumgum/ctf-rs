@@ -32,7 +32,7 @@ fn exercise(c:&Context<'_>,shapes:[&[usize];3],indices:[&str;3],mapped:[Distribu
     let d=descriptor(&mapped,indices);let mut a=make(c,shapes[0]);let mut b=make(c,shapes[1]);let mut output=make(c,shapes[2]);
     a.transform(|key,v|*v=av(key));b.transform(|key,v|*v=bv(key));output.transform(|_,v|*v=3.);
     let old=output.distribution().clone();
-    output.contract_folded_from_mapped::<Native>(indices[2],&a,indices[0],&b,indices[1],mapped,&d,2.,3.);
+    output.contract_folded_from_mapped::<Native>(indices[2],&a,indices[0],&b,indices[1],mapped,&d,None,2.,3.);
     assert_eq!(output.distribution(),&old);
     for(key,value)in output.local_pairs(){let expected=2.*reference(shapes,indices,key)+9.;
         assert!(value.is_finite()&&(value-expected).abs()<1e-6,"{indices:?}, rank {}, key {key}: {value} != {expected}",c.rank());}
@@ -69,7 +69,7 @@ fn run(c:&Context<'_>){
     b.transform(|key,v|*v=bv(key));
     for factor in [1.,2.]{a.transform(|key,v|*v=factor*av(key));output.transform(|_,v|*v=3.);
         let selected=cache.prepare([a.distribution(),b.distribution(),output.distribution()],[&[1];3],indices).unwrap().unwrap();
-        output.contract_folded_from_mapped::<Native>("ij",&a,"ik",&b,"kj",selected.distributions.clone(),selected.fold.as_ref().unwrap(),2.,3.);
+        output.contract_folded_from_mapped::<Native>("ij",&a,"ik",&b,"kj",selected.distributions.clone(),selected.fold.as_ref().unwrap(),None,2.,3.);
         for(key,value)in output.local_pairs(){assert!(value.is_finite()&&(value-(2.*factor*reference(shapes,indices,key)+9.)).abs()<1e-6);}
     }
     assert_eq!(cache.stats(),ctf::planning::CacheStats{hits:1,misses:1});

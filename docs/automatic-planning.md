@@ -201,3 +201,19 @@ This supports dense NS partial folds and batch labels without forcing aligned
 maps or globally gathering tensors. Sparse/compressed automatic execution,
 node-aware and low-memory integration remain unfinished. `LocalKernels` retains
 the compile-time replacement boundary for future faer kernels.
+
+## Node-aware dense folded execution
+
+`node_reordering::select_dense` evaluates the source inter-node grid candidates,
+retains the first strict volume minimum and enables reordering only on strict
+improvement. Its chosen intra-node lengths can now be supplied to
+`contract_folded_from_mapped`. Execution creates the rank-reordered context,
+uses MPI_Sendrecv_replace on local packed blocks, runs the existing raw panel
+tree in that context and backmaps C before restoring its distribution. Private
+A/B copies are discarded rather than unnecessarily exchanged back.
+
+Node facts remain explicit integer peer counts in this cost-tree interface;
+fractional average peer counts from irregular physical node placement and
+automatic hardware-node discovery are not yet integrated. Sparse and generic
+semiring node-aware execution remain pending. Logical node partitions in
+single-machine tests do not establish multi-node performance.

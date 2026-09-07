@@ -981,6 +981,22 @@ execution; there were no numerical failures or extra precision runs.
 All four targets compiled and linked on Windows GNU once. Native MPI runtime
 acceptance remains outstanding. DIGIT / PASS for this bounded WSL change only.
 
+## Dense node-aware remapping (2026-09-07)
+
+distributed_node_fold and the affected dense_folded_execution passed WSL
+1/2/4 ranks with world/parity contexts. Node tests check six raw GEMM mappings,
+packed block exchanges, output backmapping, exact non-involutive rank maps,
+and strict source-volume selection (32 to 8), no-improvement and ppn=1 cases.
+Finite numerical results retain abs(error)<1e-6; no tolerance changes.
+The initial selection fixture incorrectly expected communication on a wholly
+unused axis; its first correction used a physically mapped output-only label
+rejected by source preflight. Replacing it with a valid vector-matrix fixture
+resolved both test-construction errors. Only the affected four-rank target
+was rerun after those concrete fixture fixes; unchanged passing runs stayed closed.
+Both targets compiled/linked on Windows GNU; the corrected node target was
+recompiled after its fixture edits. Native MPI execution remains outstanding.
+Logical ppn=2 on one WSL host tests permutation semantics, not network speed.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

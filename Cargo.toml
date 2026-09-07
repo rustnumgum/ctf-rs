@@ -506,3 +506,8 @@ path = "tests/folded_cost.rs"
 name = "dense_folded_execution"
 path = "tests/dense_folded_execution.rs"
 harness = false
+
+[[test]]
+name = "distributed_node_fold"
+path = "tests/distributed_node_fold.rs"
+harness = false

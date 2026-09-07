@@ -57,3 +57,4 @@ pub mod fold_layout;
 pub mod partial_fold;
 pub mod partial_fold_kernel;
 pub mod folded_cost;
+pub mod node_reordering;
