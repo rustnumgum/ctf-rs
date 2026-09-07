@@ -3,7 +3,7 @@
 //! Tensor SVD via distributed matrix SVD, with no global tensor gather.
 
 use crate::{
-    algebra::Arithmetic,
+    algebra::{Arithmetic, Complex},
     mapping::Distribution,
     tensor::Tensor,
 };
@@ -25,7 +25,9 @@ pub enum TensorSvd {
     },
 }
 
-impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
+macro_rules! tensor_svd_methods {
+($scalar:ty) => {
+impl<'c, 'r> Tensor<'c, 'r, Arithmetic<$scalar>> {
     /// Factor a tensor as `U * S * VT` over the supplied index partition.
     ///
     /// `left` and `right` each contain `auxiliary` exactly once; all other
@@ -169,3 +171,9 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         ))
     }
 }
+};
+}
+tensor_svd_methods!(f32);
+tensor_svd_methods!(f64);
+tensor_svd_methods!(Complex<f32>);
+tensor_svd_methods!(Complex<f64>);

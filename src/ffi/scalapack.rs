@@ -784,6 +784,336 @@ complex_svd_family!(
     0.0
 );
 
+macro_rules! real_eigh_family {
+    ($scalar:ty, $syevx:ident, $eigh:ident, $zero:expr, $query_len:expr) => {
+        unsafe extern "C" {
+            fn $syevx(
+                job_z: *const c_char,
+                range: *const c_char,
+                uplo: *const c_char,
+                n: *const i32,
+                a: *mut $scalar,
+                ia: *const i32,
+                ja: *const i32,
+                desc_a: *const i32,
+                vl: *const $scalar,
+                vu: *const $scalar,
+                il: *const i32,
+                iu: *const i32,
+                abstol: *const $scalar,
+                m: *mut i32,
+                nz: *mut i32,
+                w: *mut $scalar,
+                orfac: *const $scalar,
+                z: *mut $scalar,
+                iz: *const i32,
+                jz: *const i32,
+                desc_z: *const i32,
+                work: *mut $scalar,
+                lwork: *const i32,
+                iwork: *mut i32,
+                liwork: *const i32,
+                ifail: *mut i32,
+                iclustr: *mut i32,
+                gap: *mut $scalar,
+                info: *mut i32,
+            );
+        }
+
+        impl Grid {
+            pub(crate) fn $eigh(
+                &self,
+                n: usize,
+                a: &[$scalar],
+                desc: &[i32; 9],
+                vectors: &mut [$scalar],
+            ) -> Result<Vec<$scalar>, i32> {
+                self.validate_matrix(desc, a.len());
+                self.validate_matrix(desc, vectors.len());
+                let n = int(n);
+                assert!(n <= desc[2] && n <= desc[3]);
+
+                let job_z = b'V' as c_char;
+                let range = b'A' as c_char;
+                let uplo = b'U' as c_char;
+                let one = 1;
+                let zero_i = 0;
+                let zero: $scalar = $zero;
+                let query = -1;
+                let (mut m, mut nz) = (0, 0);
+                let mut work_query = [$zero];
+                let mut iwork_query = [0];
+                let mut info = 0;
+                unsafe {
+                    $syevx(
+                        &job_z,
+                        &range,
+                        &uplo,
+                        &n,
+                        std::ptr::null_mut(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        &zero,
+                        &zero,
+                        &zero_i,
+                        &zero_i,
+                        &zero,
+                        &mut m,
+                        &mut nz,
+                        std::ptr::null_mut(),
+                        &zero,
+                        std::ptr::null_mut(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        work_query.as_mut_ptr(),
+                        &query,
+                        iwork_query.as_mut_ptr(),
+                        &query,
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        &mut info,
+                    );
+                }
+                result(info)?;
+
+                let lwork = int(($query_len)(work_query[0]));
+                let liwork = iwork_query[0];
+                let mut work = vec![$zero; lwork as usize];
+                let mut iwork = vec![0; usize::try_from(liwork).unwrap()];
+                let mut ifail = vec![0; n as usize];
+                let processes = self.rows.checked_mul(self.cols).unwrap();
+                let mut iclustr = vec![0; 2usize.checked_mul(processes).unwrap()];
+                let mut gap = vec![$zero; processes];
+                let mut matrix = a.to_vec();
+                let mut eigenvalues = vec![$zero; n as usize];
+                unsafe {
+                    $syevx(
+                        &job_z,
+                        &range,
+                        &uplo,
+                        &n,
+                        matrix.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        &zero,
+                        &zero,
+                        &zero_i,
+                        &zero_i,
+                        &zero,
+                        &mut m,
+                        &mut nz,
+                        eigenvalues.as_mut_ptr(),
+                        &zero,
+                        vectors.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        work.as_mut_ptr(),
+                        &lwork,
+                        iwork.as_mut_ptr(),
+                        &liwork,
+                        ifail.as_mut_ptr(),
+                        iclustr.as_mut_ptr(),
+                        gap.as_mut_ptr(),
+                        &mut info,
+                    );
+                }
+                result(info)?;
+                assert_eq!(m, n);
+                assert_eq!(nz, n);
+                Ok(eigenvalues)
+            }
+        }
+    };
+}
+
+macro_rules! complex_eigh_family {
+    (
+        $scalar:ty,
+        $real:ty,
+        $heevx:ident,
+        $eigh:ident,
+        $scalar_zero:expr,
+        $real_zero:expr
+    ) => {
+        unsafe extern "C" {
+            fn $heevx(
+                job_z: *const c_char,
+                range: *const c_char,
+                uplo: *const c_char,
+                n: *const i32,
+                a: *mut $scalar,
+                ia: *const i32,
+                ja: *const i32,
+                desc_a: *const i32,
+                vl: *const $real,
+                vu: *const $real,
+                il: *const i32,
+                iu: *const i32,
+                abstol: *const $real,
+                m: *mut i32,
+                nz: *mut i32,
+                w: *mut $real,
+                orfac: *const $real,
+                z: *mut $scalar,
+                iz: *const i32,
+                jz: *const i32,
+                desc_z: *const i32,
+                work: *mut $scalar,
+                lwork: *const i32,
+                rwork: *mut $real,
+                lrwork: *const i32,
+                iwork: *mut i32,
+                liwork: *const i32,
+                ifail: *mut i32,
+                iclustr: *mut i32,
+                gap: *mut $real,
+                info: *mut i32,
+            );
+        }
+
+        impl Grid {
+            pub(crate) fn $eigh(
+                &self,
+                n: usize,
+                a: &[$scalar],
+                desc: &[i32; 9],
+                vectors: &mut [$scalar],
+            ) -> Result<Vec<$real>, i32> {
+                self.validate_matrix(desc, a.len());
+                self.validate_matrix(desc, vectors.len());
+                let n = int(n);
+                assert!(n <= desc[2] && n <= desc[3]);
+
+                let job_z = b'V' as c_char;
+                let range = b'A' as c_char;
+                let uplo = b'U' as c_char;
+                let one = 1;
+                let zero_i = 0;
+                let zero: $real = $real_zero;
+                let query = -1;
+                let (mut m, mut nz) = (0, 0);
+                let mut work_query = [$scalar_zero];
+                let mut rwork_query = [$real_zero];
+                let mut iwork_query = [0];
+                let mut info = 0;
+                unsafe {
+                    $heevx(
+                        &job_z,
+                        &range,
+                        &uplo,
+                        &n,
+                        std::ptr::null_mut(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        &zero,
+                        &zero,
+                        &zero_i,
+                        &zero_i,
+                        &zero,
+                        &mut m,
+                        &mut nz,
+                        std::ptr::null_mut(),
+                        &zero,
+                        std::ptr::null_mut(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        work_query.as_mut_ptr(),
+                        &query,
+                        rwork_query.as_mut_ptr(),
+                        &query,
+                        iwork_query.as_mut_ptr(),
+                        &query,
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        &mut info,
+                    );
+                }
+                result(info)?;
+
+                let lwork = int(work_query[0].re as usize);
+                // Unlike the pinned pheevx forwarding typo, LRWORK describes
+                // the actual real buffer, independently of complex LWORK.
+                let lrwork = int(rwork_query[0] as usize);
+                let liwork = iwork_query[0];
+                let mut work = vec![$scalar_zero; lwork as usize];
+                let mut rwork = vec![$real_zero; lrwork as usize];
+                let mut iwork = vec![0; usize::try_from(liwork).unwrap()];
+                let mut ifail = vec![0; n as usize];
+                let processes = self.rows.checked_mul(self.cols).unwrap();
+                let mut iclustr = vec![0; 2usize.checked_mul(processes).unwrap()];
+                let mut gap = vec![$real_zero; processes];
+                let mut matrix = a.to_vec();
+                let mut eigenvalues = vec![$real_zero; n as usize];
+                unsafe {
+                    $heevx(
+                        &job_z,
+                        &range,
+                        &uplo,
+                        &n,
+                        matrix.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        &zero,
+                        &zero,
+                        &zero_i,
+                        &zero_i,
+                        &zero,
+                        &mut m,
+                        &mut nz,
+                        eigenvalues.as_mut_ptr(),
+                        &zero,
+                        vectors.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        work.as_mut_ptr(),
+                        &lwork,
+                        rwork.as_mut_ptr(),
+                        &lrwork,
+                        iwork.as_mut_ptr(),
+                        &liwork,
+                        ifail.as_mut_ptr(),
+                        iclustr.as_mut_ptr(),
+                        gap.as_mut_ptr(),
+                        &mut info,
+                    );
+                }
+                result(info)?;
+                assert_eq!(m, n);
+                assert_eq!(nz, n);
+                Ok(eigenvalues)
+            }
+        }
+    };
+}
+
+real_eigh_family!(f32, pssyevx_, eigh_f32, 0.0, |value: f32| value as usize);
+complex_eigh_family!(
+    Complex<f32>,
+    f32,
+    pcheevx_,
+    eigh_c32,
+    Complex::new(0.0, 0.0),
+    0.0
+);
+complex_eigh_family!(
+    Complex<f64>,
+    f64,
+    pzheevx_,
+    eigh_c64,
+    Complex::new(0.0, 0.0),
+    0.0
+);
+
 fn int(value: usize) -> i32 {
     value.try_into().unwrap()
 }

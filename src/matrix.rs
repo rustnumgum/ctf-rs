@@ -16,91 +16,116 @@ fn distribution(shape: &[usize], grid: [usize; 2]) -> Distribution {
     column.augment_physical(&topology, 1);
     Distribution::new(shape.to_vec(), topology, vec![row, column])
 }
-impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
-    /// Symmetric eigensolve using the source's largest-square-grid subworld
-    /// strategy. Reads the upper triangle; returns (eigenvectors, eigenvalues).
-    /// For non-square process counts, only the first floor(sqrt(np))^2 ranks
-    /// compute, then factors are distributed back to the original context.
-    pub fn eigh(&self) -> Result<(Self, Self), i32> {
-        assert_eq!(self.distribution().shape.len(), 2);
-        let n = self.distribution().shape[0];
-        assert_eq!(self.distribution().shape[1], n);
-        let context = self.context();
-        let mut side = 1;
-        while (side + 1) * (side + 1) <= context.size() {
-            side += 1;
-        }
-        let active = side * side;
-        let mapped = distribution(&[n, n], [side, side]);
-        // add_to_subworld: only canonical source owners send, directly to the
-        // rank that owns each entry in the child grid. No root tensor assembly.
-        let mut buckets = vec![Vec::new(); context.size()];
-        for (key, value) in self.local_pairs() {
-            if self.distribution().owner(key) != context.rank() {
-                continue;
-            }
-            let destination = mapped.owner(key);
-            (key as u64).encode(&mut buckets[destination]);
-            value.encode(&mut buckets[destination]);
-        }
-        let incoming = context.inner.exchange(&buckets);
-        let child = context.split(
-            if context.rank() < active {
-                Some(1)
-            } else {
-                None
-            },
-            context.rank() as i32,
-        );
-        let mut vector_pairs = Vec::new();
-        let mut value_pairs = Vec::new();
-        let mut info = 0;
-        if let Some(child) = child {
-            let mut input = vec![0.; mapped.local_len().max(1)];
-            for bytes in incoming {
-                for pair in bytes.chunks_exact(16) {
-                    let key = u64::decode(&pair[..8]) as usize;
-                    input[mapped.local_offset(child.rank(), key)] = f64::decode(&pair[8..]);
+macro_rules! matrix_eigh_methods {
+    ($scalar:ty, $real:ty, $eigh:ident, $lift:expr) => {
+        impl<'c, 'r> Tensor<'c, 'r, Arithmetic<$scalar>> {
+            /// Symmetric/Hermitian eigensolve using the source's largest-square-grid subworld
+            /// strategy. Reads the upper triangle; returns (eigenvectors, eigenvalues).
+            /// For non-square process counts, only the first floor(sqrt(np))^2 ranks
+            /// compute, then factors are distributed back to the original context.
+            pub fn eigh(&self) -> Result<(Self, Self), i32> {
+                assert_eq!(self.distribution().shape.len(), 2);
+                let n = self.distribution().shape[0];
+                assert_eq!(self.distribution().shape[1], n);
+                let context = self.context();
+                let mut side = 1;
+                while (side + 1) * (side + 1) <= context.size() {
+                    side += 1;
                 }
-            }
-            let grid = child.inner.scalapack_grid(side, side);
-            let result = (|| {
-                let desc = grid.descriptor(n, n, 1, 1, n.div_ceil(side).max(1))?;
-                let mut vectors = vec![0.; input.len()];
-                let values = grid.eigh(n, &input, &desc, &mut vectors)?;
-                for (offset, &value) in vectors.iter().enumerate() {
-                    if let Some(key) = mapped.global_key(child.rank(), offset) {
-                        vector_pairs.push((key, value));
+                let active = side * side;
+                let mapped = distribution(&[n, n], [side, side]);
+                // add_to_subworld: only canonical source owners send, directly to the
+                // rank that owns each entry in the child grid. No root tensor assembly.
+                let mut buckets = vec![Vec::new(); context.size()];
+                for (key, value) in self.local_pairs() {
+                    if self.distribution().owner(key) != context.rank() {
+                        continue;
                     }
+                    let destination = mapped.owner(key);
+                    (key as u64).encode(&mut buckets[destination]);
+                    value.encode(&mut buckets[destination]);
                 }
-                if child.rank() == 0 {
-                    value_pairs.extend(values.into_iter().enumerate());
+                let incoming = context.inner.exchange(&buckets);
+                let child = context.split(
+                    if context.rank() < active {
+                        Some(1)
+                    } else {
+                        None
+                    },
+                    context.rank() as i32,
+                );
+                let mut vector_pairs = Vec::new();
+                let mut value_pairs = Vec::new();
+                let mut info = 0;
+                if let Some(child) = child {
+                    let zero = Arithmetic::<$scalar>::new().zero();
+                    let mut input = vec![zero; mapped.local_len().max(1)];
+                    let pair_width = 8 + <$scalar as Wire>::WIDTH;
+                    for bytes in incoming {
+                        for pair in bytes.chunks_exact(pair_width) {
+                            let key = u64::decode(&pair[..8]) as usize;
+                            input[mapped.local_offset(child.rank(), key)] =
+                                <$scalar as Wire>::decode(&pair[8..]);
+                        }
+                    }
+                    let grid = child.inner.scalapack_grid(side, side);
+                    let result = (|| {
+                        let desc =
+                            grid.descriptor(n, n, 1, 1, n.div_ceil(side).max(1))?;
+                        let mut vectors = vec![zero; input.len()];
+                        let values: Vec<$real> = grid.$eigh(n, &input, &desc, &mut vectors)?;
+                        for (offset, &value) in vectors.iter().enumerate() {
+                            if let Some(key) = mapped.global_key(child.rank(), offset) {
+                                vector_pairs.push((key, value));
+                            }
+                        }
+                        if child.rank() == 0 {
+                            for (key, value) in values.into_iter().enumerate() {
+                                value_pairs.push((key, ($lift)(value)));
+                            }
+                        }
+                        Ok::<(), i32>(())
+                    })();
+                    grid.close();
+                    if let Err(error) = result {
+                        info = error;
+                    }
+                    child.close();
                 }
-                Ok::<(), i32>(())
-            })();
-            grid.close();
-            if let Err(error) = result {
-                info = error;
+                let statuses = context.inner.all_gather_i32(info);
+                if let Some(error) = statuses.into_iter().find(|&value| value != 0) {
+                    return Err(error);
+                }
+                // add_from_subworld: all parent ranks participate, including ranks that
+                // did not enter ScaLAPACK; writes restore each output's distribution.
+                let mut vectors = Self::new(context, self.distribution().clone(), Arithmetic::new());
+                vectors.write_add(&vector_pairs);
+                let mut values = Self::new(
+                    context,
+                    Distribution::cyclic(vec![n], context.size()),
+                    Arithmetic::new(),
+                );
+                values.write_add(&value_pairs);
+                Ok((vectors, values))
             }
-            child.close();
         }
-        let statuses = context.inner.all_gather_i32(info);
-        if let Some(error) = statuses.into_iter().find(|&value| value != 0) {
-            return Err(error);
-        }
-        // add_from_subworld: all parent ranks participate, including ranks that
-        // did not enter ScaLAPACK; writes restore each output's distribution.
-        let mut vectors = Self::new(context, self.distribution().clone(), Arithmetic::new());
-        vectors.write_add(&vector_pairs);
-        let mut values = Self::new(
-            context,
-            Distribution::cyclic(vec![n], context.size()),
-            Arithmetic::new(),
-        );
-        values.write_add(&value_pairs);
-        Ok((vectors, values))
-    }
+    };
 }
+
+matrix_eigh_methods!(f64, f64, eigh, |value: f64| value);
+matrix_eigh_methods!(f32, f32, eigh_f32, |value: f32| value);
+matrix_eigh_methods!(
+    Complex<f32>,
+    f32,
+    eigh_c32,
+    |value: f32| Complex::new(value, 0.)
+);
+matrix_eigh_methods!(
+    Complex<f64>,
+    f64,
+    eigh_c64,
+    |value: f64| Complex::new(value, 0.)
+);
 
 macro_rules! matrix_factor_methods {
     (

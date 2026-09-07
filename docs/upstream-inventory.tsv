@@ -36,7 +36,7 @@ src/shared/init_models.h	src/initial_models.rs	Rust static CPU model table repla
 src/shared/int_timer.cxx	src/shared	pending
 src/shared/int_timer.h	src/shared	pending
 src/shared/iter_tsr.h	src/shared	pending
-src/shared/lapack_symbs.cxx	src/ffi/linalg.rs; src/ffi/scalapack.rs	partial: four-type native GEMM and distributed POTRF/POSV/TRSM/GEQRF/ORGQR/UNGQR, existing f64 decomposition bindings; remaining scalar/routine families pending
+src/shared/lapack_symbs.cxx	src/ffi/linalg.rs; src/ffi/scalapack.rs	partial: four-type native GEMM and distributed POTRF/POSV/TRSM/GEQRF/ORGQR/UNGQR/GESVD/SYEVX/HEEVX; local decompositions remain f64; remaining scalar/routine families pending
 src/shared/lapack_symbs.h	src/shared	pending
 src/shared/Makefile	Cargo/build tooling	replaced
 src/shared/memcontrol.cxx	src/shared	pending
@@ -66,11 +66,11 @@ src/interface/idx_tensor.h	src/interface	pending
 src/interface/kernel.h	src/interface	pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
-src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed thin/truncated SVD, QR, Cholesky and triangular/positive-definite solves; f64 randomized SVD and square-subworld eigh; typed randomized SVD/eigh and remaining routines pending
+src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed thin/truncated/randomized SVD, QR, Cholesky, triangular/positive-definite solves and square-subworld symmetric/Hermitian eigh; remaining routines pending
 src/interface/matrix.h	src/matrix.rs	partial direct Rust Tensor matrix APIs
 src/interface/monoid.cxx	src/interface	pending
 src/interface/monoid.h	src/interface	pending
-src/interface/multilinear.cxx	src/multilinear.rs; src/multilinear_factor.rs; src/multilinear_kernel.rs; src/sparse_multilinear.rs; src/solve_factor.rs; src/tensor_svd.rs	partial: dense/sparse f64 TTTP with factor-fiber broadcast, fiber-grouped MTTKRP, weighted Solve_Factor, tensor SVD; additional scalar kernels and automatic memory choice pending
+src/interface/multilinear.cxx	src/multilinear.rs; src/multilinear_factor.rs; src/multilinear_kernel.rs; src/sparse_multilinear.rs; src/solve_factor.rs; src/tensor_svd.rs	partial: dense/sparse f64 TTTP with factor-fiber broadcast, fiber-grouped MTTKRP, weighted Solve_Factor, four-type indexed tensor SVD; other multilinear scalar kernels and automatic memory choice pending
 src/interface/multilinear.h	src/multilinear.rs; src/tensor_svd.rs	partial: direct Rust TTTP/MTTKRP/tensor SVD APIs
 src/interface/partition.cxx	src/interface	pending
 src/interface/partition.h	src/interface	pending
@@ -239,10 +239,10 @@ examples/sssp.cxx	tests/upstream/examples/sssp.rs	pending
 examples/strassen.cxx	tests/upstream/examples/strassen.rs	pending
 examples/trace.cxx	tests/upstream/examples/trace.rs	pending
 scalapack_tests/conj.h	tests/upstream/scalapack_tests/conj.h	pending
-scalapack_tests/eigh.cxx	tests/upstream/scalapack_tests/eigh.rs	pending
+scalapack_tests/eigh.cxx	tests/distributed_eigh.rs; tests/typed_distributed_eigh.rs	partial: four-type symmetric/Hermitian reconstruction and orthogonality at original n*n*1e-6 bounds PASS WSL 1/2/4; degenerate spectra and square subworld covered; full upstream driver pending
 scalapack_tests/Makefile	Cargo/build tooling	replaced
-scalapack_tests/qr.cxx	tests/distributed_qr_svd.rs	partial f64 thin QR residual/orthogonality criteria PASS WSL 1/2/4; other scalar types pending
-scalapack_tests/svd.cxx	tests/distributed_qr_svd.rs	partial f64 thin SVD residual/orthogonality criteria PASS WSL 1/2/4; other scalar types/truncation pending
+scalapack_tests/qr.cxx	tests/distributed_qr_svd.rs; tests/typed_distributed_qr.rs	partial: four-type thin QR source residual/orthogonality criteria PASS WSL 1/2/4; full upstream driver pending
+scalapack_tests/svd.cxx	tests/distributed_qr_svd.rs; tests/typed_distributed_svd.rs; tests/typed_svd_truncation.rs; tests/typed_randomized_svd.rs	partial: four-type thin SVD source residual/orthogonality criteria and truncation/randomized paths PASS WSL 1/2/4; full upstream driver pending
 bench/bench_contraction.cxx	tests/upstream/bench/bench_contraction.rs	pending
 bench/bench_nosym_transp.cxx	tests/upstream/bench/bench_nosym_transp.rs	pending
 bench/bench_redistribution.cxx	tests/upstream/bench/bench_redistribution.rs	pending

@@ -573,3 +573,13 @@ harness = false
 name = "typed_randomized_svd"
 path = "tests/typed_randomized_svd.rs"
 harness = false
+
+[[test]]
+name = "typed_distributed_eigh"
+path = "tests/typed_distributed_eigh.rs"
+harness = false
+
+[[test]]
+name = "typed_tensor_svd"
+path = "tests/typed_tensor_svd.rs"
+harness = false

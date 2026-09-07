@@ -1142,6 +1142,29 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## Four-type distributed eigensolve and indexed tensor SVD (2026-09-07)
+
+typed_distributed_eigh and typed_tensor_svd passed once at WSL 1/2/4 ranks,
+world/parity subcontexts. Real symmetric and complex Hermitian eigensolves use
+the largest-square-grid subworld, restore the original vector distribution and
+retain real eigenvalues (zero imaginary component for complex tensor scalars).
+Fixtures include n=5 indefinite and degenerate spectra and n=1/empty local
+shards. Reconstruction and orthogonality Frobenius norms satisfy n*n*1e-6;
+input data are exactly unchanged. No eigenvector entry/phase comparisons.
+
+The complex native HEEVX binding deliberately passes the queried real LRWORK
+for its separately allocated RWORK. The pinned C++ pheevx wrapper incorrectly
+forwards complex LWORK in that position, unlike its caller's separate buffer
+allocation. The Rust binding does not reproduce that unsafe size mismatch.
+
+Four-type indexed tensor SVD exercises noncanonical auxiliary/output index
+orders, full truncated SVD with complex inputs and randomized rank-one real
+fixtures. Matrix intermediates stay distributed. Normalized reconstruction
+is <1e-6; orthogonality retains the existing L1 <=1e-3 or relative <=1e-3 rule.
+Four corresponding/affected targets compiled and linked on Windows GNU once.
+No failures or precision studies. DIGIT / PASS for this stage; native MPI
+runtime and full-port acceptance remain outstanding.
+
 ## Four-type explicit-grid BLAS and randomized SVD (2026-09-07)
 
 typed_grid_blas and typed_randomized_svd passed once at WSL 1/2/4 ranks,
