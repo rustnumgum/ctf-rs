@@ -16,13 +16,13 @@ src/mapping/mapping.cxx	src/mapping	pending
 src/mapping/mapping.h	src/mapping	pending
 src/mapping/node_aware_dist.cxx	src/node_aware.rs; src/node_reordering.rs; src/dense_execution.rs	partial: source candidate order, strict fractional-peer volume selection and generic/folded rank-reordered execution; sparse integration pending
 src/mapping/node_aware_dist.h	src/mapping	pending
-src/mapping/topology.cxx	src/mapping.rs; src/node_reordering.rs	partial: explicit topology fibers, forward/inverse node rank permutations and fractional communicator peer averages; hardware node discovery pending
+src/mapping/topology.cxx	src/mapping.rs; src/node_reordering.rs	partial: explicit topology fibers, forward/inverse node rank permutations and fractional communicator peer averages; source CPU topology uses explicit ppn (default 1 / CTF_PPN override), not automatic hardware discovery; full responsibility audit pending
 src/mapping/topology.h	src/mapping	pending
 src/scripts/expand_includes.sh	Cargo/build tooling	replaced
 src/scripts/license.sh	Cargo/build tooling	replaced
 src/scripts/manual_readlink.sh	Cargo/build tooling	replaced
 src/scripts/recursive_expand_includes.sh	Cargo/build tooling	replaced
-src/tensor/algstrct.cxx	src/tensor	pending
+src/tensor/algstrct.cxx	src/sparse_reduce.rs; src/ffi/gather.rs	partial: source CSR/CCSR cyclic-row subgroup exchange, binary-tree merge, recursive reduction and Gather/Gatherv root assembly; exact WSL 1/2/4 plus three-rank subgroup PASS; other responsibilities/full integration pending
 src/tensor/algstrct.h	src/tensor	pending
 src/tensor/Makefile	Cargo/build tooling	replaced
 src/tensor/untyped_tensor_tmpl.h	src/tensor	pending

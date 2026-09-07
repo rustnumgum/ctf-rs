@@ -1,5 +1,10 @@
 # Source provenance
 
+`src/sparse_reduce.rs` ports tensor/algstrct.cxx::csr_reduce's subgroup row
+partition/all-to-all/tree/recursive-reduction/root-assembly algorithm. Native
+Gather/Gatherv calls remain in `src/ffi/gather.rs`. Rust COO wire encoding
+replaces C++ storage ABI while preserving source sparse structure and rank order.
+
 tests/upstream_spmv.rs ports examples/spmv.cxx's active dense/sparse output
 equations and norm criteria. The bounded fixture uses source default sparsity
 0.5/n; the C++ srand48 call is not misrepresented as the MT generator's seed.

@@ -1,5 +1,17 @@
 # Fixed-source automatic planning integration
 
+## Node-count configuration boundary
+
+Pinned CPU topology construction takes an explicit processes-per-node value:
+default ppn=1, with CTF_PPN as a source override. It requires ppn>=1 and exact
+world-size divisibility; world.h documents consecutive same-node ranks.
+get_phys_topo/get_generic_topovec factor process counts rather than discovering
+hardware, and node-aware grid selection receives an explicit node count.
+Rust's explicit ranks_per_node selection input preserves this boundary.
+Context::split_shared is available for callers that want MPI shared-memory
+groups, but automatic hardware discovery is not a missing pinned CPU routine
+to invent as part of this port. Sparse node-aware integration remains pending.
+
 Reference: cc4s CTF f69cbb46e23bc2f39cda5722ce096f56301dab4f.
 
 ## Collective raw dense-unfolded search

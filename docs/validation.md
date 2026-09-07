@@ -1,5 +1,17 @@
 # Validation evidence
 
+## Distributed CSR/CCSR reduction (2026-09-07)
+
+distributed_sparse_reduce passed once at WSL 1/2/4 ranks, world/parity and a
+three-rank subgroup of the four-rank run. Exact checks cover roots 0 and last,
+CSR/CCSR cyclic row pieces, nonuniform/empty pieces, zero-row matrices, stored
+zeros, root-only results and a million-row CCSR matrix with only a few entries.
+An associative noncommutative matrix-product monoid checks the source binary
+rank order. Initial compilation required explicit Clone bounds on concrete
+format/COO helpers; these were added before any numerical execution.
+Windows GNU compile/link passed once. DIGIT / PASS; no numerical failures or
+additional precision runs. Native MPI runtime acceptance remains pending.
+
 ## Upstream sparse matrix-vector product (2026-09-07)
 
 upstream_spmv passed once at WSL 1/2/4 ranks, world/parity. The bounded n=5

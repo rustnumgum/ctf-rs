@@ -767,3 +767,8 @@ harness = false
 name = "upstream_spmv"
 path = "tests/upstream_spmv.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_reduce"
+path = "tests/distributed_sparse_reduce.rs"
+harness = false
