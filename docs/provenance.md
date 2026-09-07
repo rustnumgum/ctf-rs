@@ -1,5 +1,15 @@
 # Source provenance
 
+tests/upstream_scan.rs follows examples/scan.cxx's recursive scan and wrapper
+transfers. The 2x2 AS matrix is repacked canonically through SH to NS, not
+unpacked as a symmetric full matrix. Dimensions/MT seed are explicit bounded
+adaptations; the source acceptance relation and tolerance are retained.
+
+`src/sparse_contraction_comm.rs` ports the sparse-output replication branches
+of contraction/spctr_comm.cxx and uses spctr_tsr.cxx virtual traversal. Its
+ordered orthogonal output-fiber early stop follows spctr_comm.cxx:295-329;
+native sparse leaves and partitioned CSR/CCSR reduction preserve storage.
+
 `src/sparse_reduce.rs` ports tensor/algstrct.cxx::csr_reduce's subgroup row
 partition/all-to-all/tree/recursive-reduction/root-assembly algorithm. Native
 Gather/Gatherv calls remain in `src/ffi/gather.rs`. Rust COO wire encoding

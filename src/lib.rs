@@ -18,6 +18,7 @@ pub mod ctr_2d;
 pub mod linalg;
 pub mod sparse_formats;
 mod sparse_reduce;
+pub mod sparse_contraction_comm;
 pub mod sparse;
 pub mod planning;
 pub mod model;

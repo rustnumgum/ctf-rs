@@ -772,3 +772,13 @@ harness = false
 name = "distributed_sparse_reduce"
 path = "tests/distributed_sparse_reduce.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_replicate"
+path = "tests/distributed_sparse_replicate.rs"
+harness = false
+
+[[test]]
+name = "upstream_scan"
+path = "tests/upstream_scan.rs"
+harness = false

@@ -23,6 +23,6 @@ There is no dense materialization of sparse A or whole-tensor gather.
 This integrates virtualization for sparse-A/dense-B/dense-C, including empty
 sparse blocks and the pinned local custom-function branch. The mapped interface
 retains its unique-label and A-only-label restrictions. Variable sparse output
-bucket traversal is unit-covered, not claimed as full distributed sparse-output
-integration; nested moving-output sparse panels and automatic plan assembly
-remain unfinished.
+bucket traversal is also used by the explicit CSR/CCSR replicated sparse-output
+layer (sparse-replicate.md), including variable output block reductions.
+Nested moving-output sparse panels and automatic plan assembly remain unfinished.

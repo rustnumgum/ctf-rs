@@ -114,7 +114,7 @@ src/contraction/sp_seq_ctr.cxx	src/sparse_sequential.rs; src/sparse_fold.rs; src
 src/contraction/sp_seq_ctr.h	src/contraction	pending
 src/contraction/spctr_2d_general.cxx	src/sparse_gemm.rs	partial: stationary-output sparse matrix panel broadcasts with LCM virtual k phases; output-moving and general recursive levels pending
 src/contraction/spctr_2d_general.h	src/contraction	pending
-src/contraction/spctr_comm.cxx	src/sparse_contract_general.rs	partial: explicit mapped sparse-A count/payload broadcasts, dense-B broadcasts, C root beta/reduction and owner restore; general sparse output and automatic plan assembly pending
+src/contraction/spctr_comm.cxx	src/sparse_contract_general.rs; src/sparse_contraction_comm.rs	partial: mapped sparse-A/dense-B/dense-C broadcasts/root beta/reduction and owner restore; explicit CSR/CSR/CSR and CCSR/dense/CCSR replicated virtual blocks, sparse output-fiber reductions and input cleanup; nested moving-output panels and automatic plan assembly pending
 src/contraction/spctr_comm.h	src/contraction	pending
 src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
@@ -230,7 +230,7 @@ examples/neural_network.cxx	tests/upstream/examples/neural_network.rs	pending
 examples/particle_interaction.cxx	tests/upstream/examples/particle_interaction.rs	pending
 examples/qinformatics.cxx	tests/upstream/examples/qinformatics.rs	pending
 examples/recursive_matmul.cxx	tests/upstream/examples/recursive_matmul.rs	pending
-examples/scan.cxx	tests/upstream/examples/scan.rs	pending
+examples/scan.cxx	tests/upstream_scan.rs	ported recursive reduction/shift-contraction/broadcast-add and local vector-tensor transfers, AS->SH->NS canonical repacks; bounded logn=3 with explicit f64 MT seed adaptation, source abs(error)<1e-9*N; PASS WSL 1/2/4 world/parity, native compile/link
 examples/sparse_mp3.cxx	tests/upstream_sparse_mp3.rs; tests/upstream_sparse_mp3_t.rs	partial: dense-T and sparse-T equation/function chains with original relative-energy tolerance; rank-seeded random fixture and benchmark driver pending
 examples/sparse_permuted_slice.cxx	pending: source-semantic packed permutation APIs exist	unaccepted: static full-orbit/canonical-duplicate analysis conflicts with compressed callback-copy assertion (SY/AS/SH off-diagonal 2x); no driver execution or tolerance change; see docs/upstream-known-failures.md
 examples/spectral_element.cxx	tests/upstream/examples/spectral_element.rs	pending

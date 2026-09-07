@@ -1,5 +1,29 @@
 # Validation evidence
 
+## Upstream recursive scan (2026-09-07)
+
+upstream_scan passed once at WSL 1/2/4 ranks, world/parity, with bounded logn=3
+and an explicitly seeded f64 MT fixture. It retains local vector-to-tensor
+writes, recursive first-axis summation, AS->SH->NS canonical repacks for the
+shift matrix, contractions, broadcast addition and tensor-to-vector writes.
+Only the source acceptance exports use all-rank data. The original adjacent
+prefix relation has strict absolute error <1e-9*N; finite values are required.
+The f64 conversion's remaining integer literals were corrected after a compile
+error and before execution. Native Windows GNU compile/link passed once.
+DIGIT / PASS; no numerical failures or extra precision checks. Native MPI
+runtime acceptance remains pending.
+
+## Sparse-output replicated/virtual communication (2026-09-07)
+
+distributed_sparse_replicate passed once at WSL 1/2/4 ranks, world/parity.
+Exact i64 values and sparse structure cover CSR and CCSR input broadcasts,
+fixed-size dense B broadcasts, virtual contracted blocks, multiple virtual C
+blocks, beta=0/3 applied once, explicit stored zeros and both input cleanup
+rules. Single and two orthogonal output-fiber reductions execute the new sparse
+matrix reduction API; no-output-fiber cases retain each rank's local result.
+Native Windows GNU compile/link passed once. DIGIT / PASS; no failures or
+extra numerical verification. Native MPI runtime acceptance remains pending.
+
 ## Distributed CSR/CCSR reduction (2026-09-07)
 
 distributed_sparse_reduce passed once at WSL 1/2/4 ranks, world/parity and a

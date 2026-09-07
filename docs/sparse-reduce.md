@@ -23,7 +23,7 @@ shape and stored COO entries rather than C++ object/packed-buffer ABI. CCSR
 transport remains proportional to stored entries, not its logical row count.
 Stored zeros and noncommutative monoid merge order are retained.
 
-This closes the reusable sparse matrix reduction primitive. Integration into
-all sparse replicated/virtual/moving-output execution plans remains unfinished;
-the existing two-dimensional sparse GEMM paths are not relabeled as that full
-communication stack.
+The primitive is now used by the explicit CSR/CCSR replicated/virtual output
+layer described in sparse-replicate.md. Integration into all automatically
+assembled sparse moving-output plans remains unfinished; existing
+two-dimensional sparse GEMM paths are not relabeled as that full stack.
