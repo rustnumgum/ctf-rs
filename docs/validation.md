@@ -1035,6 +1035,17 @@ panel operand helper; it was fixed before any test ran. No numerical failures or
 post-pass precision checks occurred. All four targets compiled/linked on Windows
 GNU; native MPI runtime execution remains pending.
 
+## Dense fold permutation selection (2026-09-07)
+
+fold_selection passed two local tests covering all six source transpose layouts
+with actual BLAS execution, last-tie selection, the first-three restriction, and
+batch-first layouts with virtual multiplicities [2,3,5]. The latter selects
+permutation 5 with exact modeled per-original-operand costs [96,120,150], proving
+that the permuted third operand (original A) is doubled. Output uses the fixed
+finite abs(error)<1e-6 acceptance. Existing folding tests passed once and affected
+tensor_blas_fold passed WSL 1/2/4 ranks. No failures or extra precision studies.
+All three targets compiled/linked on Windows GNU; native runtime remains pending.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each

@@ -473,3 +473,7 @@ harness = false
 name = "dense_execution_algebra"
 path = "tests/dense_execution_algebra.rs"
 harness = false
+
+[[test]]
+name = "fold_selection"
+path = "tests/fold_selection.rs"

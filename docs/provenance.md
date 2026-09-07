@@ -1043,3 +1043,13 @@ are unused and its communicator lists are empty: that layer left-scales C by bet
 An all-scalar leaf with topology order zero has no such layer and retains the
 source sequential right-beta special case. Ordered MPI user reductions replace
 the previous f64-only panel reduction in this generic entry point.
+
+folding::Plan::select adapts get_len_ordering/select_ctr_perm
+(contraction.cxx:601-699, 765-921). Original normalized label IDs persist when
+roles are permuted; lnmk remains defined by original A/B/C. Costs multiply each
+original operand's virtual count and double the permuted third operand, which is
+not necessarily original C. Summation follows permuted role order, costs map back
+to original operands, and dense <= comparison chooses the last tie. The six
+source transpose flags drive existing folded_f64 and its transposed-output swap.
+Sparse permutation restrictions and partially folded symmetric tensors remain
+separate unfinished paths.

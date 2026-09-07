@@ -37,6 +37,18 @@ is not yet selected automatically. Folded BLAS selection/execution, sparse
 estimates/execution, selection-scan diagnostics and custom bivariate functions
 remain unfinished here.
 
+## Local dense fold permutation selection
+
+folding::Plan::select now implements all six source dense fold permutations and
+their GEMM transpose/output-swap flags. It minimizes modeled transpose time with
+per-operand virtual multiplicities, and source ties choose the last candidate.
+The noncommutative restriction considers only the first three permutations.
+Plan::new still explicitly represents permutation zero. Both execute through the
+compile-time LocalKernels boundary (native BLAS initially).
+
+This is the fully-foldable local NS stage, not yet map_fold's full distributed
+partial/symmetry folding or its integration into automatic total-cost search.
+
 ## Executable inner cost tree now connected
 
 GridPlan::cost_tree derives the aligned unfolded dense execution tree from the
