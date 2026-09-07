@@ -86,6 +86,7 @@ mpi_tests+=(distributed_sparse_reduce)
 mpi_tests+=(distributed_sparse_replicate)
 mpi_tests+=(upstream_scan)
 mpi_tests+=(distributed_sparse_2d upstream_trace)
+mpi_tests+=(distributed_sparse_2d_dense)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \

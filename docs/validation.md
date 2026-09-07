@@ -1,5 +1,16 @@
 # Validation evidence
 
+## Mixed sparse 2D dense output (2026-09-07)
+
+distributed_sparse_2d_dense passed once at WSL 1/2/4 ranks, world/parity.
+Exact i64 checks cover moving CSR A, moving dense/CSR B, variable empty sparse
+panels, moving dense C with cyclic Reduce, one/two strips and consecutive
+blocks, two-element output blocks, beta=0/2, stationary whole beta-once,
+all layer schedules and a recursive dense-output child. References follow
+the source dense new + beta*old rule, not the distinct sparse-C convention.
+The target compiled and linked once on Windows GNU. DIGIT / PASS; numerical
+verification closed, native MPI runtime acceptance still pending.
+
 ## Sparse 2D levels and upstream cyclic trace (2026-09-07)
 
 distributed_sparse_2d and upstream_trace passed once at WSL 1/2/4 ranks,

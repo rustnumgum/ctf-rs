@@ -792,3 +792,8 @@ harness = false
 name = "upstream_trace"
 path = "tests/upstream_trace.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_2d_dense"
+path = "tests/distributed_sparse_2d_dense.rs"
+harness = false

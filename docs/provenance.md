@@ -1,5 +1,11 @@
 # Source provenance
 
+The dense-output branches of src/sparse_2d.rs follow spctr_2d_general.cxx
+reduce_step_pre/post and run: zero child beta for moving/strided output,
+cyclic native Reduce and new + beta*old scatter. The folded sparse inputs
+retain CSR broadcasts. distributed_sparse_2d_dense uses exact i64 checks;
+its CSR/CSR child is the existing custom csr_sparse leaf with multiplication.
+
 src/sparse_2d.rs ports spctr_2d_general.cxx panel ownership, broadcasts,
 sparse moving-output reduction/reassembly and layer scheduling, including
 its distinct raw sparse beta conventions (sparse-2d.md). The child callback
