@@ -1,5 +1,23 @@
 # Validation evidence
 
+## Upstream scalar/sparse identity and baseline permutation (2026-09-07)
+
+upstream_scalar and upstream_speye passed once at WSL 1/2/4 ranks, including
+world and parity subcommunicators. Scalar uses bounded n=3 and retains source
+zero-extent SY metadata, resets E before the diagonal operation, checks retained
+off-diagonal SUMABS >1e-10, then full contraction SUMABS <1e-10. Scalar assignment
+and subtraction retain the source inequalities and norm tolerances. Sparse identity
+uses order=3, n=4 and actual indexed scalar broadcast A[iii]=1; both distinct and
+repeated-index reductions satisfy the original strict absolute error <1e-9.
+An initial missing Monoid import was a compile failure only and was corrected.
+DIGIT / PASS; no additional numerical computations after passing. Both targets
+compiled and linked on Windows GNU; native MPI runtime acceptance remains pending.
+
+Separately, one unmodified pinned C++ permute_multiworld diagnostic at n=3/rank=1
+passed NS then failed the SY expected-copy assertion. AS/SH were not reached.
+This is recorded in upstream-known-failures.md, not counted as a Rust pass or
+used to relax any threshold. The reference library remains development-only.
+
 ## Mixed-storage coordinate permutation (2026-09-07)
 
 `symmetric_permuted_io` and `sparse_permuted_io` passed once at 1/2/4 WSL ranks,

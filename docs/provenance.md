@@ -1,5 +1,10 @@
 # Source provenance
 
+`tests/upstream_scalar.rs` and `tests/upstream_speye.rs` reimplement the active
+fixtures in pinned `test/scalar.cxx` and `test/speye.cxx`. They preserve the source
+acceptance inequalities with bounded dimensions (scalar n=3; speye n=4/order=3),
+excluding source-disabled blocks. No C++ interface or library is linked by Cargo.
+
 Reference repository: https://gitlab.cc4s.org/cc4s/ctf
 Reference commit: f69cbb46e23bc2f39cda5722ce096f56301dab4f
 

@@ -707,3 +707,13 @@ harness = false
 name = "sparse_permuted_io"
 path = "tests/sparse_permuted_io.rs"
 harness = false
+
+[[test]]
+name = "upstream_scalar"
+path = "tests/upstream_scalar.rs"
+harness = false
+
+[[test]]
+name = "upstream_speye"
+path = "tests/upstream_speye.rs"
+harness = false

@@ -181,13 +181,13 @@ test/endomorphism.cxx	tests/upstream_endomorphism.rs	ported: original indexed cu
 test/gemm_4D.cxx	tests/upstream_gemm4d.rs	NS associativity port PASS WSL 1/2/4; SY/AS branches pending
 test/Makefile	Cargo/build tooling	replaced
 test/multi_tsr_sym.cxx	tests/upstream_multi_tsr_sym.rs	ported NS/SY Gram equality, original norm<1e-6; WSL 1/2/4 pass
-test/permute_multiworld.cxx	tests/upstream_permute_multiworld.rs; tests/symmetric_permuted_io.rs; tests/sparse_permuted_io.rs	partial: NS original driver PASS WSL1/2/4; all mixed-storage paths have exact source-semantic fixtures PASS; original compressed expected-copy assertions remain unreconciled with pinned full-orbit duplicate accumulation
+test/permute_multiworld.cxx	tests/upstream_permute_multiworld.rs; tests/symmetric_permuted_io.rs; tests/sparse_permuted_io.rs	partial: Rust NS driver PASS WSL1/2/4; mixed-storage source-semantic fixtures PASS; unmodified pinned C++ n3/rank1 passed NS then FAILED SY copy assertion (docs/upstream-known-failures.md), AS/SH not reached
 test/readall_test.cxx	tests/upstream_readall.rs	ported bounded 2x3x2x3: source seed-zero drand48, root-only child transfer, explicit all-data read; abs<=1e-10 PASS WSL1/2/4 world/parity
 test/readwrite_test.cxx	tests/upstream_readwrite.rs	ported bounded n3: NS/SY/SH and source-literal AS=SH diagonal writes, distributed reductions and NS/SY self contractions; abs<=1e-10 PASS WSL1/2/4 world/parity
 test/reduce_bcast.cxx	tests/upstream_dense.rs; tests/upstream_reduce_bcast.rs	both identities through dense and compressed tensor APIs; original norm<=1e-6, WSL 1/2/4 pass
 test/repack.cxx	tests/distributed_symmetric_repack.rs	canonical-only source repack semantics ported; exact SY/AS/SH and partial-group WSL checks at 1/2/4 ranks; original random driver pending
-test/scalar.cxx	tests/upstream/test/scalar.rs	pending
-test/speye.cxx	tests/upstream/test/speye.rs	pending
+test/scalar.cxx	tests/upstream_scalar.rs	ported active cases at bounded n=3: scalar assignment, zero-edge SY metadata, diagonal preservation and full zero contraction; original inequalities; PASS WSL 1/2/4 world/parity; native compile/link only; disabled AS block excluded
+test/speye.cxx	tests/upstream_speye.rs	ported active order=3 case at n=4: sparse indexed scalar broadcast A[iii]=1 and full/repeated-index reductions; original abs<1e-9; PASS WSL 1/2/4 world/parity; native compile/link only; disabled SY block excluded
 test/sptensor_sum.cxx	tests/upstream_sptensor_sum.rs	ported bounded n2: exact source sparse fixtures/union, overlap66, abs<=1e-9 PASS WSL1/2/4 world/parity
 test/subworld_gemm.cxx	tests/upstream_subworld_gemm.rs	ported source defaults17x23x31 plus tiny2x3x1, divisions1/2/4, POSIX drand48 recurrence, distributed child GEMM accumulation identity; Frobenius<1e-9 PASS WSL1/2/4 world/parity
 test/sy_times_ns.cxx	tests/upstream_sy_times_ns.rs	ported literal zero-input source and separately adapted nonzero fixture, original norm<1e-10; WSL 1/2/4 pass

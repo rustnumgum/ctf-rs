@@ -74,6 +74,7 @@ mpi_tests+=(upstream_permute_multiworld)
 mpi_tests+=(indexed_write_order)
 mpi_tests+=(symmetric_permuted_io)
 mpi_tests+=(sparse_permuted_io)
+mpi_tests+=(upstream_scalar upstream_speye)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \

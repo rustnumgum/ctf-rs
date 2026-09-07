@@ -50,8 +50,8 @@ key. Packed scatter sends only canonical nonzero source entries, not full orbits
 Sparse scatter sends all stored pairs including explicit zeros; an explicit zero
 therefore touches and scales the destination, unlike an omitted dense zero.
 
-The original `permute_multiworld` driver's compressed expected-copy assertions
-remain unreconciled with this pinned full-orbit accumulation path, so that driver
-row is not declared fully passing. Dedicated exact source-semantic fixtures cover
-the compressed/mixed paths; no normalization was invented to satisfy a different
-copy contract.
+The original `permute_multiworld` driver was run unmodified at n3/one rank:
+NS passed, then its SY expected-copy assertion failed in the C++ baseline.
+See `upstream-known-failures.md`. The driver row is not declared fully passing.
+Dedicated exact source-semantic fixtures cover the compressed/mixed paths; no
+normalization was invented to satisfy a different copy contract.
