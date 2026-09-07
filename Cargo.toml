@@ -332,3 +332,9 @@ harness = false
 name = "distributed_sparse_multilinear"
 path = "tests/distributed_sparse_multilinear.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_solve_factor"
+path = "tests/distributed_sparse_solve_factor.rs"
+harness = false
+required-features = ["native-linalg"]

@@ -883,3 +883,16 @@ changes, and a two-billion-element logical tensor with only two stored entries.
 DIGIT / PASS; no diagnostic computations or tighter precision runs. The new
 target compiled and linked once on native Windows GNU. Windows execution remains
 unaccepted because the Microsoft MPI runtime installation was canceled earlier.
+
+## Sparse weighted Solve_Factor (2026-09-07)
+
+distributed_sparse_solve_factor and the affected distributed_solve_factor target
+passed once at 1/2/4 WSL MPI ranks, world/parity subcommunicators. The new fixture
+forms RHS from an analytic known solution and its sparse weighted Gram matrix;
+the existing dense acceptance bound is retained: abs(error)<=1e-8+1e-5*abs(ref),
+with finite results and exact output distribution. All output modes, all physical
+mode placements, virtual blocks, replicated weights, empty local sparse shards,
+explicit stored zero and empty/singular normal systems are covered. Singular
+systems return POSV INFO=1 on all ranks. No failures or extra precision runs.
+DIGIT / PASS, verification closed. Both changed targets compiled and linked once
+on Windows GNU; native runtime acceptance remains outstanding.

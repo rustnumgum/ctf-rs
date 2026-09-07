@@ -785,3 +785,15 @@ or global tensor gather is used. TTTP retains stored keys and explicit zeros;
 matrix TTTP supports both auxiliary orientations and balanced auxiliary blocks.
 The direct Rust MTTKRP matrix API uses auxiliary-first factors, matching the
 existing dense API. The source one-physical-axis-per-mode restriction remains.
+
+Sparse weighted Solve_Factor shares the dense algorithm in src/solve_factor.rs.
+Pinned multilinear.cxx:714-720 differs only in obtaining stored pairs versus
+materializing dense local pairs; factor alignment, Gram construction and solves
+then share the same source path. Lines 910-930 form q as the elementwise product
+of non-output factor rows and accumulate weight*q*q^T using lower-triangle SYR;
+weights are not squared. Reduce-scatter assigns Gram systems to fiber workers,
+each worker calls POSV, and only solved factors are gathered within the fiber.
+Sparse absence contributes zero without allocating the logical tensor domain.
+The existing Rust padding, canonical-owner and collective INFO rules also apply
+to this path. A module-local macro emits the algorithm for both concrete receiver
+types; no runtime storage or native-library backend abstraction is introduced.

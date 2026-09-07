@@ -70,7 +70,7 @@ src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: f64 distri
 src/interface/matrix.h	src/matrix.rs	partial direct Rust Tensor matrix APIs
 src/interface/monoid.cxx	src/interface	pending
 src/interface/monoid.h	src/interface	pending
-src/interface/multilinear.cxx	src/multilinear.rs; src/multilinear_kernel.rs; src/sparse_multilinear.rs; src/solve_factor.rs; src/tensor_svd.rs	partial: dense/sparse f64 TTTP and MTTKRP, dense Solve_Factor and tensor SVD; sparse weighted Solve_Factor, dense TTTP optimized communication and automatic memory choice pending
+src/interface/multilinear.cxx	src/multilinear.rs; src/multilinear_kernel.rs; src/sparse_multilinear.rs; src/solve_factor.rs; src/tensor_svd.rs	partial: dense/sparse f64 TTTP, MTTKRP and weighted Solve_Factor, tensor SVD; additional scalar kernels, dense TTTP optimized communication and automatic memory choice pending
 src/interface/multilinear.h	src/multilinear.rs; src/tensor_svd.rs	partial: direct Rust TTTP/MTTKRP/tensor SVD APIs
 src/interface/partition.cxx	src/interface	pending
 src/interface/partition.h	src/interface	pending
