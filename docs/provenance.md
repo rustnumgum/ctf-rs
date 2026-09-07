@@ -772,3 +772,16 @@ from a separately labeled nonzero deterministic fixture using the same indexed
 equations. The nonzero case is not presented as literal upstream initialization.
 All original residual inequalities remain intact; rank-dependent random values
 are replaced by global-key fixtures for reproducible MPI-rank comparisons.
+
+## Sparse multilinear operations
+
+src/sparse_multilinear.rs ports the stored-entry TTTP/MTTKRP paths from pinned
+interface/multilinear.cxx and interface/semiring.h. Factors are aligned with the
+tensor mode's physical mapping and broadcast along complementary process fibers.
+MTTKRP reduces the local stored-entry contributions on output fibers and routes
+the resulting factor to the requested distribution. Canonical sparse owners
+contribute once even when tensor data are replicated. No dense tensor conversion
+or global tensor gather is used. TTTP retains stored keys and explicit zeros;
+matrix TTTP supports both auxiliary orientations and balanced auxiliary blocks.
+The direct Rust MTTKRP matrix API uses auxiliary-first factors, matching the
+existing dense API. The source one-physical-axis-per-mode restriction remains.

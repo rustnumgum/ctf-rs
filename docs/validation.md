@@ -871,3 +871,15 @@ The adapted SY-times-NS maximum observed norm was 2.2591401799415137e-16;
 the NS/SY Gram differences were zero. No failures or additional precision runs.
 DIGIT / PASS, verification closed. All four new targets compiled and linked
 once on Windows GNU; execution still awaits native MPI runtime acceptance.
+
+## Sparse TTTP and MTTKRP (2026-09-07)
+
+distributed_sparse_multilinear passed once at 1/2/4 WSL MPI ranks, world and
+parity subcommunicators. Fixed analytic stored-entry products/sums use finite
+values and absolute error <=1e-6; the vector TTTP stored-key sequence is exact.
+Coverage includes vector factors, both matrix auxiliary orientations, uneven
+auxiliary blocks, virtual mapping, empty local sparse shards, output distribution
+changes, and a two-billion-element logical tensor with only two stored entries.
+DIGIT / PASS; no diagnostic computations or tighter precision runs. The new
+target compiled and linked once on native Windows GNU. Windows execution remains
+unaccepted because the Microsoft MPI runtime installation was canceled earlier.

@@ -327,3 +327,8 @@ harness = false
 name = "upstream_reduce_bcast"
 path = "tests/upstream_reduce_bcast.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_multilinear"
+path = "tests/distributed_sparse_multilinear.rs"
+harness = false
