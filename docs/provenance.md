@@ -938,3 +938,13 @@ Global-key fixtures replace rank-seeded random initialization. The source unary
 function's printed cube label is a typo; the test and implementation use its actual
 fourth-power formula. Additional typed scalar-broadcast/diagonal checks in the
 bivariate transform test are explicitly separate from the original source case.
+
+## Custom name endomorphism tests
+
+The dense custom endomorphism test retains empty-name identity and longest actual
+string addition, with left operand winning ties. The transform caches actual
+null-terminated name length and checks exact equality. Its sparse counterpart
+checks stored entries only. Rust uses a fixed wire encoding, not a C++ ABI shim.
+The sparse source uses Set with unique-value writes; Rust's required transport
+monoid is supplied with unique canonical-owner writes so no duplicate addition
+changes those values. Deterministic key-derived lengths replace random values.

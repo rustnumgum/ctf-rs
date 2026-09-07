@@ -976,6 +976,35 @@ diagonal transform additionally match exact representable values, including empt
 local shards. DIGIT / PASS; no failures or extra numerical runs. All three targets
 compiled and linked once on Windows GNU. Native runtime acceptance remains open.
 
+## Custom endomorphisms and structured measurements (2026-09-07)
+
+upstream_endomorphism_cust and upstream_endomorphism_cust_sp passed once at 1/2/4
+WSL ranks, world/parity, exact cached string lengths and unchanged sparse nnz.
+Both tests and mpi_structured_bench compiled/linked on Windows GNU; native runtime
+remains unaccepted. DIGIT / PASS. A benchmark compilation initially assumed Clone
+for SymmetricTensor; constructing the second independent operand fixed it before
+any benchmark execution. No numerical failures or diagnostic runs occurred.
+
+The release example mpi_structured_bench ran each case once per rank count with
+OPENBLAS_NUM_THREADS=1 and mpirun --oversubscribe. Both use 96x96 matrices. Sparse
+inputs contain unit entries on modular masks (moduli 11 and 13); symmetric inputs
+are compressed SY matrices of ones. Timings include the operation and final
+barrier, exclude setup/checks. Three exact output probes check each run. GNU time
+wraps every MPI worker; reported RSS is the maximum worker lifetime peak, including
+MPI/library overhead and setup, not summed rank memory or operation-only allocation.
+
+| Case | Ranks | Elapsed seconds | Maximum worker peak RSS KiB |
+|---|---:|---:|---:|
+| Sparse GEMM | 1 | 0.001417 | 26540 |
+| Sparse GEMM | 2 | 0.000909 | 26552 |
+| Sparse GEMM | 4 | 0.000729 | 26624 |
+| SY x SY -> NS | 1 | 0.051151 | 27116 |
+| SY x SY -> NS | 2 | 0.029630 | 27224 |
+| SY x SY -> NS | 4 | 0.017829 | 27172 |
+
+These single samples are representative records, not a statistical comparison
+or a speedup claim. They do not close automatic planning/low-memory acceptance.
+
 ## High-order sparse custom contraction (2026-09-07)
 
 distributed_sparse_fold_function passed once at 1/2/4 WSL ranks, world/parity,
