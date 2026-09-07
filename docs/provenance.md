@@ -1,5 +1,14 @@
 # Source provenance
 
+tests/upstream_spmv.rs ports examples/spmv.cxx's active dense/sparse output
+equations and norm criteria. The bounded fixture uses source default sparsity
+0.5/n; the C++ srand48 call is not misrepresented as the MT generator's seed.
+
+The ordinary sparse-output storage branches in sparse_gemm.rs/sparse_fold.rs
+follow contraction.cxx:5373-5388, including its pointer-identity sparsification
+predicate and unconditional dense/sparse operand reversal. These source quirks
+are documented in sparse-output.md and covered by exact discrete-algebra tests.
+
 Sparse-output krnl5 dispatch follows contraction.cxx:4313-4327 and
 spctr_tsr.cxx:505-524. sparse_gemm.rs reuses source-style sparse/dense panel
 communication with the existing gen_ccsrmm port; sparse_fold.rs applies the

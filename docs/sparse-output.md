@@ -28,6 +28,21 @@ sparse-output leaf is not a missing working source algorithm to manufacture.
 Source ordinary dense-A/sparse-B can swap operands; custom sparse-B is rejected
 (`contraction.cxx:5382-5388`). Dense+dense->sparse computes through a dense output
 then sparsifies (`:5373-5379`); it is not a native sparse-output kernel.
+
+These ordinary storage branches are now exposed as `SparseTensor::gemm_dense`,
+`gemm_dense_sparse`, `contract_from_dense` and `contract_from_dense_sparse`.
+Dense+dense uses a distributed dense copy of old C and transfers the final
+owned sparse blocks back without changing C's context or distribution. The
+source's post-contraction predicate is literally `v != caddid` on pointers,
+not values: every valid output entry, including zero, is retained. No numerical
+zero pruning is substituted for that source quirk.
+
+For dense-A/sparse-B, the source ordinary branch swaps the operands without a
+commutativity check. Matrix execution transposes operands/output and reverses
+the process grid before using the sparse-first CCSR path; indexed execution
+swaps operand labels. Noncommutative elements consequently multiply as B*A,
+not A*B. This behavior is preserved and tested, not silently corrected.
+
 These source boundaries do not establish full Rust automatic dispatch:
 automatic sparse plan assembly and nested moving-output communication remain
 unfinished. Sparse virtual/replicated communication in the source wraps these

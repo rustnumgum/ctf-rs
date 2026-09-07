@@ -1,5 +1,32 @@
 # Validation evidence
 
+## Upstream sparse matrix-vector product (2026-09-07)
+
+upstream_spmv passed once at WSL 1/2/4 ranks, world/parity. The bounded n=5
+fixture retains source matrix sparsity 0.5/n and initial-vector sparsity 0.5,
+with an explicit Rust MT seed adaptation. Both dense and sparse output execute
+the source two half-weighted sparse/dense operand orders and compare against
+the dense reference update. Original criteria remain initial norm>=1e-6 and
+residual norm<=1e-6, with finite values. An ambiguous inferred Arithmetic type
+was resolved explicitly before execution; no tolerance change was made.
+Native Windows GNU compile/link passed once. DIGIT / PASS; no extra numerical
+checks. Native MPI runtime acceptance remains pending.
+
+## Remaining ordinary sparse-output storage dispatch (2026-09-07)
+
+distributed_sparse_storage_dispatch passed once at WSL 1/2/4 ranks with
+world/parity subcommunicators. Both matrix and indexed entry points are covered.
+Exact keys/values verify dense+dense sparse-output retention of every valid
+zero, repeated-output diagonal isolation, original off-diagonal values and
+virtual distribution restoration. A noncommutative 2x2 matrix semiring verifies
+the pinned ordinary dense-A/sparse-B swap computes B*A, with square/rectangular
+process grids and empty local pieces. Initial compilation rejected replacing
+the lifetime-bearing sparse tensor from shortened dense input borrows; the fix
+transfers only owned output blocks into the unchanged context/distribution.
+No numerical run occurred before that compile fix. Native Windows GNU
+compile/link passed once; native runtime acceptance remains pending.
+DIGIT / PASS; no numerical failures or extra precision checks.
+
 ## Sparse-A/dense-B native sparse output (2026-09-07)
 
 distributed_sparse_dense_output and the affected distributed_sparse_gemm,

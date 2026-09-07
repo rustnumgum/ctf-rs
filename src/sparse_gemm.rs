@@ -191,6 +191,33 @@ impl<A: Semiring + Clone> SparseTensor<'_, '_, A> where A::Element: Wire {
         self.redistribute(original);
     }
 
+    /// Dense matrix product through the source dense-output-then-sparsify path.
+    /// The source pointer predicate retains every valid dense entry, including
+    /// values equal to the additive identity.
+    pub fn gemm_dense(&mut self, a: &Tensor<'_, '_, A>, b: &Tensor<'_, '_, A>, grid: [usize; 2],
+        alpha: A::Element, beta: A::Element) {
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        let mut dense = self.clone().into_dense();
+        dense.contract_from("ij", a, "ik", b, "kj", Topology::new(grid.to_vec()), alpha, beta)
+            .unwrap();
+        self.blocks = dense.into_sparse(|_| true).blocks;
+    }
+
+    /// Ordinary dense-by-sparse product using the source's unconditional
+    /// operand swap. For noncommutative multiplication this evaluates B*A.
+    pub fn gemm_dense_sparse(&mut self, a: &Tensor<'_, '_, A>, b: &Self, grid: [usize; 2],
+        alpha: A::Element, beta: A::Element) {
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        let original = self.distribution().clone();
+        let mut c = self.permute_axes(&[1, 0]);
+        let b = b.permute_axes(&[1, 0]);
+        let a = a.permute_axes(&[1, 0]);
+        c.gemm_sparse_dense(&b, &a, [grid[1], grid[0]], alpha, beta);
+        let mut restored = c.permute_axes(&[1, 0]);
+        restored.redistribute(original);
+        *self = restored;
+    }
+
     /// Custom sparse matrix product with sparse output throughout. Structural
     /// products, including zero-valued results, are retained as in source CSR.
     pub fn gemm_sparse_function(&mut self, a: &Self, b: &Self, grid: [usize; 2],

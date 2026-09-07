@@ -757,3 +757,13 @@ harness = false
 name = "distributed_sparse_dense_output"
 path = "tests/distributed_sparse_dense_output.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_storage_dispatch"
+path = "tests/distributed_sparse_storage_dispatch.rs"
+harness = false
+
+[[test]]
+name = "upstream_spmv"
+path = "tests/upstream_spmv.rs"
+harness = false

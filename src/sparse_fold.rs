@@ -463,6 +463,79 @@ where
         *self = restored;
         Ok(())
     }
+
+    /// Contract dense inputs through a distributed dense output temporary, then
+    /// retain every valid dense entry as the source pointer predicate does.
+    pub fn contract_from_dense(
+        &mut self,
+        indices_c: &str,
+        a: &Tensor<'_, '_, A>,
+        indices_a: &str,
+        b: &Tensor<'_, '_, A>,
+        indices_b: &str,
+        grid: [usize; 2],
+        alpha: A::Element,
+        beta: A::Element,
+    ) -> Result<(), crate::map_tensor::Rejected> {
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        validate_grid(grid, self.context().size());
+        let mut dense = self.clone().into_dense();
+        dense.contract_from(indices_c, a, indices_a, b, indices_b,
+            Topology::new(grid.to_vec()), alpha, beta)?;
+        self.blocks = dense.into_sparse(|_| true).blocks;
+        Ok(())
+    }
+
+    /// Contract dense A and sparse B using the source's ordinary operand swap.
+    /// The sparse-first leaf therefore preserves the source's B*A ordering for
+    /// noncommutative element multiplication.
+    pub fn contract_from_dense_sparse(
+        &mut self,
+        indices_c: &str,
+        a: &Tensor<'_, '_, A>,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        grid: [usize; 2],
+        alpha: A::Element,
+        beta: A::Element,
+    ) -> Result<(), Rejected> {
+        let [input_a, input_b, output] = validated_projections(
+            [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
+            [indices_a, indices_b, indices_c])?;
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        validate_grid(grid, self.context().size());
+        if let Some(axis) = first_input_only_axis(indices_a, indices_b, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(a.distribution(), indices_a, axis);
+            let mut reduced = Tensor::new(a.context(), distribution, a.algebra().clone());
+            let one = a.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_a.len(), axis);
+            reduced.sum_from(&sum_output, a, &sum_input, Topology::new(grid.to_vec()),
+                one.clone(), one).unwrap();
+            return self.contract_from_dense_sparse(indices_c, &reduced, &reduced_indices,
+                b, indices_b, grid, alpha, beta);
+        }
+        if let Some(axis) = first_input_only_axis(indices_b, indices_a, indices_c) {
+            let (distribution, reduced_indices) = remove_axis(b.distribution(), indices_b, axis);
+            let mut reduced = Self::new(b.context(), distribution, b.algebra().clone());
+            let one = b.algebra().one();
+            let (sum_input, sum_output) = reduction_indices(indices_b.len(), axis);
+            reduced.sum_from(&sum_output, b, &sum_input, one.clone(), one);
+            return self.contract_from_dense_sparse(indices_c, a, indices_a, &reduced,
+                &reduced_indices, grid, alpha, beta);
+        }
+        if input_a.repeated() || input_b.repeated() || output.repeated() {
+            let (aa, ia) = a.extract_diagonal(indices_a);
+            let (bb, ib) = b.extract_diagonal(indices_b);
+            let (mut cc, ic) = self.extract_diagonal(indices_c);
+            cc.contract_from_dense_sparse(&ic, &aa, &ia, &bb, &ib, grid, alpha, beta)?;
+            if output.repeated() { self.replace_diagonal(indices_c, &cc); }
+            else { *self = cc; }
+            return Ok(());
+        }
+        self.contract_from_sparse_dense(indices_c, b, indices_b, a, indices_a,
+            [grid[1], grid[0]], alpha, beta)
+    }
 }
 
 impl<'c, 'r, A: Semiring + Clone> Tensor<'c, 'r, A>

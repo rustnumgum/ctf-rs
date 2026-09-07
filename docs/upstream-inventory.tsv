@@ -99,7 +99,7 @@ src/contraction/contraction_plan.h	src/planning.rs	partial: executable explicit-
 src/contraction/contraction_selector.h	src/contraction	pending
 src/contraction/contraction_signature.cxx	src/planning.rs	partial: dense structural signature and context-scoped cache; sparse/symmetry signatures pending
 src/contraction/contraction_signature.h	src/planning.rs	partial: dense structural signature, full collision-safe equality
-src/contraction/contraction.cxx	src/folding.rs; src/sparse_fold.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs; src/normal_mapping.rs; src/mapping_variants.rs; src/dense_search.rs; src/dense_execution.rs	partial: dense folded/unfolded normal/exhaustive cached selection and raw execution, f64 node-aware and generic/folded low-memory ownership, sparse input-only reduction and explicit symmetry orchestration; full automatic sparse/compressed plans pending
+src/contraction/contraction.cxx	src/folding.rs; src/sparse_fold.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs; src/normal_mapping.rs; src/mapping_variants.rs; src/dense_search.rs; src/dense_execution.rs	partial: dense folded/unfolded normal/exhaustive cached selection and raw execution, f64 node-aware and generic/folded low-memory ownership, sparse input-only reduction, ordinary sparse-output storage dispatch with source zero-retention/operand-swap quirks, and explicit symmetry/custom-function orchestration; full automatic sparse/compressed plans pending
 src/contraction/contraction.h	src/contraction	pending
 src/contraction/ctr_2d_general.cxx	src/ctr_2d.rs; src/mapped_cost.rs; src/plan_cost.rs; src/dense_execution.rs	partial: raw NS generic semiring and selected f64 folded nested panel execution; sparse integration pending
 src/contraction/ctr_2d_general.h	src/contraction	pending
@@ -234,7 +234,7 @@ examples/scan.cxx	tests/upstream/examples/scan.rs	pending
 examples/sparse_mp3.cxx	tests/upstream_sparse_mp3.rs; tests/upstream_sparse_mp3_t.rs	partial: dense-T and sparse-T equation/function chains with original relative-energy tolerance; rank-seeded random fixture and benchmark driver pending
 examples/sparse_permuted_slice.cxx	pending: source-semantic packed permutation APIs exist	unaccepted: static full-orbit/canonical-duplicate analysis conflicts with compressed callback-copy assertion (SY/AS/SH off-diagonal 2x); no driver execution or tolerance change; see docs/upstream-known-failures.md
 examples/spectral_element.cxx	tests/upstream/examples/spectral_element.rs	pending
-examples/spmv.cxx	tests/upstream/examples/spmv.rs	pending
+examples/spmv.cxx	tests/upstream_spmv.rs	ported active sparse-A/dense-vector equations with dense and sparse output, both operand orders; bounded n=5 and source sparsity 0.5/n, explicit MT seed adaptation; original initial norm>=1e-6 and residual<=1e-6; PASS WSL 1/2/4 world/parity, native compile/link
 examples/sssp.cxx	tests/upstream/examples/sssp.rs	pending
 examples/strassen.cxx	tests/upstream/examples/strassen.rs	pending
 examples/trace.cxx	tests/upstream/examples/trace.rs	pending
