@@ -42,7 +42,7 @@ $mpiTests = @(
 )
 $arguments = @()
 foreach ($test in $mpiTests) { $arguments += @('--test', $test) }
-foreach ($test in @('typed_grid_blas','typed_randomized_svd','typed_distributed_eigh','typed_tensor_svd','typed_multilinear','tttp_memory')) { $arguments += @('--test', $test) }
+foreach ($test in @('typed_grid_blas','typed_randomized_svd','typed_distributed_eigh','typed_tensor_svd','typed_multilinear','tttp_memory','tensor_norms')) { $arguments += @('--test', $test) }
 foreach ($ranks in 1,2,4) {
     $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = "mpiexec -n $ranks"
     cargo test @arguments
@@ -50,6 +50,8 @@ foreach ($ranks in 1,2,4) {
 }
 Remove-Item Env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER
 cargo test --lib tttp_blocking
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo test --test narrow_algebra
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $localTests = @('random_generator','scalar_blas','node_peer_counts','folded_cost','partial_fold_kernel','fold_storage','partial_fold','fold_indices','fold_layout','fold_selection','mapped_cost','local_linalg','topology_candidates','node_aware','map_tensor',
     'sequential_sum','virtual_sum','sequential_contraction','folded_contraction',

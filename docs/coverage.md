@@ -25,6 +25,24 @@ Python tests can specify numerical semantics even though Python APIs are exclude
 Interface expression/operator classes are replaced by direct Rust operations.
 CUDA/offload code and Python/C++ API compatibility are excluded, not CPU paths.
 
+### Remaining tensor-interface boundaries from the pinned implementation
+
+- Dense-to-sparse conversion: tensor.cxx:895-910 and untyped_tensor.cxx:1647-1820;
+  the existing SparseTensor::sparsify only filters already-sparse storage.
+- Sparse text I/O: tensor.cxx:945-1015 and graph_io_aux.cxx:45-248; MPI-IO
+  line partitioning and coordinate codecs are not yet ported.
+- Generic cross-world accumulation: tensor.cxx:1019-1062; the restricted
+  square-subworld eigensolver path is not a reusable add_to/from_subworld API.
+- Explicit all-pair/all-data extraction: tensor.cxx:275-426,823-835;
+  indexed reads and local_pairs do not provide those collective operations.
+- Sparse random fill: tensor.cxx:1623-1707; dense fill_random is not equivalent.
+- Compressed-symmetry norms and bool norm1/norm_infty remain open. Dense/sparse
+  real norms and source NS manual norm2 are implemented in norms.rs.
+
+Solve_Factor is f64-only in the pinned working implementation: multilinear.cxx
+uses double buffers and MPI_DOUBLE (935-965). Missing f32/complex versions are
+not counted as unported CPU capabilities merely because its declaration is templated.
+
 ## Upstream incomplete declarations
 
 `ContractionSelector::allgather()` asserts unconditionally in the pinned source.

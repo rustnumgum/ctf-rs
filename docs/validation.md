@@ -1142,6 +1142,24 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## Dense/sparse source norms and narrow scalar algebra (2026-09-07)
+
+tensor_norms passed once at WSL 1/2/4 ranks, world/parity: norm1/norm_infty/
+norm2 for i8/i16/i32/i64/f32/f64, and norm2 for bool and both complex precisions.
+Finite analytic results satisfy abs<1e-6; inputs remain exact. The pinned NS
+manual_norm2 accumulates every local storage slot or stored sparse pair in f64,
+including replicas, rather than selecting logical owners. That source behavior
+is tested explicitly on replicated layouts; norm1 and norm_infty use logical
+canonical-owner reductions. Complex magnitude is formed in source precision
+before conversion to f64. This is not the unported compressed-symmetry norm2
+branch, which expands and squares in the tensor scalar precision.
+
+narrow_algebra passed exact i8/i16 promoted-then-narrowed arithmetic and Wire
+encoding, and Boolean OR-add/AND-multiply. Both targets compiled and linked on
+Windows GNU once. No failures or precision studies. DIGIT / PASS for this stage.
+Bool norm1/norm_infty remain open pending resolution of the pinned cross-algebra
+Term::operator double path; compressed norms and native MPI runtime remain open.
+
 ## TTTP budget-selected auxiliary blocking (2026-09-07)
 
 Matrix TTTP now takes TttpBlocking::Divisions or AvailableBytes. The latter

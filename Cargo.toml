@@ -593,3 +593,12 @@ harness = false
 name = "tttp_memory"
 path = "tests/tttp_memory.rs"
 harness = false
+
+[[test]]
+name = "narrow_algebra"
+path = "tests/narrow_algebra.rs"
+
+[[test]]
+name = "tensor_norms"
+path = "tests/tensor_norms.rs"
+harness = false

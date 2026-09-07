@@ -86,7 +86,7 @@ src/interface/set.cxx	src/interface	pending
 src/interface/set.h	src/sparse_formats.rs	partial: seq_coo_to_csr, seq_coo_to_ccsr, seq_csr_to_coo; remaining set responsibilities pending
 src/interface/sparse_tensor.cxx	src/interface	pending
 src/interface/sparse_tensor.h	src/interface	pending
-src/interface/tensor.cxx	src/tensor.rs; src/random.rs	partial: direct Rust dense operations and four-type random fill with source padding draw order; full interface responsibility inventory pending
+src/interface/tensor.cxx	src/tensor.rs; src/random.rs; src/norms.rs	partial: direct dense operations, four-type dense random fill, dense/sparse real norms and bool/complex NS norm2; sparse random fill, dense-to-sparse conversion, sparse text I/O, cross-world accumulation, all-pair extraction, bool 1/infinity and compressed norms pending
 src/interface/tensor.h	src/interface	pending
 src/interface/term.cxx	src/interface	pending
 src/interface/term.h	src/interface	pending

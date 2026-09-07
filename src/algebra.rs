@@ -96,6 +96,35 @@ macro_rules! arithmetic {
 }
 arithmetic!(f32, f64, i32, i64);
 
+// C++ promotes the narrow integers to int before narrowing the result.
+macro_rules! narrow_arithmetic {
+    ($($t:ty),*) => {$(
+        impl Monoid for Arithmetic<$t> {
+            type Element = $t;
+            fn zero(&self) -> $t { 0 }
+            fn add(&self, a: &$t, b: &$t) -> $t { (*a as i32 + *b as i32) as $t }
+        }
+        impl Semiring for Arithmetic<$t> {
+            fn one(&self) -> $t { 1 }
+            fn multiply(&self, a: &$t, b: &$t) -> $t { (*a as i32 * *b as i32) as $t }
+        }
+        impl Group for Arithmetic<$t> {
+            fn negate(&self, a: &$t) -> $t { (-(*a as i32)) as $t }
+        }
+    )*};
+}
+narrow_arithmetic!(i8, i16);
+
+impl Monoid for Arithmetic<bool> {
+    type Element = bool;
+    fn zero(&self) -> bool { false }
+    fn add(&self, a: &bool, b: &bool) -> bool { *a || *b }
+}
+impl Semiring for Arithmetic<bool> {
+    fn one(&self) -> bool { true }
+    fn multiply(&self, a: &bool, b: &bool) -> bool { *a && *b }
+}
+
 /// Rust-owned complex scalar. Communication uses Wire, not the memory layout.
 #[repr(C)]
 #[derive(Clone,Copy,Debug,Default,PartialEq)]
@@ -146,7 +175,7 @@ macro_rules! wire_number {
         }
     )*}
 }
-wire_number!(i32, i64, u32, u64, f32, f64);
+wire_number!(i8, i16, i32, i64, u32, u64, f32, f64);
 impl Wire for bool {
     const WIDTH: usize = 1;
     fn encode(&self, output: &mut Vec<u8>) { output.push(u8::from(*self)); }
