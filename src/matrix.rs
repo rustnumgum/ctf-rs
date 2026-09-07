@@ -110,13 +110,14 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         iterations: usize,
         oversampling: usize,
         seed: u64,
-        guess: Option<&Self>,
+        guess: Option<&mut Self>,
     ) -> Result<(Self, Self, Self), i32> {
         assert_eq!(self.distribution().shape.len(), 2);
         let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
         assert!(rank > 0 && rank <= m.min(n));
         let width = (rank + oversampling).min(m.min(n));
-        let mut subspace = if let Some(guess) = guess {
+        let mut guess = guess;
+        let mut subspace = if let Some(guess) = guess.as_deref() {
             assert!(std::ptr::eq(self.context(), guess.context()));
             assert!(rank + oversampling <= m.min(n));
             assert_eq!(guess.distribution().shape, vec![m, width]);
@@ -149,6 +150,11 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
             );
             next.gemm_2d::<crate::linalg::Native>(&gram, &subspace, grid, 1., 0.);
             subspace = next.qr(grid)?.0;
+        }
+        if iterations > 0 {
+            if let Some(guess) = guess.as_deref_mut() {
+                *guess = subspace.clone();
+            }
         }
         let u = if width > rank {
             subspace.slice(&[0..m, 0..rank])

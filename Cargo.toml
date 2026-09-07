@@ -549,3 +549,8 @@ harness = false
 name = "typed_svd_truncation"
 path = "tests/typed_svd_truncation.rs"
 harness = false
+
+[[test]]
+name = "randomized_guess"
+path = "tests/randomized_guess.rs"
+harness = false

@@ -1130,6 +1130,18 @@ the existing m*n*n*1e-6 Frobenius bound and finite results. No failures or extra
 precision runs. New target and existing distributed_svd_paths compiled/linked
 on Windows GNU once. Native MPI runtime remains pending. DIGIT / PASS.
 
+## Randomized-SVD input/output guess (2026-09-07)
+
+randomized_guess passed once at WSL 1/2/4 ranks, world/parity. A supplied
+nonorthogonal guess is exactly unchanged for zero iterations. After one
+iteration its full oversampled 5x3 shape is retained and its column Gram has
+Frobenius residual <=5*3*1e-6, while returned factors have the requested rank 2.
+This specifically checks the source in/out side effect, not an approximation
+claim for the deliberately nonorthogonal zero-iteration fixture. No failures
+or extra numerical studies. New target and updated distributed_svd_paths caller
+compiled/linked on Windows GNU once; native MPI runtime remains pending.
+DIGIT / PASS for the guess contract; random-generator fidelity remains open.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

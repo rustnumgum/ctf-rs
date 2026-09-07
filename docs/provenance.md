@@ -1198,3 +1198,17 @@ comparison, matching the source dtype threshold conversion. Complex singular
 values have zero imaginary part, so real-component absolute value avoids
 unnecessary squaring/overflow. Only the singular-value vector is read; factors
 are sliced collectively in their existing distributed layouts.
+
+Randomized-SVD source audit (matrix.cxx:1151-1190, matrix.h:324-334) confirms
+that supplied U_guess is in/out and retains the final oversampled iterate.
+The Rust argument is now Option<&mut Self>; after positive iteration counts it
+receives the updated subspace before rank cropping. At zero iterations it stays
+unchanged, including its distribution, because the source skips initial QR for
+a supplied guess. This corrects the previous read-only cloned-guess behavior.
+
+Remaining randomized-SVD fidelity work: source complex iteration/projection
+uses plain A*A^T and U^T*A even though native complex SVD returns V^H; do not
+silently substitute a Hermitian power iteration. Source complex random guesses
+are real-only (tensor.cxx:1578-1608). Its rank-seeded MT generator is still not
+ported; current Rust auto-guess uses an explicit-seed 48-bit LCG. This is an
+open source-fidelity gap, not completed random-initialization acceptance.

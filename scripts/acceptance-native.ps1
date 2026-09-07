@@ -38,7 +38,7 @@ $mpiTests = @(
     'distributed_sparse_function_output','distributed_sparse_fold_function',
     'upstream_bivar_function','distributed_dense_function',
     'upstream_univar_function','upstream_endomorphism','upstream_bivar_transform',
-    'upstream_endomorphism_cust','upstream_endomorphism_cust_sp','distributed_exhaustive_mapping','distributed_normal_mapping','selected_mapping','dense_search','dense_execution','dense_execution_algebra','dense_folded_execution','distributed_node_fold','dense_low_memory','typed_folded_execution','typed_matrix_factors','typed_distributed_qr','typed_distributed_svd','typed_svd_truncation'
+    'upstream_endomorphism_cust','upstream_endomorphism_cust_sp','distributed_exhaustive_mapping','distributed_normal_mapping','selected_mapping','dense_search','dense_execution','dense_execution_algebra','dense_folded_execution','distributed_node_fold','dense_low_memory','typed_folded_execution','typed_matrix_factors','typed_distributed_qr','typed_distributed_svd','typed_svd_truncation','randomized_guess'
 )
 $arguments = @()
 foreach ($test in $mpiTests) { $arguments += @('--test', $test) }
