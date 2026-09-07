@@ -529,3 +529,8 @@ path = "tests/scalar_blas.rs"
 name = "typed_folded_execution"
 path = "tests/typed_folded_execution.rs"
 harness = false
+
+[[test]]
+name = "typed_matrix_factors"
+path = "tests/typed_matrix_factors.rs"
+harness = false

@@ -1078,6 +1078,21 @@ targets passed at the same rank counts. All four targets compiled/linked on
 Windows GNU once. No failures or further precision runs. DIGIT / PASS;
 native MPI runtime and typed decomposition coverage remain incomplete.
 
+## Four-type distributed positive-definite and triangular factors (2026-09-07)
+
+typed_matrix_factors, distributed_matrix and distributed_spd passed at WSL
+1/2/4 ranks, world/parity. Native S/D/C/Z POTRF, POSV and TRSM are covered,
+including n=1 empty local rows, n=5 uneven partition, identity padding/virtual
+columns, upper/lower factors, left/right solves and plain N/T operation.
+Complex inputs are genuinely Hermitian rather than real-only fixtures.
+Cholesky is checked by factor reconstruction, solutions by A*X or X*T residuals;
+the existing upstream L1 absolute-or-relative 1e-3 and triangle 1e-6 criteria
+are retained, with finite results. Original output distributions are exact.
+A missing Group import in the new test was corrected before numerical execution.
+No numerical failures or further precision runs. All three targets compiled and
+linked on Windows GNU once; native MPI runtime remains pending. DIGIT / PASS.
+Typed QR/SVD/eigenvalue decomposition and whole-port acceptance remain unfinished.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

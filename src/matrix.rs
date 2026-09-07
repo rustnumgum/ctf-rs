@@ -3,7 +3,7 @@
 //! Distributed native matrix operations, following interface/matrix.cxx's
 //! read_mat -> ScaLAPACK -> tensor/get_tri sequence. No global tensor gather.
 use crate::{
-    algebra::{Arithmetic, Wire},
+    algebra::{Arithmetic, Complex, Monoid, Semiring, Wire},
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -17,69 +17,6 @@ fn distribution(shape: &[usize], grid: [usize; 2]) -> Distribution {
     Distribution::new(shape.to_vec(), topology, vec![row, column])
 }
 impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
-    /// Solve A X = self for symmetric positive definite A (lower triangle).
-    /// Uses upstream's paired-prime grid, virtual columns and identity padding
-    /// to reinterpret cyclic storage as square-block ScaLAPACK storage.
-    pub fn solve_spd(&self, coefficient: &Self) -> Result<Self, i32> {
-        assert!(std::ptr::eq(self.context(), coefficient.context()));
-        assert_eq!(self.distribution().shape.len(), 2);
-        let (n, nrhs) = (self.distribution().shape[0], self.distribution().shape[1]);
-        assert!(n > 0 && nrhs > 0);
-        assert_eq!(coefficient.distribution().shape, vec![n, n]);
-        let np = self.context().size();
-        let mut remaining = np;
-        let mut prime = 2;
-        let mut phase = 1;
-        while remaining > 1 {
-            let mut exponent = 0usize;
-            while remaining % prime == 0 {
-                remaining /= prime;
-                exponent += 1;
-            }
-            phase *= prime.pow(exponent.div_ceil(2) as u32);
-            prime += 1;
-        }
-        let grid = [phase, np / phase];
-        let virtual_columns = phase / grid[1];
-        let mut a_dist = distribution(&[n, n], grid);
-        a_dist.mappings[1].augment_virtual(phase);
-        let mut a = coefficient.clone();
-        a.redistribute(a_dist);
-        let mut result = self.clone();
-        result.redistribute(distribution(&[n, nrhs], grid));
-        let block = n.div_ceil(phase);
-        let rhs_block = nrhs.div_ceil(grid[1]);
-        let rank = self.context().rank();
-        let row = rank % grid[0];
-        let column = rank / grid[0];
-        let mut av = a.local_storage().to_vec();
-        // Missing cyclic rows represent independent identity equations. The
-        // virtual-column block order is also the blocked solver's column order.
-        for local_row in n / phase + usize::from(row < n % phase)..block {
-            let global_row = local_row * phase + row;
-            if global_row % grid[1] == column {
-                let local_column = global_row / phase
-                    + ((global_row / grid[1]) % virtual_columns) * block;
-                av[local_row + local_column * block] = 1.;
-            }
-        }
-        let mut values = result.local_storage().to_vec();
-        let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
-        let operation = (|| {
-            let padded = block * phase;
-            let padded_rhs = rhs_block * grid[1];
-            let da = blacs.descriptor(padded, padded, block, block, block)?;
-            let db = blacs.descriptor(padded, padded_rhs, block, rhs_block, block)?;
-            blacs.solve_spd(padded, padded_rhs, &mut av, &da, &mut values, &db)
-        })();
-        blacs.close();
-        operation?;
-        let dist = result.distribution().clone();
-        result.transform(|key, value| *value = values[dist.local_offset(rank, key)]);
-        result.redistribute(self.distribution().clone());
-        Ok(result)
-    }
-
     /// Symmetric eigensolve using the source's largest-square-grid subworld
     /// strategy. Reads the upper triangle; returns (eigenvectors, eigenvalues).
     /// For non-square process counts, only the first floor(sqrt(np))^2 ranks
@@ -373,89 +310,187 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         }
         Ok((u, singular, vt))
     }
-    /// Collective PD POTRF on a caller-selected grid with cyclic block size 1.
-    /// Returns only the requested triangle in the input's original distribution.
-    /// The BLACS grid is explicitly closed before returning, including info errors.
-    pub fn cholesky(&self, grid: [usize; 2], lower: bool) -> Result<Self, i32> {
-        assert_eq!(self.distribution().shape.len(), 2);
-        let n = self.distribution().shape[0];
-        assert_eq!(self.distribution().shape[1], n);
-        let mut result = self.clone();
-        result.redistribute(distribution(&[n, n], grid));
-        let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
-        let operation: Result<(), i32> = (|| {
-            let desc = blacs.descriptor(n, n, 1, 1, n.div_ceil(grid[0]).max(1))?;
-            let mut values = result.local_storage().to_vec();
-            values.resize(values.len().max(1), 0.);
-            blacs.cholesky(n, &mut values, &desc, lower)?;
-            let dist = result.distribution().clone();
-            let rank = self.context().rank();
-            result.transform(|key, value| {
-                let row = key % n;
-                let col = key / n;
-                *value = if (lower && row >= col) || (!lower && row <= col) {
-                    values[dist.local_offset(rank, key)]
-                } else {
-                    0.
-                };
-            });
-            Ok(())
-        })();
-        blacs.close();
-        operation?;
-        result.redistribute(self.distribution().clone());
-        Ok(result)
-    }
-    /// Solve op(T)*X=B or X*op(T)=B using PDTRSM, keeping input tensors unchanged.
-    /// `self` is B; diagonal entries of T are non-unit, as in upstream solve_tri.
-    pub fn solve_tri(
-        &self,
-        factor: &Self,
-        grid: [usize; 2],
-        lower: bool,
-        from_left: bool,
-        transpose: bool,
-    ) -> Result<Self, i32> {
-        assert!(std::ptr::eq(self.context(), factor.context()));
-        assert_eq!(self.distribution().shape.len(), 2);
-        assert_eq!(factor.distribution().shape.len(), 2);
-        let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
-        let order = if from_left { m } else { n };
-        assert_eq!(factor.distribution().shape, vec![order, order]);
-        let mut a = factor.clone();
-        a.redistribute(distribution(&[order, order], grid));
-        let mut result = self.clone();
-        result.redistribute(distribution(&[m, n], grid));
-        let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
-        let operation: Result<(), i32> = (|| {
-            let da = blacs.descriptor(order, order, 1, 1, order.div_ceil(grid[0]).max(1))?;
-            let db = blacs.descriptor(m, n, 1, 1, m.div_ceil(grid[0]).max(1))?;
-            let mut av = a.local_storage().to_vec();
-            av.resize(av.len().max(1), 0.);
-            let mut values = result.local_storage().to_vec();
-            values.resize(
-                (m.div_ceil(grid[0]).max(1) * n.div_ceil(grid[1])).max(1),
-                0.,
-            );
-            blacs.solve_tri(
-                m,
-                n,
-                &av,
-                &da,
-                &mut values,
-                &db,
-                lower,
-                from_left,
-                transpose,
-            );
-            let dist = result.distribution().clone();
-            let rank = self.context().rank();
-            result.transform(|key, value| *value = values[dist.local_offset(rank, key)]);
-            Ok(())
-        })();
-        blacs.close();
-        operation?;
-        result.redistribute(self.distribution().clone());
-        Ok(result)
-    }
 }
+
+macro_rules! matrix_factor_methods {
+    ($scalar:ty, $cholesky:ident, $solve_tri:ident, $solve_spd:ident) => {
+        impl<'c, 'r> Tensor<'c, 'r, Arithmetic<$scalar>> {
+            /// Solve A X = self for positive definite A (lower triangle):
+            /// symmetric for real scalars, Hermitian for complex scalars.
+            /// Uses upstream's paired-prime grid, virtual columns and identity padding
+            /// to reinterpret cyclic storage as square-block ScaLAPACK storage.
+            pub fn solve_spd(&self, coefficient: &Self) -> Result<Self, i32> {
+                assert!(std::ptr::eq(self.context(), coefficient.context()));
+                assert_eq!(self.distribution().shape.len(), 2);
+                let (n, nrhs) =
+                    (self.distribution().shape[0], self.distribution().shape[1]);
+                assert!(n > 0 && nrhs > 0);
+                assert_eq!(coefficient.distribution().shape, vec![n, n]);
+                let np = self.context().size();
+                let mut remaining = np;
+                let mut prime = 2;
+                let mut phase = 1;
+                while remaining > 1 {
+                    let mut exponent = 0usize;
+                    while remaining % prime == 0 {
+                        remaining /= prime;
+                        exponent += 1;
+                    }
+                    phase *= prime.pow(exponent.div_ceil(2) as u32);
+                    prime += 1;
+                }
+                let grid = [phase, np / phase];
+                let virtual_columns = phase / grid[1];
+                let mut a_dist = distribution(&[n, n], grid);
+                a_dist.mappings[1].augment_virtual(phase);
+                let mut a = coefficient.clone();
+                a.redistribute(a_dist);
+                let mut result = self.clone();
+                result.redistribute(distribution(&[n, nrhs], grid));
+                let block = n.div_ceil(phase);
+                let rhs_block = nrhs.div_ceil(grid[1]);
+                let rank = self.context().rank();
+                let row = rank % grid[0];
+                let column = rank / grid[0];
+                let mut av = a.local_storage().to_vec();
+                let one = Arithmetic::<$scalar>::new().one();
+                // Missing cyclic rows represent independent identity equations. The
+                // virtual-column block order is also the blocked solver's column order.
+                for local_row in n / phase + usize::from(row < n % phase)..block {
+                    let global_row = local_row * phase + row;
+                    if global_row % grid[1] == column {
+                        let local_column = global_row / phase
+                            + ((global_row / grid[1]) % virtual_columns) * block;
+                        av[local_row + local_column * block] = one;
+                    }
+                }
+                let mut values = result.local_storage().to_vec();
+                let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
+                let operation = (|| {
+                    let padded = block * phase;
+                    let padded_rhs = rhs_block * grid[1];
+                    let da = blacs.descriptor(padded, padded, block, block, block)?;
+                    let db = blacs.descriptor(padded, padded_rhs, block, rhs_block, block)?;
+                    blacs.$solve_spd(padded, padded_rhs, &mut av, &da, &mut values, &db)
+                })();
+                blacs.close();
+                operation?;
+                let dist = result.distribution().clone();
+                result.transform(|key, value| *value = values[dist.local_offset(rank, key)]);
+                result.redistribute(self.distribution().clone());
+                Ok(result)
+            }
+
+            /// Collective P{S,D,C,Z}POTRF on a caller-selected cyclic block-1 grid.
+            /// Returns only the requested triangle in the input's original distribution.
+            /// The BLACS grid is explicitly closed before returning, including info errors.
+            pub fn cholesky(&self, grid: [usize; 2], lower: bool) -> Result<Self, i32> {
+                assert_eq!(self.distribution().shape.len(), 2);
+                let n = self.distribution().shape[0];
+                assert_eq!(self.distribution().shape[1], n);
+                let mut result = self.clone();
+                result.redistribute(distribution(&[n, n], grid));
+                let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
+                let operation: Result<(), i32> = (|| {
+                    let desc =
+                        blacs.descriptor(n, n, 1, 1, n.div_ceil(grid[0]).max(1))?;
+                    let mut values = result.local_storage().to_vec();
+                    let zero = Arithmetic::<$scalar>::new().zero();
+                    values.resize(values.len().max(1), zero);
+                    blacs.$cholesky(n, &mut values, &desc, lower)?;
+                    let dist = result.distribution().clone();
+                    let rank = self.context().rank();
+                    result.transform(|key, value| {
+                        let row = key % n;
+                        let col = key / n;
+                        *value = if (lower && row >= col) || (!lower && row <= col) {
+                            values[dist.local_offset(rank, key)]
+                        } else {
+                            zero
+                        };
+                    });
+                    Ok(())
+                })();
+                blacs.close();
+                operation?;
+                result.redistribute(self.distribution().clone());
+                Ok(result)
+            }
+
+            /// Solve op(T)*X=B or X*op(T)=B using P{S,D,C,Z}TRSM.
+            /// Transposition is ordinary T, not conjugation; inputs stay unchanged.
+            /// `self` is B; diagonal entries of T are non-unit, as in upstream solve_tri.
+            pub fn solve_tri(
+                &self,
+                factor: &Self,
+                grid: [usize; 2],
+                lower: bool,
+                from_left: bool,
+                transpose: bool,
+            ) -> Result<Self, i32> {
+                assert!(std::ptr::eq(self.context(), factor.context()));
+                assert_eq!(self.distribution().shape.len(), 2);
+                assert_eq!(factor.distribution().shape.len(), 2);
+                let (m, n) =
+                    (self.distribution().shape[0], self.distribution().shape[1]);
+                let order = if from_left { m } else { n };
+                assert_eq!(factor.distribution().shape, vec![order, order]);
+                let mut a = factor.clone();
+                a.redistribute(distribution(&[order, order], grid));
+                let mut result = self.clone();
+                result.redistribute(distribution(&[m, n], grid));
+                let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
+                let operation: Result<(), i32> = (|| {
+                    let da = blacs.descriptor(
+                        order,
+                        order,
+                        1,
+                        1,
+                        order.div_ceil(grid[0]).max(1),
+                    )?;
+                    let db = blacs.descriptor(
+                        m,
+                        n,
+                        1,
+                        1,
+                        m.div_ceil(grid[0]).max(1),
+                    )?;
+                    let mut av = a.local_storage().to_vec();
+                    let zero = Arithmetic::<$scalar>::new().zero();
+                    av.resize(av.len().max(1), zero);
+                    let mut values = result.local_storage().to_vec();
+                    values.resize(
+                        (m.div_ceil(grid[0]).max(1) * n.div_ceil(grid[1])).max(1),
+                        zero,
+                    );
+                    blacs.$solve_tri(
+                        m,
+                        n,
+                        &av,
+                        &da,
+                        &mut values,
+                        &db,
+                        lower,
+                        from_left,
+                        transpose,
+                    );
+                    let dist = result.distribution().clone();
+                    let rank = self.context().rank();
+                    result.transform(|key, value| {
+                        *value = values[dist.local_offset(rank, key)]
+                    });
+                    Ok(())
+                })();
+                blacs.close();
+                operation?;
+                result.redistribute(self.distribution().clone());
+                Ok(result)
+            }
+        }
+    };
+}
+
+matrix_factor_methods!(f64, cholesky, solve_tri, solve_spd);
+matrix_factor_methods!(f32, cholesky_f32, solve_tri_f32, solve_spd_f32);
+matrix_factor_methods!(Complex<f32>, cholesky_c32, solve_tri_c32, solve_spd_c32);
+matrix_factor_methods!(Complex<f64>, cholesky_c64, solve_tri_c64, solve_spd_c64);

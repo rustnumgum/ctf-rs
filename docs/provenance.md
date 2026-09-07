@@ -1168,3 +1168,10 @@ The transpose estimator intentionally remains element-count based across
 scalar types: nosym_transp.cxx:759-793 accepts sr but does not use its element
 size, feeding {1, total_elements} to its three models. Actual storage and
 communication memory estimates still use the selected scalar's byte width.
+
+Distributed POTRF/POSV/TRSM now dispatch to ScaLAPACK's S/D/C/Z families
+without scalar promotion. The tensor-level algorithms retain matrix.cxx's
+cyclic read_mat descriptors and triangle extraction, and the existing paired
+prime-grid/virtual-column/identity-padding POSV path. Complex positive-definite
+factorization is Hermitian; solve_tri's transpose boolean remains the source
+plain N/T operation, not implicit conjugation. QR/SVD/eigensolver code is unchanged.

@@ -4,6 +4,7 @@
 //! CTF reference at f69cbb46e23bc2f39cda5722ce096f56301dab4f
 //! (`src/interface/matrix.cxx` and `src/shared/lapack_symbs.cxx`).
 use mpi_sys as sys;
+use crate::algebra::Complex;
 use std::{ffi::c_char, marker::PhantomData, rc::Rc};
 
 #[cfg_attr(target_os = "windows", link(name = "scalapack"))]
@@ -156,6 +157,207 @@ pub(crate) struct Grid {
     col: usize,
     _single_thread: PhantomData<Rc<()>>,
 }
+
+macro_rules! typed_spd_family {
+    (
+        $scalar:ty,
+        $potrf:ident,
+        $posv:ident,
+        $trsm:ident,
+        $cholesky:ident,
+        $solve_spd:ident,
+        $solve_tri:ident,
+        $one:expr
+    ) => {
+        unsafe extern "C" {
+            fn $potrf(
+                uplo: *const c_char,
+                n: *const i32,
+                a: *mut $scalar,
+                ia: *const i32,
+                ja: *const i32,
+                desc: *const i32,
+                info: *mut i32,
+            );
+            fn $posv(
+                uplo: *const c_char,
+                n: *const i32,
+                nrhs: *const i32,
+                a: *mut $scalar,
+                ia: *const i32,
+                ja: *const i32,
+                desc_a: *const i32,
+                b: *mut $scalar,
+                ib: *const i32,
+                jb: *const i32,
+                desc_b: *const i32,
+                info: *mut i32,
+            );
+            fn $trsm(
+                side: *const c_char,
+                uplo: *const c_char,
+                transpose: *const c_char,
+                diagonal: *const c_char,
+                m: *const i32,
+                n: *const i32,
+                alpha: *const $scalar,
+                factor: *const $scalar,
+                ia: *const i32,
+                ja: *const i32,
+                desc_factor: *const i32,
+                b: *mut $scalar,
+                ib: *const i32,
+                jb: *const i32,
+                desc_b: *const i32,
+            );
+        }
+
+        impl Grid {
+            pub(crate) fn $cholesky(
+                &self,
+                n: usize,
+                a: &mut [$scalar],
+                desc: &[i32; 9],
+                lower: bool,
+            ) -> Result<(), i32> {
+                self.validate_matrix(desc, a.len());
+                let n = int(n);
+                assert!(n <= desc[2] && n <= desc[3]);
+                let uplo = if lower { b'L' } else { b'U' } as c_char;
+                let one = 1;
+                let mut info = 0;
+                unsafe {
+                    $potrf(
+                        &uplo,
+                        &n,
+                        a.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc.as_ptr(),
+                        &mut info,
+                    );
+                }
+                result(info)
+            }
+
+            pub(crate) fn $solve_spd(
+                &self,
+                n: usize,
+                nrhs: usize,
+                a: &mut [$scalar],
+                desc_a: &[i32; 9],
+                b: &mut [$scalar],
+                desc_b: &[i32; 9],
+            ) -> Result<(), i32> {
+                self.validate_matrix(desc_a, a.len());
+                self.validate_matrix(desc_b, b.len());
+                let (n, nrhs) = (int(n), int(nrhs));
+                assert!(n <= desc_a[2] && n <= desc_a[3]);
+                assert!(n <= desc_b[2] && nrhs <= desc_b[3]);
+                let uplo = b'L' as c_char;
+                let one = 1;
+                let mut info = 0;
+                unsafe {
+                    $posv(
+                        &uplo,
+                        &n,
+                        &nrhs,
+                        a.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_a.as_ptr(),
+                        b.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_b.as_ptr(),
+                        &mut info,
+                    );
+                }
+                result(info)
+            }
+
+            #[allow(clippy::too_many_arguments)]
+            pub(crate) fn $solve_tri(
+                &self,
+                m: usize,
+                n: usize,
+                factor: &[$scalar],
+                desc_factor: &[i32; 9],
+                b: &mut [$scalar],
+                desc_b: &[i32; 9],
+                lower: bool,
+                from_left: bool,
+                transpose: bool,
+            ) {
+                self.validate_matrix(desc_factor, factor.len());
+                self.validate_matrix(desc_b, b.len());
+                let factor_order = if from_left { m } else { n };
+                assert!(
+                    int(factor_order) <= desc_factor[2]
+                        && int(factor_order) <= desc_factor[3]
+                );
+                assert!(int(m) <= desc_b[2] && int(n) <= desc_b[3]);
+                let side = if from_left { b'L' } else { b'R' } as c_char;
+                let uplo = if lower { b'L' } else { b'U' } as c_char;
+                let transpose = if transpose { b'T' } else { b'N' } as c_char;
+                let diagonal = b'N' as c_char;
+                let (m, n) = (int(m), int(n));
+                let one = 1;
+                let alpha: $scalar = $one;
+                unsafe {
+                    $trsm(
+                        &side,
+                        &uplo,
+                        &transpose,
+                        &diagonal,
+                        &m,
+                        &n,
+                        &alpha,
+                        factor.as_ptr(),
+                        &one,
+                        &one,
+                        desc_factor.as_ptr(),
+                        b.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_b.as_ptr(),
+                    );
+                }
+            }
+        }
+    };
+}
+
+typed_spd_family!(
+    f32,
+    pspotrf_,
+    psposv_,
+    pstrsm_,
+    cholesky_f32,
+    solve_spd_f32,
+    solve_tri_f32,
+    1.0
+);
+typed_spd_family!(
+    Complex<f32>,
+    pcpotrf_,
+    pcposv_,
+    pctrsm_,
+    cholesky_c32,
+    solve_spd_c32,
+    solve_tri_c32,
+    Complex::new(1.0, 0.0)
+);
+typed_spd_family!(
+    Complex<f64>,
+    pzpotrf_,
+    pzposv_,
+    pztrsm_,
+    cholesky_c64,
+    solve_spd_c64,
+    solve_tri_c64,
+    Complex::new(1.0, 0.0)
+);
 
 fn int(value: usize) -> i32 {
     value.try_into().unwrap()
