@@ -84,6 +84,7 @@ working-memory maximum. It is cost metadata, not another cached execution plan.
 
 Three exact local checks cover aligned replication/virtualization, a normal
 GEMM mapping with mismatched shared axes and sparse panel strides, and the
-supported input boundary. Connecting these estimates to automatic sparse
-normal/exhaustive selection and executing arbitrary selected panel trees
-remains unfinished; passing metadata tests does not prove that integration.
+supported input boundary. The unfolded sparse-A estimates now feed
+normal/exhaustive selection and raw panel execution (see sparse-search.md).
+Folded and sparse-output candidate integration remains unfinished; metadata
+tests alone do not prove execution.

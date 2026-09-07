@@ -291,6 +291,88 @@ fn execute_mapped<A, F>(
     output.write_add(&contributions);
 }
 
+#[allow(clippy::too_many_arguments)]
+fn execute_raw_panels<A: Semiring>(
+    communicators: &[[Option<Context<'_>>; 3]],
+    execution: &crate::sparse_mapped_cost::Execution,
+    level: usize,
+    layers: crate::sparse_2d::Layers,
+    algebra: &A,
+    indices: [&str; 3],
+    alpha: &A::Element,
+    a: &[Vec<(usize, A::Element)>],
+    b: &[Vec<A::Element>],
+    mut c: Vec<Vec<A::Element>>,
+    beta: A::Element,
+) -> Vec<Vec<A::Element>>
+where
+    A::Element: Wire,
+{
+    if level == execution.panels.len() {
+        let one = algebra.one();
+        let sizes: [usize; 3] = execution.block_shapes.each_ref()
+            .map(|shape| shape.iter().product());
+        crate::sparse_virtual::execute(
+            &execution.virtual_dimensions,
+            execution.indices.each_ref().map(Vec::as_slice),
+            &beta,
+            &one,
+            |blocks, leaf_beta| {
+                crate::sparse_sequential::sequential(
+                    algebra,
+                    &execution.block_shapes[0],
+                    indices[0],
+                    &a[blocks[0]],
+                    &execution.block_shapes[1],
+                    indices[1],
+                    &b[blocks[1]],
+                    &execution.block_shapes[2],
+                    indices[2],
+                    &mut c[blocks[2]][..sizes[2]],
+                    alpha,
+                    leaf_beta,
+                );
+            },
+        );
+        return c;
+    }
+
+    let panel = &execution.panels[level];
+    let plans: [crate::sparse_2d::Panel<'_, '_>; 3] = std::array::from_fn(|operand| crate::sparse_2d::Panel {
+        comm: communicators[level][operand].as_ref(),
+        outer: panel.operands[operand].outer,
+        inner: panel.operands[operand].inner,
+    });
+    let result = crate::sparse_2d::execute_pairs_dense(
+        algebra,
+        panel.edge,
+        layers,
+        plans[0],
+        plans[1],
+        plans[2],
+        a,
+        b,
+        c,
+        beta,
+        |a, b, c, child_beta, child_layers| {
+            execute_raw_panels(
+                communicators,
+                execution,
+                level + 1,
+                child_layers,
+                algebra,
+                indices,
+                alpha,
+                a,
+                b,
+                c,
+                child_beta,
+            )
+        },
+    );
+    result
+}
+
 macro_rules! define_mapped_contraction {
     ($(#[$attribute:meta])* $name:ident, $kernel:path
         $(, $function:ident : $function_type:ty)?) => {
@@ -355,6 +437,118 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A>
 where
     A::Element: Wire,
 {
+    /// Execute the source unfolded sparse-A/dense-B/dense-C tree for arbitrary
+    /// preflight-valid raw mappings, including shared-label mapping mismatches
+    /// that require nested 2D panel movement.
+    pub fn contract_sparse_from_mapped(
+        &mut self,
+        indices_c: &str,
+        a: &SparseTensor<'_, '_, A>,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        mapped: [Distribution; 3],
+        alpha: A::Element,
+        beta: A::Element,
+        commutative: bool,
+    ) {
+        assert!(std::ptr::eq(self.context(), a.context()));
+        assert!(std::ptr::eq(self.context(), b.context()));
+        assert_eq!(mapped[0].shape, a.distribution().shape);
+        assert_eq!(mapped[1].shape, b.distribution().shape);
+        assert_eq!(mapped[2].shape, self.distribution().shape);
+        assert!(mapped.iter().all(|distribution| {
+            distribution.topology == mapped[0].topology
+                && distribution.topology.size() == self.context().size()
+        }));
+        let metadata = LabelMetadata::new(
+            [a.distribution(), b.distribution(), self.distribution()],
+            [indices_a, indices_b, indices_c],
+        );
+        let element_size = A::Element::WIDTH;
+        let pair_size = 8 + element_size;
+        let dense_virtual_size: usize = mapped[0].block_shape().iter().product();
+        let storage = [
+            crate::sparse_cost::Storage { sparse: true, element_size, pair_size,
+                dense_virtual_size, custom_addition: false },
+            crate::sparse_cost::Storage { sparse: false, element_size, pair_size,
+                dense_virtual_size: 0, custom_addition: false },
+            crate::sparse_cost::Storage { sparse: false, element_size, pair_size,
+                dense_virtual_size: 0, custom_addition: false },
+        ];
+        // Reuse only structural execution descriptors here. Fractions do not
+        // affect layout assembly; no cost estimate is evaluated by this call.
+        let plan = crate::sparse_mapped_cost::build_unfolded(
+            mapped.each_ref(),
+            [indices_a, indices_b, indices_c],
+            crate::sparse_mapped_cost::Inputs {
+                storage,
+                fractions: crate::sparse_cost::Fractions { a: 1., b: 1., c: 1. },
+                custom: false,
+            },
+        ).expect("unsupported unfolded sparse raw mapping");
+        assert_eq!(metadata.index_maps, plan.execution.indices);
+
+        let rank = self.context().rank();
+        let mut sparse_a = sparse_on_roots(a, &mapped[0]);
+        let mut dense_b = dense_on_roots(b, &mapped[1]);
+        let mut dense_c = dense_on_roots(self, &mapped[2]);
+        let replication: [Vec<Context<'_>>; 3] = std::array::from_fn(|operand| {
+            plan.execution.replication_axes[operand].iter()
+                .map(|&axis| mapped[0].topology.fiber(self.context(), axis)).collect()
+        });
+        for communicator in &replication[0] {
+            broadcast_sparse(communicator, &mut sparse_a);
+        }
+        for communicator in &replication[1] {
+            communicator.broadcast(0, &mut dense_b);
+        }
+        let output_root = replication[2].iter().all(|communicator| communicator.rank() == 0);
+        let child_beta = if output_root { beta } else { self.algebra().zero() };
+        let dense_blocks = |values: Vec<A::Element>, block_size: usize| {
+            assert!(block_size > 0 && values.len() % block_size == 0);
+            values.chunks_exact(block_size).map(<[A::Element]>::to_vec).collect::<Vec<_>>()
+        };
+        let b_size: usize = plan.execution.block_shapes[1].iter().product();
+        let c_size: usize = plan.execution.block_shapes[2].iter().product();
+        let b_blocks = dense_blocks(dense_b, b_size);
+        let c_blocks = dense_blocks(dense_c, c_size);
+        let panel_contexts: Vec<[Option<Context<'_>>; 3]> = plan.execution.panels.iter()
+            .map(|panel| std::array::from_fn(|operand| panel.operands[operand].topology_axis
+                .map(|axis| mapped[0].topology.fiber(self.context(), axis)))).collect();
+        let c_blocks = execute_raw_panels(
+            &panel_contexts,
+            &plan.execution,
+            0,
+            crate::sparse_2d::Layers { count: 1, index: 0 },
+            self.algebra(),
+            [indices_a, indices_b, indices_c],
+            &alpha,
+            &sparse_a,
+            &b_blocks,
+            c_blocks,
+            child_beta,
+        );
+        for level in panel_contexts {
+            for communicator in level.into_iter().flatten() { communicator.close(); }
+        }
+        dense_c = c_blocks.into_iter().flatten().collect();
+        for communicator in &replication[2] {
+            communicator.reduce_monoid(self.algebra(), &mut dense_c, commutative, 0);
+        }
+        let contributions: Vec<_> = dense_c.into_iter().enumerate().filter_map(|(offset, value)| {
+            mapped[2].global_key(rank, offset)
+                .filter(|&key| mapped[2].owner(key) == rank)
+                .map(|key| (key, value))
+        }).collect();
+        for group in replication {
+            for communicator in group { communicator.close(); }
+        }
+        let zero = self.algebra().zero();
+        self.transform(|_, value| *value = zero.clone());
+        self.write_add(&contributions);
+    }
+
     /// Execute sparse-A/dense-B contraction with a reusable aligned grid plan.
     /// The plan contains mappings only; current tensor values, coefficients and
     /// reduction commutativity are supplied for every execution.

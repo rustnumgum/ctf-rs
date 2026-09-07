@@ -21,7 +21,9 @@ label are required by this raw sparse path. Physically mapped labels must
 occur in at least two operands. Unsupported plans are rejected, not silently
 remapped. Explicit nontrivial virtual factors remain available through `_on`;
 they are not represented by `PlanCache::prepare` and are not claimed cached.
-Automatic sparse/compressed candidate construction remains unfinished.
+Separate unfolded sparse-A raw search/execution is now available (sparse-search.md).
+Automatic folded/sparse-output/compressed candidates and raw search caching
+remain unfinished.
 
 `distributed_sparse_plan` checks exact integer results while reusing a plan
 after changing stored values/nonzero count to an empty sparse input, switching

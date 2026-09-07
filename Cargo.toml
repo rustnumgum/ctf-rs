@@ -842,3 +842,13 @@ harness = false
 name = "upstream_hosvd"
 path = "tests/upstream_hosvd.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_raw"
+path = "tests/distributed_sparse_raw.rs"
+harness = false
+
+[[test]]
+name = "distributed_sparse_search"
+path = "tests/distributed_sparse_search.rs"
+harness = false

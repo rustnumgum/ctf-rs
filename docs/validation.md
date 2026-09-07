@@ -1,5 +1,19 @@
 # Validation evidence
 
+## Unfolded sparse raw execution and automatic selection (2026-09-08)
+
+sparse_mapped_cost passed its three local WSL checks once after adding shared
+execution descriptors. distributed_sparse_raw and distributed_sparse_search,
+plus affected aligned distributed_sparse_general/function/plan, passed once
+at WSL 1/2/4 ranks with world/parity contexts. Exact i64 checks cover uneven
+mapped GEMM, shared-axis mismatches, virtual factors, nonempty/empty sparse A,
+alpha/beta and restored C distribution. Search covers normal, weighted and
+enabled exhaustive passes, collective winner agreement and strict zero-memory
+rejection; selected raw mappings execute rather than being replaced by aligned
+ones. No numerical diagnostics or tolerance changes were needed. DIGIT / PASS.
+All six targets compiled/linked on Windows GNU; native runtime remains
+unaccepted. Folded/sparse-output/compressed automatic planning is still pending.
+
 ## Sparse randomized matrix/tensor SVD (2026-09-08)
 
 typed_randomized_svd and typed_tensor_svd passed once at WSL 1/2/4 ranks,

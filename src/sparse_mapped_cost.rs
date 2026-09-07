@@ -56,6 +56,29 @@ pub struct Plan {
     pub tree: Tree,
     fractions: Fractions,
     storage: [Storage; 3],
+    pub(crate) execution: Execution,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Execution {
+    pub replication_axes: [Vec<usize>; 3],
+    pub panels: Vec<ExecutionPanel>,
+    pub virtual_dimensions: Vec<usize>,
+    pub indices: [Vec<usize>; 3],
+    pub block_shapes: [Vec<usize>; 3],
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ExecutionPanel {
+    pub edge: usize,
+    pub operands: [ExecutionOperand; 3],
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ExecutionOperand {
+    pub topology_axis: Option<usize>,
+    pub outer: usize,
+    pub inner: usize,
 }
 
 impl Tree {
@@ -366,6 +389,7 @@ pub fn build_unfolded(
         for mapping in &mapped[operand].mappings { mark_physical(mapping, &mut physical[operand]); }
     }
     let mut communicator_ranks: [Vec<usize>; 3] = std::array::from_fn(|_| Vec::new());
+    let mut replication_axes: [Vec<usize>; 3] = std::array::from_fn(|_| Vec::new());
     let mut need_replication = false;
     for axis in 0..topology.dimensions.len() {
         need_replication |= physical.iter().any(|operand| !operand[axis]);
@@ -373,12 +397,14 @@ pub fn build_unfolded(
         for operand in 0..3 {
             if !physical[operand][axis] {
                 communicator_ranks[operand].push(topology.dimensions[axis]);
+                replication_axes[operand].push(axis);
             }
         }
     }
 
     let mut phases = vec![1; labels.len()];
     let mut panels = Vec::new();
+    let mut execution_panels = Vec::new();
     for label in 0..labels.len() {
         let present: Vec<_> = (0..3).filter_map(|operand| {
             inverse[label][operand].map(|axis| (operand, axis))
@@ -417,6 +443,9 @@ pub fn build_unfolded(
         let mut operands: [Operand2d; 3] = std::array::from_fn(|operand| Operand2d {
             storage: inputs.storage[operand], moving: false, ranks: 1, outer: 1, inner: 0,
         });
+        let mut execution_operands = [ExecutionOperand {
+            topology_axis: None, outer: 1, inner: 0,
+        }; 3];
         for (&operand, &axis) in order.iter().zip(&axes) {
             let mapping = &mapped[operand].mappings[axis];
             let (outer, inner) = panel_strides(&states[operand], axis, mapping, edge);
@@ -428,6 +457,17 @@ pub fn build_unfolded(
                 outer,
                 inner,
             };
+            let execution_inner = if inputs.storage[operand].sparse || inner == 0 {
+                inner
+            } else {
+                assert_eq!(inner % dimensions[operand].virtual_size, 0);
+                inner / dimensions[operand].virtual_size
+            };
+            execution_operands[operand] = ExecutionOperand {
+                topology_axis: movement.map(|(topology_axis, _)| topology_axis),
+                outer,
+                inner: execution_inner,
+            };
         }
         for (&operand, &axis) in order.iter().zip(&axes) {
             update_panel(&mut states[operand], axis, &mapped[operand].mappings[axis], steps);
@@ -436,6 +476,7 @@ pub fn build_unfolded(
         panels.push(sparse_cost::TwoDimensional {
             edge, a: operands[0], b: operands[1], c: operands[2],
         });
+        execution_panels.push(ExecutionPanel { edge, operands: execution_operands });
     }
 
     let block_shapes = mapped.each_ref().map(|distribution| distribution.block_shape());
@@ -463,7 +504,7 @@ pub fn build_unfolded(
     let mut tree = Tree::Local(local);
     if phases.iter().product::<usize>() > 1 {
         tree = Tree::Virtual(sparse_cost::Virtual {
-            dimensions: phases,
+            dimensions: phases.clone(),
             orders: normalized.each_ref().map(Vec::len),
         }, Box::new(tree));
     }
@@ -483,5 +524,16 @@ pub fn build_unfolded(
             pair_sizes: inputs.storage.map(|storage| storage.pair_size),
         }, Box::new(tree));
     }
-    Ok(Plan { tree, fractions: inputs.fractions, storage: inputs.storage })
+    Ok(Plan {
+        tree,
+        fractions: inputs.fractions,
+        storage: inputs.storage,
+        execution: Execution {
+            replication_axes,
+            panels: execution_panels,
+            virtual_dimensions: phases,
+            indices: normalized,
+            block_shapes,
+        },
+    })
 }

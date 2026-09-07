@@ -120,15 +120,15 @@ impl From<crate::partial_fold::Error> for Error {
 }
 
 #[derive(Clone, Copy)]
-struct Objective {
-    memory_limit: u64,
-    weight: f64,
-    baseline_seconds: f64,
-    baseline_memory: u64,
+pub(crate) struct Objective {
+    pub(crate) memory_limit: u64,
+    pub(crate) weight: f64,
+    pub(crate) baseline_seconds: f64,
+    pub(crate) baseline_memory: u64,
 }
 
 impl Objective {
-    fn time_only(memory_limit: u64) -> Self {
+    pub(crate) fn time_only(memory_limit: u64) -> Self {
         Self {
             memory_limit,
             weight: 0.,
@@ -137,7 +137,7 @@ impl Objective {
         }
     }
 
-    fn score(self, seconds: f64, memory: u64) -> f64 {
+    pub(crate) fn score(self, seconds: f64, memory: u64) -> f64 {
         if self.weight.abs() > 1e-8 {
             assert!(self.baseline_seconds > 0. && self.baseline_memory > 0);
             (seconds - self.baseline_seconds) / self.baseline_seconds
@@ -150,10 +150,10 @@ impl Objective {
 }
 
 #[derive(Clone, Copy)]
-struct CandidateCost {
-    source_id: usize,
-    seconds: f64,
-    memory_bytes: u64,
+pub(crate) struct CandidateCost {
+    pub(crate) source_id: usize,
+    pub(crate) seconds: f64,
+    pub(crate) memory_bytes: u64,
 }
 
 struct NodeFacts<'a> {
@@ -296,7 +296,7 @@ fn consider(
     Some((seconds, memory_bytes as u64))
 }
 
-fn select_global(
+pub(crate) fn select_global(
     context: &Context<'_>,
     local: Option<CandidateCost>,
     objective: Objective,
