@@ -28,8 +28,12 @@ pub struct CustomMonoid<T, Add> {
 }
 impl<T: Clone + PartialEq, Add: Fn(&T, &T) -> T> Monoid for CustomMonoid<T, Add> {
     type Element = T;
-    fn zero(&self) -> T { self.identity.clone() }
-    fn add(&self, a: &T, b: &T) -> T { (self.addition)(a, b) }
+    fn zero(&self) -> T {
+        self.identity.clone()
+    }
+    fn add(&self, a: &T, b: &T) -> T {
+        (self.addition)(a, b)
+    }
 }
 
 #[derive(Clone)]
@@ -40,13 +44,19 @@ pub struct CustomSemiring<M: Monoid, Mul> {
 }
 impl<M: Monoid, Mul> Monoid for CustomSemiring<M, Mul> {
     type Element = M::Element;
-    fn zero(&self) -> Self::Element { self.monoid.zero() }
+    fn zero(&self) -> Self::Element {
+        self.monoid.zero()
+    }
     fn add(&self, a: &Self::Element, b: &Self::Element) -> Self::Element {
         self.monoid.add(a, b)
     }
 }
-impl<M: Monoid, Mul: Fn(&M::Element, &M::Element) -> M::Element> Semiring for CustomSemiring<M, Mul> {
-    fn one(&self) -> Self::Element { self.identity.clone() }
+impl<M: Monoid, Mul: Fn(&M::Element, &M::Element) -> M::Element> Semiring
+    for CustomSemiring<M, Mul>
+{
+    fn one(&self) -> Self::Element {
+        self.identity.clone()
+    }
     fn multiply(&self, a: &Self::Element, b: &Self::Element) -> Self::Element {
         (self.multiplication)(a, b)
     }
@@ -59,24 +69,34 @@ pub struct CustomRing<S: Semiring, Neg> {
 }
 impl<S: Semiring, Neg> Monoid for CustomRing<S, Neg> {
     type Element = S::Element;
-    fn zero(&self) -> Self::Element { self.semiring.zero() }
+    fn zero(&self) -> Self::Element {
+        self.semiring.zero()
+    }
     fn add(&self, a: &Self::Element, b: &Self::Element) -> Self::Element {
         self.semiring.add(a, b)
     }
 }
 impl<S: Semiring, Neg> Semiring for CustomRing<S, Neg> {
-    fn one(&self) -> Self::Element { self.semiring.one() }
+    fn one(&self) -> Self::Element {
+        self.semiring.one()
+    }
     fn multiply(&self, a: &Self::Element, b: &Self::Element) -> Self::Element {
         self.semiring.multiply(a, b)
     }
 }
 impl<S: Semiring, Neg: Fn(&S::Element) -> S::Element> Group for CustomRing<S, Neg> {
-    fn negate(&self, a: &Self::Element) -> Self::Element { (self.negation)(a) }
+    fn negate(&self, a: &Self::Element) -> Self::Element {
+        (self.negation)(a)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Arithmetic<T>(std::marker::PhantomData<T>);
-impl<T> Arithmetic<T> { pub fn new() -> Self { Self(std::marker::PhantomData) } }
+impl<T> Arithmetic<T> {
+    pub fn new() -> Self {
+        Self(std::marker::PhantomData)
+    }
+}
 
 macro_rules! arithmetic {
     ($($t:ty),*) => {$(
@@ -148,9 +168,16 @@ impl Semiring for Arithmetic<bool> {
 
 /// Rust-owned complex scalar. Communication uses Wire, not the memory layout.
 #[repr(C)]
-#[derive(Clone,Copy,Debug,Default,PartialEq)]
-pub struct Complex<T> {pub re:T,pub im:T}
-impl<T> Complex<T> {pub fn new(re:T,im:T)->Self {Self {re,im}}}
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Complex<T> {
+    pub re: T,
+    pub im: T,
+}
+impl<T> Complex<T> {
+    pub fn new(re: T, im: T) -> Self {
+        Self { re, im }
+    }
+}
 macro_rules! complex_arithmetic {
     ($($t:ty),*) => {$(
         impl Monoid for Arithmetic<Complex<$t>> {
@@ -173,7 +200,7 @@ macro_rules! complex_arithmetic {
         }
     )*}
 }
-complex_arithmetic!(f32,f64);
+complex_arithmetic!(f32, f64);
 
 /// Explicit serialization, rather than transmitting Rust object representations.
 /// Each encoded element occupies exactly WIDTH bytes on every rank.
@@ -182,10 +209,15 @@ pub trait Wire: Sized {
     fn encode(&self, output: &mut Vec<u8>);
     fn decode(input: &[u8]) -> Self;
 }
-impl<T:Wire> Wire for Complex<T> {
-    const WIDTH:usize=2*T::WIDTH;
-    fn encode(&self,output:&mut Vec<u8>) {self.re.encode(output);self.im.encode(output);}
-    fn decode(input:&[u8])->Self {Self::new(T::decode(&input[..T::WIDTH]),T::decode(&input[T::WIDTH..]))}
+impl<T: Wire> Wire for Complex<T> {
+    const WIDTH: usize = 2 * T::WIDTH;
+    fn encode(&self, output: &mut Vec<u8>) {
+        self.re.encode(output);
+        self.im.encode(output);
+    }
+    fn decode(input: &[u8]) -> Self {
+        Self::new(T::decode(&input[..T::WIDTH]), T::decode(&input[T::WIDTH..]))
+    }
 }
 macro_rules! wire_number {
     ($($t:ty),*) => {$(
@@ -199,6 +231,11 @@ macro_rules! wire_number {
 wire_number!(i8, i16, i32, i64, u32, u64, f32, f64);
 impl Wire for bool {
     const WIDTH: usize = 1;
-    fn encode(&self, output: &mut Vec<u8>) { output.push(u8::from(*self)); }
-    fn decode(input: &[u8]) -> Self { assert!(input[0] <= 1); input[0] == 1 }
+    fn encode(&self, output: &mut Vec<u8>) {
+        output.push(u8::from(*self));
+    }
+    fn decode(input: &[u8]) -> Self {
+        assert!(input[0] <= 1);
+        input[0] == 1
+    }
 }

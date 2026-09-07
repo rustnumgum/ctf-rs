@@ -39,7 +39,7 @@ fn main() {
             c[0] = beta * c[0] + a[0] * b[0] + a[1] * b[1];
         },
     );
-    assert_eq!(c,[30.+(3*edge*(edge-1)/2+5*edge) as f64]);
+    assert_eq!(c, [30. + (3 * edge * (edge - 1) / 2 + 5 * edge) as f64]);
     // Moving output with two strips and cyclic root ownership; beta on scatter.
     let output = Panel {
         comm: Some(&world),

@@ -27,8 +27,8 @@ unsafe extern "C" fn monoid_add<A: Monoid>(
     A::Element: Wire,
 {
     ACTIVE_ALGEBRA.with(|active| {
-        let algebra = unsafe {&*active.get().cast::<A>()};
-        let count = unsafe {*count} as usize;
+        let algebra = unsafe { &*active.get().cast::<A>() };
+        let count = unsafe { *count } as usize;
         let left =
             unsafe { std::slice::from_raw_parts(input.cast::<u8>(), count * A::Element::WIDTH) };
         let right = unsafe {
@@ -38,7 +38,7 @@ unsafe extern "C" fn monoid_add<A: Monoid>(
             .chunks_exact(A::Element::WIDTH)
             .zip(right.chunks_exact_mut(A::Element::WIDTH))
         {
-            let value = algebra.add(&A::Element::decode(a),&A::Element::decode(b));
+            let value = algebra.add(&A::Element::decode(a), &A::Element::decode(b));
             let mut bytes = Vec::with_capacity(A::Element::WIDTH);
             value.encode(&mut bytes);
             b.copy_from_slice(&bytes);
@@ -182,7 +182,7 @@ impl Comm {
             assert!(root < self.size());
         }
         assert!(A::Element::WIDTH > 0);
-        let mut input = Vec::with_capacity(values.len()*A::Element::WIDTH);
+        let mut input = Vec::with_capacity(values.len() * A::Element::WIDTH);
         for value in values.iter() {
             value.encode(&mut input);
         }
@@ -191,7 +191,7 @@ impl Comm {
             values.len() * A::Element::WIDTH,
             "Wire encoding must match its fixed width before MPI reads the buffer"
         );
-        let mut output = vec![0u8;input.len().max(1)];
+        let mut output = vec![0u8; input.len().max(1)];
         if input.is_empty() {
             input.push(0);
         }
@@ -215,7 +215,7 @@ impl Comm {
                     i32::from(commutative),
                     &mut operation,
                 ));
-                if let Some(root)=root {
+                if let Some(root) = root {
                     check(sys::MPI_Reduce(
                         input.as_ptr().cast(),
                         output.as_mut_ptr().cast(),
@@ -240,7 +240,7 @@ impl Comm {
             }
             active.set(std::ptr::null());
         });
-        if root.is_none() || root==Some(self.rank()) {
+        if root.is_none() || root == Some(self.rank()) {
             for (value, bytes) in values
                 .iter_mut()
                 .zip(output.chunks_exact(A::Element::WIDTH))
@@ -314,7 +314,7 @@ impl Comm {
         if input.is_empty() {
             input.push(0.);
         }
-        let mut output = vec![0.;values.len().max(1)];
+        let mut output = vec![0.; values.len().max(1)];
         unsafe {
             check(sys::MPI_Reduce(
                 input.as_ptr().cast(),
@@ -359,9 +359,9 @@ impl Comm {
             }
         }
     }
-    pub(crate) fn all_gather_f64(&self, values:&[f64])->Vec<f64> {
-        let count=values.len().try_into().unwrap();
-        let mut output=vec![0.;(values.len()*self.size()).max(1)];
+    pub(crate) fn all_gather_f64(&self, values: &[f64]) -> Vec<f64> {
+        let count = values.len().try_into().unwrap();
+        let mut output = vec![0.; (values.len() * self.size()).max(1)];
         let empty = 0.0f64;
         let input = if values.is_empty() {
             &empty as *const f64
@@ -382,8 +382,8 @@ impl Comm {
         output.truncate(values.len() * self.size());
         output
     }
-    pub(crate) fn all_gather_i32(&self,value:i32)->Vec<i32> {
-        let mut output=vec![0;self.size()];
+    pub(crate) fn all_gather_i32(&self, value: i32) -> Vec<i32> {
+        let mut output = vec![0; self.size()];
         unsafe {
             check(sys::MPI_Allgather(
                 (&value as *const i32).cast(),
@@ -398,11 +398,11 @@ impl Comm {
         output
     }
     #[cfg(feature = "native-scalapack")]
-    pub(crate) fn scalapack_grid(&self,rows:usize,cols:usize)->super::scalapack::Grid {
+    pub(crate) fn scalapack_grid(&self, rows: usize, cols: usize) -> super::scalapack::Grid {
         assert_eq!(rows * cols, self.size());
         super::scalapack::Grid::new(self.raw, rows, cols)
     }
-    pub(crate) fn gather_plan_cost(&self,seconds:f64,memory:i64)->(Vec<f64>,Vec<i64>) {
+    pub(crate) fn gather_plan_cost(&self, seconds: f64, memory: i64) -> (Vec<f64>, Vec<i64>) {
         let mut times = vec![0.; self.size()];
         let mut bytes = vec![0i64; self.size()];
         unsafe {
@@ -427,7 +427,7 @@ impl Comm {
                 self.raw,
             ));
         }
-        (times,bytes)
+        (times, bytes)
     }
     pub(crate) fn send_receive(
         &self,

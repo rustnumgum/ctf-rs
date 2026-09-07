@@ -36,12 +36,9 @@ fn high_order_multiple_k_weighted_batches_and_nontrivial_layout() {
     let mut c: Vec<_> = (1..=8).map(|x| x as f64).collect();
     let old_c = c.clone();
 
-    Plan::new(
-        [&shape_a, &shape_b, &shape_c],
-        ["ixapw", "ypwaz", "zwixy"],
-    )
-    .unwrap()
-    .execute::<f64, Native>(&a, &b, &mut c, 2., 3.);
+    Plan::new([&shape_a, &shape_b, &shape_c], ["ixapw", "ypwaz", "zwixy"])
+        .unwrap()
+        .execute::<f64, Native>(&a, &b, &mut c, 2., 3.);
 
     let mut expected = old_c.iter().map(|value| 3. * value).collect::<Vec<_>>();
     let mut coordinates = [0; 256];
