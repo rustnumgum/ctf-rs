@@ -19,6 +19,8 @@ mod diagonal;
 mod sy_summation;
 #[path = "symmetric_contract_tensor.rs"]
 mod contraction;
+#[path = "symmetric_contract.rs"]
+mod symmetric_contraction;
 
 impl<'c, 'r, A: Group + crate::algebra::Semiring> SymmetricTensor<'c, 'r, A>
 where A::Element: Wire {

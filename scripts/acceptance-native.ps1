@@ -30,7 +30,8 @@ $mpiTests = @(
     'distributed_sparse_diagonal','distributed_symmetric_io','distributed_symmetric_operations',
     'distributed_symmetric_repack','distributed_packed_sum','distributed_packed_contraction',
     'distributed_canonical_sum','distributed_hollow_sum','distributed_symmetric_diagonal',
-    'distributed_sy_sum','distributed_sy_scalars','distributed_canonical_contraction'
+    'distributed_sy_sum','distributed_sy_scalars','distributed_canonical_contraction',
+    'distributed_symmetric_contraction'
 )
 $arguments = @()
 foreach ($test in $mpiTests) { $arguments += @('--test', $test) }

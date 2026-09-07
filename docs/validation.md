@@ -830,3 +830,16 @@ restoration of the original output mapping. No failures/retries; DIGIT / PASS,
 tolerance zero. The new target compiled and linked once on Windows GNU.
 No symmetry overcount factors or full semantic symmetric contraction are
 claimed by these canonical tests; native runtime acceptance is still pending.
+
+## Explicit-map symmetry-aware contractions (2026-09-07)
+
+distributed_symmetric_contraction passed once at 1/2/4 WSL MPI ranks, with
+world/parity contexts. Fixed atol=1e-6 and finite-value checks compare full-domain
+SY/AS/SH matrix products and dot products to analytic references, not merely the
+canonical chamber. Fixtures cover SY diagonal prescaling versus factorial
+overcounting, mixed SY/AS cancellation, preserved SY Hadamard symmetry, beta
+handling and supported repeated diagonal output with off-diagonal preservation.
+No numerical failures/retries; DIGIT / PASS, verification closed.
+Integration review corrected prescale input selection to mapped packed local
+size before the first run. The new target also compiled and linked once on
+Windows GNU; native MPI runtime acceptance remains pending.

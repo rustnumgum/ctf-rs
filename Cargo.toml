@@ -292,3 +292,8 @@ harness = false
 name = "distributed_canonical_contraction"
 path = "tests/distributed_canonical_contraction.rs"
 harness = false
+
+[[test]]
+name = "distributed_symmetric_contraction"
+path = "tests/distributed_symmetric_contraction.rs"
+harness = false

@@ -305,7 +305,7 @@ where
     /// other group axis plus the identity. The two-axis transpose excludes its
     /// diagonal, while larger groups retain the source's sequential
     /// coincidence-surface scaling (including its documented FIXME behavior).
-    fn desymmetrized(
+    pub(super) fn desymmetrized(
         source: &Self,
         target_links: Vec<Symmetry>,
         indices: &[u8],
@@ -422,7 +422,7 @@ where
     /// symmetry, then accumulate that tensor into the old target. The disabled
     /// fractional-rescaling implementation in the source is intentionally not
     /// reproduced.
-    fn symmetrize_from(&mut self, nonsymmetric: &Self, indices: &[u8]) {
+    pub(super) fn symmetrize_from(&mut self, nonsymmetric: &Self, indices: &[u8]) {
         let mut intermediate = Self::new(
             self.context,
             self.distribution.clone(),

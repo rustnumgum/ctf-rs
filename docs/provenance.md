@@ -714,3 +714,27 @@ aligned sign are required; upper-layer orbit expansion, overcounting factors,
 diagonal preprocessing and automatic physical-label selection are not supplied
 by this method. Current key-based redistribution is not a claim that all
 optimized source redistribution kernels have been ported.
+
+## Symmetry-aware contraction on explicit mappings (2026-09-07)
+
+src/symmetric_contract.rs ports contraction::sym_contract and its
+three-operand broken-link test, not the two-operand summation recursion. It
+aligns signs and computes reduced-group overcounting factors, then unfolds
+broken operands or uses operation permutations according to mapping feasibility.
+Recursive unfolding receives signed alpha without the parent overcount factor;
+terminal raw tasks receive the adjusted coefficient. Output temporaries follow
+source beta scaling and symmetrization. Supported repeated labels are extracted
+and reinserted before recursion.
+
+Terminal SY reductions apply source prescale_operands/scale_diagonals to the
+selected input, correcting repeated-coordinate multiplicity before factorial
+overcounting. Input selection uses the mapped local packed allocation sizes,
+not the global rectangular shape product. Temporary tensor ownership replaces
+source alias/pull-alias memory management while source kernels and collective
+steps remain explicit. This connects to contract_canonical_on rather than
+gathering tensors or switching to an unrelated contraction implementation.
+
+The topology and physical-label map remain caller-supplied; automatic cost-based
+mapping selection and full optimized 2D symmetric planning are not completed.
+General cross-group repeated-index extraction and the full upstream CPU test
+suite remain open. Availability of this operation is not whole-project acceptance.
