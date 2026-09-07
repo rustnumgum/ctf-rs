@@ -828,3 +828,23 @@ This does not implement C-only indices by contracting then broadcasting. In the
 source those indices use map_extra_indices (virtual phase one) and the general
 sp_seq_ctr loop. That path remains pending and still returns OneOperandLabel(C)
 from the folded entrypoints before communication; it is not counted as complete.
+
+## General sparse key recursion and mapped replication
+
+src/sparse_sequential.rs ports the nonsymmetric sparse-A/dense-B/dense-C branch
+of sp_seq_ctr.cxx. Labels are normalized in A/B/C first-occurrence order and
+traversed from highest to lowest. Sorted sparse keys restrict A-axis recursion;
+B-only/BC/C-only dimensions are traversed without materializing sparse zeros.
+It retains ((A*B)*alpha), contribution-before-old-C addition, left beta scaling
+of nonscalar C, and the source distinct right beta scaling in the all-scalar path.
+Repeated indices and A-only reduction belong above this local kernel.
+
+src/sparse_contract_general.rs exposes the corresponding explicit physical-label
+mapping. Singleton labels cannot be physically mapped (map_extra_indices).
+Canonical A keys move once to mapped owners; count/payload broadcasts distribute
+sparse local blocks along missing-label fibers. B/C root blocks use indexed reads,
+B is broadcast, and C is reduced with beta applied only on the root contribution.
+Only canonical reduced output owners restore the original C distribution. There
+is no full tensor gather, dense expansion of A, or contraction-then-broadcast C
+substitute. Source 2D sparse and virtual plan assembly, automatic mapping, and
+other general sparse storage combinations remain separate pending paths.

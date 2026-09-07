@@ -343,3 +343,12 @@ required-features = ["native-linalg"]
 name = "distributed_sparse_input_reduction"
 path = "tests/distributed_sparse_input_reduction.rs"
 harness = false
+
+[[test]]
+name = "sparse_sequential"
+path = "tests/sparse_sequential.rs"
+
+[[test]]
+name = "distributed_sparse_general"
+path = "tests/distributed_sparse_general.rs"
+harness = false

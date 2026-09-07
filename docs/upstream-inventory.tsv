@@ -110,11 +110,11 @@ src/contraction/ctr_offload.h	excluded: CUDA/offload	excluded
 src/contraction/ctr_tsr.cxx	src/contraction.rs; src/symmetric_contraction_comm.rs	partial: NS/packed virtual and explicit broadcast/root-Reduce execution; automatic symmetric plan integration pending
 src/contraction/ctr_tsr.h	src/contraction	pending
 src/contraction/Makefile	Cargo/build tooling	replaced
-src/contraction/sp_seq_ctr.cxx	src/sparse_fold.rs; src/sparse_diagonal.rs; src/sparse_gemm.rs; src/sparse_gemm_kernel.rs; src/sparse_formats.rs	partial: fully foldable NS sparse/mixed contractions with diagonal preprocessing and CSR children; one-sided indices and general sparse sequential paths pending
+src/contraction/sp_seq_ctr.cxx	src/sparse_sequential.rs; src/sparse_fold.rs; src/sparse_diagonal.rs; src/sparse_gemm.rs; src/sparse_formats.rs	partial: general NS sparse-A/dense-B/dense-C recursive key kernel incl B/C-only indices; folded sparse/mixed children and input pre-reduction; custom functions and other general sparse combinations pending
 src/contraction/sp_seq_ctr.h	src/contraction	pending
 src/contraction/spctr_2d_general.cxx	src/sparse_gemm.rs	partial: stationary-output sparse matrix panel broadcasts with LCM virtual k phases; output-moving and general recursive levels pending
 src/contraction/spctr_2d_general.h	src/contraction	pending
-src/contraction/spctr_comm.cxx	src/contraction	pending
+src/contraction/spctr_comm.cxx	src/sparse_contract_general.rs	partial: explicit mapped sparse-A count/payload broadcasts, dense-B broadcasts, C root beta/reduction and owner restore; general sparse output and automatic plan assembly pending
 src/contraction/spctr_comm.h	src/contraction	pending
 src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded

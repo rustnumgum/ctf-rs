@@ -39,3 +39,4 @@ pub mod symmetric_sum_comm;
 pub mod symmetric_contraction;
 pub mod symmetric_contraction_comm;
 pub mod scalar_conversion;
+pub mod sparse_sequential;

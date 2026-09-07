@@ -29,6 +29,7 @@ mpi_tests+=(upstream_reduce_bcast)
 mpi_tests+=(distributed_sparse_multilinear)
 mpi_tests+=(distributed_sparse_solve_factor)
 mpi_tests+=(distributed_sparse_input_reduction)
+mpi_tests+=(distributed_sparse_general)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
@@ -36,4 +37,4 @@ for ranks in 1 2 4; do
 done
 cargo test --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
   --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction \
-  --test sparse_formats --test cost_models --test plan_cost --test symmetry_layout --test sym_indices --test sym_triple --test sym_operations --test folding -- --nocapture
+  --test sparse_formats --test sparse_sequential --test cost_models --test plan_cost --test symmetry_layout --test sym_indices --test sym_triple --test sym_operations --test folding -- --nocapture

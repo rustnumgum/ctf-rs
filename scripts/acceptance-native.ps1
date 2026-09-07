@@ -33,7 +33,8 @@ $mpiTests = @(
     'distributed_sy_sum','distributed_sy_scalars','distributed_canonical_contraction',
     'distributed_symmetric_contraction','upstream_diag_sym','distributed_cross_diagonal',
     'upstream_diag_ctr','upstream_sy_times_ns','upstream_multi_tsr_sym','upstream_reduce_bcast',
-    'distributed_sparse_multilinear','distributed_sparse_solve_factor','distributed_sparse_input_reduction'
+    'distributed_sparse_multilinear','distributed_sparse_solve_factor','distributed_sparse_input_reduction',
+    'distributed_sparse_general'
 )
 $arguments = @()
 foreach ($test in $mpiTests) { $arguments += @('--test', $test) }
@@ -45,7 +46,7 @@ foreach ($ranks in 1,2,4) {
 Remove-Item Env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER
 $localTests = @('local_linalg','topology_candidates','node_aware','map_tensor',
     'sequential_sum','virtual_sum','sequential_contraction','folded_contraction',
-    'sparse_formats','cost_models','plan_cost','symmetry_layout','sym_indices',
+    'sparse_formats','sparse_sequential','cost_models','plan_cost','symmetry_layout','sym_indices',
     'sym_triple','sym_operations','folding')
 $arguments = @()
 foreach ($test in $localTests) { $arguments += @('--test', $test) }

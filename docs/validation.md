@@ -918,3 +918,17 @@ empty input-only reduction extent, replicas, virtual blocks, and 2x2 rank grid.
 Off-diagonal output entries remain exact. DIGIT / PASS; no diagnostic runs.
 All three targets compiled and linked once on Windows GNU. Native runtime and
 the source general sparse C-only execution path remain unaccepted/incomplete.
+
+## General sparse sequential and mapped contraction (2026-09-07)
+
+Three sparse_sequential local tests passed: exact i64 B/C-only label traversal,
+empty sparse/zero extent beta behavior, and noncommutative matrix-semiring scalar
+operand order. An initial test compilation needed Arithmetic::<i64> specified;
+no numerical criterion changed. distributed_sparse_general passed at 1/2/4 WSL
+ranks on world/parity contexts, exact i64. It covers physical i/j/k mappings and
+2x2 ij, variable sparse broadcasts, output reduction, C-only x, empty sparse
+shards, and original distribution restoration. The distributed target was rerun
+after staging changed to canonical-root-only transfer; local passing tests were
+not rerun. Final distributed implementation also passed all required rank counts.
+DIGIT / PASS. Both targets compiled/linked on Windows GNU, and the changed
+distributed staging target was rebuilt; native runtime remains unaccepted.

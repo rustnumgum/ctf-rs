@@ -19,6 +19,8 @@ mod functions;
 mod diagonal;
 #[path = "sparse_multilinear.rs"]
 mod multilinear;
+#[path = "sparse_contract_general.rs"]
+mod general_contraction;
 
 #[derive(Clone)]
 pub struct SparseTensor<'c, 'r, A: Monoid> {
