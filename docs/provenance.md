@@ -948,3 +948,12 @@ checks stored entries only. Rust uses a fixed wire encoding, not a C++ ABI shim.
 The sparse source uses Set with unique-value writes; Rust's required transport
 monoid is supplied with unique canonical-owner writes so no duplicate addition
 changes those values. Deterministic key-derived lengths replace random values.
+
+## Executable aligned plan cost extraction
+
+grid_plan_cost.rs derives source Replicated/Virtual/Local cost nodes from GridPlan's
+mapped layouts and normalized labels. Message sizes, unique-label FLOP product,
+virtual multiplicity and bookkeeping follow ctr_comm/ctr_tsr. The supplied node
+counts are explicit topology facts. This is the inner aligned execution estimate,
+not total plan time/memory; redistribution/folding and candidate generation remain
+pending. See automatic-planning.md for pinned source integration boundaries.

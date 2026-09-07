@@ -415,3 +415,7 @@ harness = false
 name = "upstream_endomorphism_cust_sp"
 path = "tests/upstream_endomorphism_cust_sp.rs"
 harness = false
+
+[[test]]
+name = "grid_plan_cost"
+path = "tests/grid_plan_cost.rs"

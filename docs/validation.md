@@ -1005,6 +1005,15 @@ MPI/library overhead and setup, not summed rank memory or operation-only allocat
 These single samples are representative records, not a statistical comparison
 or a speedup claim. They do not close automatic planning/low-memory acceptance.
 
+## GridPlan-derived execution cost tree (2026-09-07)
+
+grid_plan_cost passed once in WSL using 1/2/4-process topology shapes, without MPI
+execution. Analytic model coefficients isolate FLOPs and communicated bytes;
+expected estimates 120/168/156, volumes 0/96/192 and zero source workspace match
+exactly. These are synthetic coefficient checks, not measured seconds. The target
+compiled and linked on Windows GNU. DIGIT / PASS; no repeated precision checks.
+Automatic selection and total candidate costs remain incomplete.
+
 ## High-order sparse custom contraction (2026-09-07)
 
 distributed_sparse_fold_function passed once at 1/2/4 WSL ranks, world/parity,
