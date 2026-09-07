@@ -3,7 +3,7 @@
 //! Distributed native matrix operations, following interface/matrix.cxx's
 //! read_mat -> ScaLAPACK -> tensor/get_tri sequence. No global tensor gather.
 use crate::{
-    algebra::{Arithmetic, Complex, Monoid, Semiring, Wire},
+    algebra::{Arithmetic, Complex, Group, Monoid, Semiring, Wire},
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -99,80 +99,6 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         );
         values.write_add(&value_pairs);
         Ok((vectors, values))
-    }
-    /// Source svd_rand: initialize/QR (unless a guess is supplied), apply A*A^T
-    /// and QR, retain requested columns, SVD U^T*A, and rotate the left factor.
-    /// All matrix intermediates remain distributed; seed is explicitly supplied.
-    pub fn svd_randomized(
-        &self,
-        grid: [usize; 2],
-        rank: usize,
-        iterations: usize,
-        oversampling: usize,
-        seed: u64,
-        guess: Option<&mut Self>,
-    ) -> Result<(Self, Self, Self), i32> {
-        assert_eq!(self.distribution().shape.len(), 2);
-        let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
-        assert!(rank > 0 && rank <= m.min(n));
-        let width = (rank + oversampling).min(m.min(n));
-        let mut guess = guess;
-        let mut subspace = if let Some(guess) = guess.as_deref() {
-            assert!(std::ptr::eq(self.context(), guess.context()));
-            assert!(rank + oversampling <= m.min(n));
-            assert_eq!(guess.distribution().shape, vec![m, width]);
-            guess.clone()
-        } else {
-            let mut values = Self::new(
-                self.context(),
-                distribution(&[m, width], grid),
-                Arithmetic::new(),
-            );
-            let mut generator = crate::random::Generator::new(seed.wrapping_add(self.context().rank() as u64));
-            values.fill_random(-1., 1., &mut generator);
-            values.qr(grid)?.0
-        };
-        for _ in 0..iterations {
-            let transpose = self.permute_axes(&[1, 0]);
-            let mut gram = Self::new(
-                self.context(),
-                distribution(&[m, m], grid),
-                Arithmetic::new(),
-            );
-            gram.gemm_2d::<crate::linalg::Native>(self, &transpose, grid, 1., 0.);
-            let mut next = Self::new(
-                self.context(),
-                distribution(&[m, width], grid),
-                Arithmetic::new(),
-            );
-            next.gemm_2d::<crate::linalg::Native>(&gram, &subspace, grid, 1., 0.);
-            subspace = next.qr(grid)?.0;
-        }
-        if iterations > 0 {
-            if let Some(guess) = guess.as_deref_mut() {
-                *guess = subspace.clone();
-            }
-        }
-        let u = if width > rank {
-            subspace.slice(&[0..m, 0..rank])
-        } else {
-            subspace
-        };
-        let transpose = u.permute_axes(&[1, 0]);
-        let mut projected = Self::new(
-            self.context(),
-            distribution(&[rank, n], grid),
-            Arithmetic::new(),
-        );
-        projected.gemm_2d::<crate::linalg::Native>(&transpose, self, grid, 1., 0.);
-        let (rotation, s, vt) = projected.svd(grid)?;
-        let mut left = Self::new(
-            self.context(),
-            distribution(&[m, rank], grid),
-            Arithmetic::new(),
-        );
-        left.gemm_2d::<crate::linalg::Native>(&u, &rotation, grid, 1., 0.);
-        Ok((left, s, vt))
     }
 }
 
@@ -471,6 +397,110 @@ macro_rules! matrix_factor_methods {
                     vt.redistribute(distribution(&[k, n], requested_grid));
                 }
                 Ok((u, singular, vt))
+            }
+
+            /// Source svd_rand: initialize/QR (unless a guess is supplied), apply A*A^T
+            /// and QR, retain requested columns, SVD U^T*A, and rotate the left factor.
+            /// All matrix intermediates remain distributed; seed is explicitly supplied.
+            pub fn svd_randomized(
+                &self,
+                grid: [usize; 2],
+                rank: usize,
+                iterations: usize,
+                oversampling: usize,
+                seed: u64,
+                guess: Option<&mut Self>,
+            ) -> Result<(Self, Self, Self), i32> {
+                assert_eq!(self.distribution().shape.len(), 2);
+                let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
+                assert!(rank > 0 && rank <= m.min(n));
+                let width = (rank + oversampling).min(m.min(n));
+                let algebra = Arithmetic::<$scalar>::new();
+                let zero = algebra.zero();
+                let one = algebra.one();
+                let mut guess = guess;
+                let mut subspace = if let Some(guess) = guess.as_deref() {
+                    assert!(std::ptr::eq(self.context(), guess.context()));
+                    assert!(rank + oversampling <= m.min(n));
+                    assert_eq!(guess.distribution().shape, vec![m, width]);
+                    guess.clone()
+                } else {
+                    let mut values = Self::new(
+                        self.context(),
+                        distribution(&[m, width], grid),
+                        Arithmetic::new(),
+                    );
+                    let mut generator = crate::random::Generator::new(
+                        seed.wrapping_add(self.context().rank() as u64),
+                    );
+                    values.fill_random(algebra.negate(&one), one.clone(), &mut generator);
+                    values.qr(grid)?.0
+                };
+                for _ in 0..iterations {
+                    let transpose = self.permute_axes(&[1, 0]);
+                    let mut gram = Self::new(
+                        self.context(),
+                        distribution(&[m, m], grid),
+                        Arithmetic::new(),
+                    );
+                    gram.gemm_2d::<crate::linalg::Native>(
+                        self,
+                        &transpose,
+                        grid,
+                        one.clone(),
+                        zero.clone(),
+                    );
+                    let mut next = Self::new(
+                        self.context(),
+                        distribution(&[m, width], grid),
+                        Arithmetic::new(),
+                    );
+                    next.gemm_2d::<crate::linalg::Native>(
+                        &gram,
+                        &subspace,
+                        grid,
+                        one.clone(),
+                        zero.clone(),
+                    );
+                    subspace = next.qr(grid)?.0;
+                }
+                if iterations > 0 {
+                    if let Some(guess) = guess.as_deref_mut() {
+                        *guess = subspace.clone();
+                    }
+                }
+                let u = if width > rank {
+                    subspace.slice(&[0..m, 0..rank])
+                } else {
+                    subspace
+                };
+                let transpose = u.permute_axes(&[1, 0]);
+                let mut projected = Self::new(
+                    self.context(),
+                    distribution(&[rank, n], grid),
+                    Arithmetic::new(),
+                );
+                projected.gemm_2d::<crate::linalg::Native>(
+                    &transpose,
+                    self,
+                    grid,
+                    one.clone(),
+                    zero.clone(),
+                );
+                let (rotation, s, vt) = projected.svd(grid)?;
+                let mut left = Self::new(
+                    self.context(),
+                    distribution(&[m, rank], grid),
+                    Arithmetic::new(),
+                );
+                left.gemm_2d::<crate::linalg::Native>(
+                    &u,
+                    &rotation,
+                    grid,
+                    one,
+                    zero,
+                );
+                Ok((left, s, vt))
             }
         }
     };

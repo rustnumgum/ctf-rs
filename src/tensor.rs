@@ -5,98 +5,289 @@ use crate::{algebra::{Monoid, Semiring, Wire}, context::Context, mapping::Distri
 #[derive(Debug)]
 pub enum BlasContractionError { Mapping(crate::map_tensor::Rejected), Folding(crate::folding::Rejected) }
 
-impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
+impl<T> Tensor<'_, '_, crate::algebra::Arithmetic<T>>
+where
+    T: Clone + PartialEq + Wire,
+    crate::algebra::Arithmetic<T>: Semiring<Element = T> + Clone,
+{
     /// Fully foldable unique-label dense contraction on an explicit grid. Uses
     /// upstream aligned replication/virtual traversal with a folded BLAS child.
     /// Unsupported folds return an error before any tensor redistribution; no
     /// reference-kernel fallback or global gather is hidden here.
-    pub fn contract_blas_on_grid<K:crate::linalg::LocalKernels>(&mut self,indices_c:&str,
-        a:&Self,indices_a:&str,b:&Self,indices_b:&str,topology:crate::mapping::Topology,
-        alpha:f64,beta:f64)->Result<(),BlasContractionError> {
-        assert!(std::ptr::eq(self.context,a.context)&&std::ptr::eq(self.context,b.context));
-        assert_eq!(topology.size(),self.context.size());
-        let indices=[indices_a,indices_b,indices_c];
+    pub fn contract_blas_on_grid<K: crate::linalg::GemmKernel<T>>(
+        &mut self,
+        indices_c: &str,
+        a: &Self,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        topology: crate::mapping::Topology,
+        alpha: T,
+        beta: T,
+    ) -> Result<(), BlasContractionError> {
+        assert!(std::ptr::eq(self.context, a.context) && std::ptr::eq(self.context, b.context));
+        assert_eq!(topology.size(), self.context.size());
+        let indices = [indices_a, indices_b, indices_c];
         // Check semantic foldability before asking the mapping layer to assign it.
-        crate::folding::Plan::new([&a.distribution.shape,&b.distribution.shape,&self.distribution.shape],indices)
+        crate::folding::Plan::new(
+            [
+                &a.distribution.shape,
+                &b.distribution.shape,
+                &self.distribution.shape,
+            ],
+            indices,
+        )
+        .map_err(BlasContractionError::Folding)?;
+        let plan = crate::planning::GridPlan::prepare(
+            [&a.distribution, &b.distribution, &self.distribution],
+            indices,
+            topology,
+        )
+        .map_err(BlasContractionError::Mapping)?;
+        let mapped = plan.mapped_distributions();
+        let shapes: Vec<_> = mapped.iter().map(|d| d.block_shape()).collect();
+        let local = crate::folding::Plan::new([&shapes[0], &shapes[1], &shapes[2]], indices)
             .map_err(BlasContractionError::Folding)?;
-        let plan=crate::planning::GridPlan::prepare([&a.distribution,&b.distribution,&self.distribution],indices,topology)
-            .map_err(BlasContractionError::Mapping)?;
-        let mapped=plan.mapped_distributions();
-        let shapes:Vec<_>=mapped.iter().map(|d|d.block_shape()).collect();
-        let local=crate::folding::Plan::new([&shapes[0],&shapes[1],&shapes[2]],indices)
-            .map_err(BlasContractionError::Folding)?;
-        let phases:Vec<Vec<_>>=mapped.iter().map(|d|d.mappings.iter().map(|m|m.phase()/m.physical_phase()).collect()).collect();
-        let block_sizes:Vec<usize>=shapes.iter().map(|shape|shape.iter().product()).collect();
-        let mut aa=Self{context:a.context,algebra:a.algebra,distribution:a.distribution.clone(),data:a.data.clone()};
-        let mut bb=Self{context:b.context,algebra:b.algebra,distribution:b.distribution.clone(),data:b.data.clone()};
-        let mut cc=Self{context:self.context,algebra:self.algebra,distribution:self.distribution.clone(),data:self.data.clone()};
-        aa.redistribute(mapped[0].clone());bb.redistribute(mapped[1].clone());cc.redistribute(mapped[2].clone());
-        fn mark(map:&crate::mapping::Mapping,used:&mut [bool]) {
+        let phases: Vec<Vec<_>> = mapped
+            .iter()
+            .map(|d| {
+                d.mappings
+                    .iter()
+                    .map(|m| m.phase() / m.physical_phase())
+                    .collect()
+            })
+            .collect();
+        let block_sizes: Vec<usize> = shapes.iter().map(|shape| shape.iter().product()).collect();
+        let mut aa = Self {
+            context: a.context,
+            algebra: a.algebra.clone(),
+            distribution: a.distribution.clone(),
+            data: a.data.clone(),
+        };
+        let mut bb = Self {
+            context: b.context,
+            algebra: b.algebra.clone(),
+            distribution: b.distribution.clone(),
+            data: b.data.clone(),
+        };
+        let mut cc = Self {
+            context: self.context,
+            algebra: self.algebra.clone(),
+            distribution: self.distribution.clone(),
+            data: self.data.clone(),
+        };
+        aa.redistribute(mapped[0].clone());
+        bb.redistribute(mapped[1].clone());
+        cc.redistribute(mapped[2].clone());
+        fn mark(map: &crate::mapping::Mapping, used: &mut [bool]) {
             use crate::mapping::Mapping;
-            match map {Mapping::Unmapped=>{},Mapping::Virtual{child,..}=>mark(child,used),
-                Mapping::Physical{axis,child,..}=>{used[*axis]=true;mark(child,used);}}
+            match map {
+                Mapping::Unmapped => {}
+                Mapping::Virtual { child, .. } => mark(child, used),
+                Mapping::Physical { axis, child, .. } => {
+                    used[*axis] = true;
+                    mark(child, used);
+                }
+            }
         }
-        let topology=&mapped[0].topology;
-        let mut used=vec![vec![false;topology.dimensions.len()];3];
-        for operand in 0..3 {for map in &mapped[operand].mappings {mark(map,&mut used[operand]);}}
-        let mut comms:[Vec<Context<'_>>;3]=std::array::from_fn(|_|Vec::new());
+        let topology = &mapped[0].topology;
+        let mut used = vec![vec![false; topology.dimensions.len()]; 3];
+        for operand in 0..3 {
+            for map in &mapped[operand].mappings {
+                mark(map, &mut used[operand]);
+            }
+        }
+        let mut comms: [Vec<Context<'_>>; 3] = std::array::from_fn(|_| Vec::new());
         for axis in 0..topology.dimensions.len() {
-            if !(0..3).any(|operand|used[operand][axis]) {continue;}
-            for operand in 0..3 {if !used[operand][axis] {comms[operand].push(topology.fiber(self.context,axis));}}
+            if !(0..3).any(|operand| used[operand][axis]) {
+                continue;
+            }
+            for operand in 0..3 {
+                if !used[operand][axis] {
+                    comms[operand].push(topology.fiber(self.context, axis));
+                }
+            }
         }
-        for comm in &comms[0] {comm.broadcast(0,&mut aa.data);}
-        for comm in &comms[1] {comm.broadcast(0,&mut bb.data);}
-        let root=comms[2].iter().all(|comm|comm.rank()==0);
+        for comm in &comms[0] {
+            comm.broadcast(0, &mut aa.data);
+        }
+        for comm in &comms[1] {
+            comm.broadcast(0, &mut bb.data);
+        }
+        let root = comms[2].iter().all(|comm| comm.rank() == 0);
+        let algebra = self.algebra.clone();
+        let zero = algebra.zero();
+        let one = algebra.one();
         if root {
-            if beta==0. {cc.data.fill(0.);} else if beta!=1. {for value in &mut cc.data {*value*=beta;}}
+            if beta == zero {
+                cc.data.fill(zero.clone());
+            } else if beta != one {
+                for value in &mut cc.data {
+                    *value = algebra.multiply(&beta, value);
+                }
+            }
         }
-        let space=crate::summation::Indices::new(&[(&phases[0],indices_a),(&phases[1],indices_b),(&phases[2],indices_c)]);
-        let mut visited=vec![false;phases[2].iter().product()];
+        let space = crate::summation::Indices::new(&[
+            (&phases[0], indices_a),
+            (&phases[1], indices_b),
+            (&phases[2], indices_c),
+        ]);
+        let mut visited = vec![false; phases[2].iter().product()];
         space.for_each(|offsets| {
-            let [ia,ib,ic]=[offsets[0],offsets[1],offsets[2]];
-            local.execute::<K>(&aa.data[ia*block_sizes[0]..(ia+1)*block_sizes[0]],
-                &bb.data[ib*block_sizes[1]..(ib+1)*block_sizes[1]],
-                &mut cc.data[ic*block_sizes[2]..(ic+1)*block_sizes[2]],alpha,
-                if root||visited[ic] {1.} else {0.});
-            visited[ic]=true;
+            let [ia, ib, ic] = [offsets[0], offsets[1], offsets[2]];
+            local.execute::<T, K>(
+                &aa.data[ia * block_sizes[0]..(ia + 1) * block_sizes[0]],
+                &bb.data[ib * block_sizes[1]..(ib + 1) * block_sizes[1]],
+                &mut cc.data[ic * block_sizes[2]..(ic + 1) * block_sizes[2]],
+                alpha.clone(),
+                if root || visited[ic] {
+                    one.clone()
+                } else {
+                    zero.clone()
+                },
+            );
+            visited[ic] = true;
         });
-        for comm in &comms[2] {comm.reduce_f64(0,&mut cc.data);}
-        for group in comms {for comm in group {comm.close();}}
-        cc.redistribute(self.distribution.clone());self.data=cc.data;Ok(())
+        for comm in &comms[2] {
+            comm.reduce_monoid(&algebra, &mut cc.data, false, 0);
+        }
+        for group in comms {
+            for comm in group {
+                comm.close();
+            }
+        }
+        cc.redistribute(self.distribution.clone());
+        self.data = cc.data;
+        Ok(())
     }
     /// Explicit-grid distributed matrix multiplication C = alpha*A*B + beta*C.
     /// Cyclic k phases are equalized to lcm(grid rows, grid columns), then the
     /// upstream 2D panel executor drives local BLAS. Original distributions stay.
-    pub fn gemm_2d<K: crate::linalg::LocalKernels>(&mut self, a: &Self,b: &Self,grid: [usize;2],alpha: f64,beta: f64) {
-        use crate::{mapping::{Mapping,Topology},ctr_2d::{Panel,Layers},contraction::Folded,linalg::Transpose};
-        assert!(std::ptr::eq(self.context,a.context) && std::ptr::eq(self.context,b.context));
-        assert_eq!(a.distribution.shape.len(),2); assert_eq!(b.distribution.shape.len(),2); assert_eq!(self.distribution.shape.len(),2);
-        let (m,k,n) = (a.distribution.shape[0],a.distribution.shape[1],b.distribution.shape[1]);
-        assert_eq!(b.distribution.shape[0],k); assert_eq!(self.distribution.shape,vec![m,n]);
-        let topology = Topology::new(grid.to_vec()); assert_eq!(topology.size(),self.context.size());
-        let (mut x,mut y) = (grid[0],grid[1]); while y != 0 {(x,y) = (y,x%y);}
-        let steps = grid[0]/x*grid[1];
-        let mut row = Mapping::Unmapped; row.augment_physical(&topology,0);
-        let mut column = Mapping::Unmapped; column.augment_physical(&topology,1);
-        let mut krow = row.clone(); krow.augment_virtual(steps);
-        let mut kcolumn = column.clone(); kcolumn.augment_virtual(steps);
-        let mut aa = Self {context:a.context,algebra:a.algebra,distribution:a.distribution.clone(),data:a.data.clone()};
-        let mut bb = Self {context:b.context,algebra:b.algebra,distribution:b.distribution.clone(),data:b.data.clone()};
-        let mut cc = Self {context:self.context,algebra:self.algebra,distribution:self.distribution.clone(),data:self.data.clone()};
-        aa.redistribute(Distribution::new(vec![m,k],topology.clone(),vec![row.clone(),kcolumn]));
-        bb.redistribute(Distribution::new(vec![k,n],topology.clone(),vec![krow,column.clone()]));
-        cc.redistribute(Distribution::new(vec![m,n],topology.clone(),vec![row,column]));
-        let ma = m.div_ceil(grid[0]); let nb = n.div_ceil(grid[1]); let kb = k.div_ceil(steps);
-        let across_columns = topology.fiber(self.context,1); let across_rows = topology.fiber(self.context,0);
-        crate::ctr_2d::execute(&crate::algebra::Arithmetic::<f64>::new(),steps,Layers {count:1,index:0},
-            Panel {comm:Some(&across_columns),outer:1,inner:ma*kb},
-            Panel {comm:Some(&across_rows),outer:1,inner:kb*nb},Panel {comm:None,outer:1,inner:0},
-            &aa.data,&bb.data,&mut cc.data,beta,|a,b,c,beta,_| {
-                crate::contraction::folded::<f64,K>(Folded {m:ma,n:nb,k:kb,batches:1,
-                    trans_a:Transpose::No,trans_b:Transpose::No,transposed_output:false},a,b,c,alpha,beta);
-            });
-        across_columns.close(); across_rows.close();
-        cc.redistribute(self.distribution.clone()); self.data = cc.data;
+    pub fn gemm_2d<K: crate::linalg::GemmKernel<T>>(
+        &mut self,
+        a: &Self,
+        b: &Self,
+        grid: [usize; 2],
+        alpha: T,
+        beta: T,
+    ) {
+        use crate::{
+            contraction::Folded,
+            ctr_2d::{Layers, Panel},
+            linalg::Transpose,
+            mapping::{Mapping, Topology},
+        };
+        assert!(std::ptr::eq(self.context, a.context) && std::ptr::eq(self.context, b.context));
+        assert_eq!(a.distribution.shape.len(), 2);
+        assert_eq!(b.distribution.shape.len(), 2);
+        assert_eq!(self.distribution.shape.len(), 2);
+        let (m, k, n) = (
+            a.distribution.shape[0],
+            a.distribution.shape[1],
+            b.distribution.shape[1],
+        );
+        assert_eq!(b.distribution.shape[0], k);
+        assert_eq!(self.distribution.shape, vec![m, n]);
+        let topology = Topology::new(grid.to_vec());
+        assert_eq!(topology.size(), self.context.size());
+        let (mut x, mut y) = (grid[0], grid[1]);
+        while y != 0 {
+            (x, y) = (y, x % y);
+        }
+        let steps = grid[0] / x * grid[1];
+        let mut row = Mapping::Unmapped;
+        row.augment_physical(&topology, 0);
+        let mut column = Mapping::Unmapped;
+        column.augment_physical(&topology, 1);
+        let mut krow = row.clone();
+        krow.augment_virtual(steps);
+        let mut kcolumn = column.clone();
+        kcolumn.augment_virtual(steps);
+        let mut aa = Self {
+            context: a.context,
+            algebra: a.algebra.clone(),
+            distribution: a.distribution.clone(),
+            data: a.data.clone(),
+        };
+        let mut bb = Self {
+            context: b.context,
+            algebra: b.algebra.clone(),
+            distribution: b.distribution.clone(),
+            data: b.data.clone(),
+        };
+        let mut cc = Self {
+            context: self.context,
+            algebra: self.algebra.clone(),
+            distribution: self.distribution.clone(),
+            data: self.data.clone(),
+        };
+        aa.redistribute(Distribution::new(
+            vec![m, k],
+            topology.clone(),
+            vec![row.clone(), kcolumn],
+        ));
+        bb.redistribute(Distribution::new(
+            vec![k, n],
+            topology.clone(),
+            vec![krow, column.clone()],
+        ));
+        cc.redistribute(Distribution::new(
+            vec![m, n],
+            topology.clone(),
+            vec![row, column],
+        ));
+        let ma = m.div_ceil(grid[0]);
+        let nb = n.div_ceil(grid[1]);
+        let kb = k.div_ceil(steps);
+        let across_columns = topology.fiber(self.context, 1);
+        let across_rows = topology.fiber(self.context, 0);
+        let algebra = self.algebra.clone();
+        crate::ctr_2d::execute(
+            &algebra,
+            steps,
+            Layers { count: 1, index: 0 },
+            Panel {
+                comm: Some(&across_columns),
+                outer: 1,
+                inner: ma * kb,
+            },
+            Panel {
+                comm: Some(&across_rows),
+                outer: 1,
+                inner: kb * nb,
+            },
+            Panel {
+                comm: None,
+                outer: 1,
+                inner: 0,
+            },
+            &aa.data,
+            &bb.data,
+            &mut cc.data,
+            beta,
+            |a, b, c, beta, _| {
+                crate::contraction::folded::<T, K>(
+                    Folded {
+                        m: ma,
+                        n: nb,
+                        k: kb,
+                        batches: 1,
+                        trans_a: Transpose::No,
+                        trans_b: Transpose::No,
+                        transposed_output: false,
+                    },
+                    a,
+                    b,
+                    c,
+                    alpha.clone(),
+                    beta,
+                );
+            },
+        );
+        across_columns.close();
+        across_rows.close();
+        cc.redistribute(self.distribution.clone());
+        self.data = cc.data;
     }
 }
 

@@ -19,7 +19,7 @@ fn execute(indices:[&str;3],models:&Models,copies:[usize;3],commutative:bool,per
     assert_eq!(p.permutation(),permutation);
     let aa:Vec<_>=(0..shapes[0].iter().product()).map(|key|a(&coordinates(indices[0],key))).collect();
     let bb:Vec<_>=(0..shapes[1].iter().product()).map(|key|b(&coordinates(indices[1],key))).collect();
-    let mut output=vec![4.;shapes[2].iter().product()];p.execute::<Native>(&aa,&bb,&mut output,2.,3.);
+    let mut output=vec![4.;shapes[2].iter().product()];p.execute::<f64,Native>(&aa,&bb,&mut output,2.,3.);
     for(key,&value)in output.iter().enumerate(){let mut c=coordinates(indices[2],key);let mut sum=0.;
         for k in 0..4{c[b'k' as usize]=k;sum+=a(&c)*b(&c);}
         assert!(value.is_finite()&&(value-(2.*sum+12.)).abs()<1e-6,"permutation {permutation}, key {key}");

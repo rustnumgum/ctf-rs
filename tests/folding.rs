@@ -41,7 +41,7 @@ fn high_order_multiple_k_weighted_batches_and_nontrivial_layout() {
         ["ixapw", "ypwaz", "zwixy"],
     )
     .unwrap()
-    .execute::<Native>(&a, &b, &mut c, 2., 3.);
+    .execute::<f64, Native>(&a, &b, &mut c, 2., 3.);
 
     let mut expected = old_c.iter().map(|value| 3. * value).collect::<Vec<_>>();
     let mut coordinates = [0; 256];
@@ -78,7 +78,7 @@ fn outer_product_with_alpha_and_beta() {
 
     Plan::new([&shape_a, &shape_b, &shape_c], ["ji", "qp", "piqj"])
         .unwrap()
-        .execute::<Native>(&a, &b, &mut c, 3., 2.);
+        .execute::<f64, Native>(&a, &b, &mut c, 3., 2.);
 
     let mut coordinates = [0; 256];
     let mut expected = [0.; 16];

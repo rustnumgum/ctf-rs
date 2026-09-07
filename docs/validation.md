@@ -1142,6 +1142,27 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## Four-type explicit-grid BLAS and randomized SVD (2026-09-07)
+
+typed_grid_blas and typed_randomized_svd passed once at WSL 1/2/4 ranks,
+world/parity subcontexts, for f32/f64/Complex<f32>/Complex<f64>. Explicit-grid
+GEMM and reordered batched folding cover rectangular and square grids, uneven
+dimensions and empty local shards. Inputs/layouts are exact and outputs finite
+with componentwise abs<1e-6. The five existing folding/fold_selection local tests
+also passed once after updating the generic Plan::execute<T,K> calls.
+
+Randomized SVD preserves the fixed source's plain transpose, including complex
+inputs, real-only automatic guesses and full oversampled in/out guess writeback
+before rank cropping. The automatic rank-two fixture reconstructs A; the complex
+supplied-guess case reconstructs the literal source projection Q_r*(Q_r^T*A),
+not a silently substituted Hermitian projection. Both use the existing source
+Frobenius reconstruction bound m*n*n*1e-6. No extra precision studies or failures.
+
+Eight corresponding/affected test targets compiled and linked on Windows GNU;
+an initial command used the nonexistent target tensor_svd and was corrected to
+distributed_tensor_svd before compilation. Native MPI runtime acceptance remains
+pending. DIGIT / PASS for this stage, not whole-port completion.
+
 ## MT19937-64 and typed dense random fill (2026-09-07)
 
 random_generator passed exact u64 vectors for seeds 0,1,5489 across positions

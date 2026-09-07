@@ -563,3 +563,13 @@ path = "tests/random_generator.rs"
 name = "distributed_random_fill"
 path = "tests/distributed_random_fill.rs"
 harness = false
+
+[[test]]
+name = "typed_grid_blas"
+path = "tests/typed_grid_blas.rs"
+harness = false
+
+[[test]]
+name = "typed_randomized_svd"
+path = "tests/typed_randomized_svd.rs"
+harness = false

@@ -10,7 +10,7 @@
 
 use crate::{
     contraction::{Folded, folded},
-    linalg::{LocalKernels, Transpose},
+    linalg::{GemmKernel, Transpose},
 };
 
 const PERMUTATIONS: [[usize; 3]; 6] = [
@@ -63,7 +63,7 @@ pub enum Rejected {
     SizeOverflow,
 }
 
-/// A fully foldable local dense f64 contraction.
+/// A fully foldable local dense contraction.
 ///
 /// Permutation zero packs `A[k,m,l]`, `B[k,n,l]`, `C[m,n,l]`; the selected
 /// source permutation controls the other layouts and GEMM transpose flags.
@@ -297,14 +297,19 @@ impl Plan {
     }
 
     /// Pack, execute the existing batched GEMM kernel, and restore C's layout.
-    pub fn execute<K: LocalKernels>(
+    pub fn execute<T, K>(
         &self,
-        a: &[f64],
-        b: &[f64],
-        c: &mut [f64],
-        alpha: f64,
-        beta: f64,
-    ) {
+        a: &[T],
+        b: &[T],
+        c: &mut [T],
+        alpha: T,
+        beta: T,
+    )
+    where
+        T: Clone + PartialEq,
+        crate::algebra::Arithmetic<T>: crate::algebra::Semiring<Element = T>,
+        K: GemmKernel<T>,
+    {
         assert_eq!(a.len(), self.size_a);
         assert_eq!(b.len(), self.size_b);
         assert_eq!(c.len(), self.size_c);
@@ -312,7 +317,7 @@ impl Plan {
         let packed_a = pack(a, &self.shape_a, &self.order_a);
         let packed_b = pack(b, &self.shape_b, &self.order_b);
         let mut packed_c = pack(c, &self.shape_c, &self.order_c);
-        folded::<f64,K>(
+        folded::<T, K>(
             Folded {
                 m: self.m,
                 n: self.n,
@@ -366,10 +371,10 @@ fn axis_order(source_labels: &[u8], packed_labels: &[u8]) -> Vec<usize> {
         .collect()
 }
 
-fn pack(source: &[f64], source_shape: &[usize], order: &[usize]) -> Vec<f64> {
+fn pack<T: Clone>(source: &[T], source_shape: &[usize], order: &[usize]) -> Vec<T> {
     let source_strides = strides(source_shape);
     let packed_shape: Vec<_> = order.iter().map(|&axis| source_shape[axis]).collect();
-    let mut packed = vec![0.; source.len()];
+    let mut packed = source.to_vec();
     for (packed_offset, value) in packed.iter_mut().enumerate() {
         let mut remainder = packed_offset;
         let mut source_offset = 0;
@@ -378,15 +383,15 @@ fn pack(source: &[f64], source_shape: &[usize], order: &[usize]) -> Vec<f64> {
             remainder /= dimension;
             source_offset += coordinate * source_strides[axis];
         }
-        *value = source[source_offset];
+        value.clone_from(&source[source_offset]);
     }
     packed
 }
 
-fn unpack(packed: &[f64], destination: &mut [f64], source_shape: &[usize], order: &[usize]) {
+fn unpack<T: Clone>(packed: &[T], destination: &mut [T], source_shape: &[usize], order: &[usize]) {
     let source_strides = strides(source_shape);
     let packed_shape: Vec<_> = order.iter().map(|&axis| source_shape[axis]).collect();
-    for (packed_offset, &value) in packed.iter().enumerate() {
+    for (packed_offset, value) in packed.iter().enumerate() {
         let mut remainder = packed_offset;
         let mut destination_offset = 0;
         for (&axis, &dimension) in order.iter().zip(&packed_shape) {
@@ -394,7 +399,7 @@ fn unpack(packed: &[f64], destination: &mut [f64], source_shape: &[usize], order
             remainder /= dimension;
             destination_offset += coordinate * source_strides[axis];
         }
-        destination[destination_offset] = value;
+        destination[destination_offset].clone_from(value);
     }
 }
 
