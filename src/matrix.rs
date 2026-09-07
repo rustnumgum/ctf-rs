@@ -128,11 +128,8 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
                 distribution(&[m, width], grid),
                 Arithmetic::new(),
             );
-            let mut state = ((seed.wrapping_add(self.context().rank() as u64)) << 16) | 0x330e;
-            values.transform(|_, value| {
-                state = (state.wrapping_mul(0x5deece66d).wrapping_add(11)) & ((1 << 48) - 1);
-                *value = 2. * state as f64 / (1u64 << 48) as f64 - 1.;
-            });
+            let mut generator = crate::random::Generator::new(seed.wrapping_add(self.context().rank() as u64));
+            values.fill_random(-1., 1., &mut generator);
             values.qr(grid)?.0
         };
         for _ in 0..iterations {

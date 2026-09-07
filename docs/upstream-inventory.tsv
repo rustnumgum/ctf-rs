@@ -51,7 +51,7 @@ src/shared/pmpi.h	src/shared	pending
 src/shared/util.cxx	src/shared	pending
 src/shared/util.h	src/shared	pending
 src/interface/back_comp.h	src/interface	pending
-src/interface/common.cxx	src/interface	pending
+src/interface/common.cxx	src/random.rs	partial: exact MT19937-64 engine and get_rand48 interval conversion; remaining common runtime helpers pending
 src/interface/common.h	src/interface	pending
 src/interface/decomposition.cxx	src/interface	pending
 src/interface/decomposition.h	src/interface	pending
@@ -86,7 +86,7 @@ src/interface/set.cxx	src/interface	pending
 src/interface/set.h	src/sparse_formats.rs	partial: seq_coo_to_csr, seq_coo_to_ccsr, seq_csr_to_coo; remaining set responsibilities pending
 src/interface/sparse_tensor.cxx	src/interface	pending
 src/interface/sparse_tensor.h	src/interface	pending
-src/interface/tensor.cxx	src/interface	pending
+src/interface/tensor.cxx	src/tensor.rs; src/random.rs	partial: direct Rust dense operations and four-type random fill with source padding draw order; full interface responsibility inventory pending
 src/interface/tensor.h	src/interface	pending
 src/interface/term.cxx	src/interface	pending
 src/interface/term.h	src/interface	pending

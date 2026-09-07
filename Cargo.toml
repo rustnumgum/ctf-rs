@@ -554,3 +554,12 @@ harness = false
 name = "randomized_guess"
 path = "tests/randomized_guess.rs"
 harness = false
+
+[[test]]
+name = "random_generator"
+path = "tests/random_generator.rs"
+
+[[test]]
+name = "distributed_random_fill"
+path = "tests/distributed_random_fill.rs"
+harness = false

@@ -1209,6 +1209,14 @@ a supplied guess. This corrects the previous read-only cloned-guess behavior.
 Remaining randomized-SVD fidelity work: source complex iteration/projection
 uses plain A*A^T and U^T*A even though native complex SVD returns V^H; do not
 silently substitute a Hermitian power iteration. Source complex random guesses
-are real-only (tensor.cxx:1578-1608). Its rank-seeded MT generator is still not
-ported; current Rust auto-guess uses an explicit-seed 48-bit LCG. This is an
-open source-fidelity gap, not completed random-initialization acceptance.
+are real-only (tensor.cxx:1578-1608).
+
+The former 48-bit LCG auto-guess has now been replaced by the exact MT19937-64
+parameters in interface/common.cxx:29-43. Generator owns its state explicitly;
+unit_interval divides the converted u64 result by converted u64::MAX exactly
+as get_rand48 does, without endpoint clamping. Tensor fill_random consumes a
+draw for every local storage slot before zeroing padding; f32 casts the sample
+before typed span arithmetic. Randomized SVD retains its explicit seed API,
+initializing the rank-local stream with seed+rank (wrapping u64 addition).
+Persistent streams can be supplied directly to fill_random rather than relying
+on the source's process-global RNG. Complex guesses with real bounds are real.

@@ -1142,6 +1142,19 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## MT19937-64 and typed dense random fill (2026-09-07)
+
+random_generator passed exact u64 vectors for seeds 0,1,5489 across positions
+0,1,311,312,623,624 (two twist boundaries), plus exact source interval conversion.
+Vectors came from one development-only std::mt19937_64 oracle execution, matching
+the pinned engine parameters; no C++ file or executable is a project dependency.
+distributed_random_fill passed WSL 1/2/4 ranks, world/parity: all four scalar
+fills and padding draw consumption are exact. It also verifies the changed
+f64 randomized-SVD auto-guess path on a rank-two matrix using the existing
+5*4*4*1e-6 reconstruction bound and finite results. No failures or extra studies.
+Both targets compiled/linked on Windows GNU once. Native MPI runtime remains
+pending. DIGIT / PASS for this change; whole-port acceptance remains incomplete.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,
