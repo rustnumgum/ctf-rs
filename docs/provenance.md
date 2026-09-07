@@ -1,5 +1,14 @@
 # Source provenance
 
+src/sparse_cost.rs directly ports spctr_2d_general.cxx time/memory estimates,
+spctr_comm.cxx replication estimates and spctr_tsr.cxx virtual bookkeeping.
+src/sparse_cost_local.rs ports seq_tsr_spctr::est_fp/est_membw/est_time_fp for
+CPU k0..k5, ordinary and custom named models. Source integer conversion points,
+heuristic sparse multipliers and unconditional csrred_mdl selection are kept.
+Model memory is not measured Rust allocator memory; automatic plan attachment
+is still pending. tests/sparse_cost.rs fixes exact coefficients and fractions
+to check these formulas without timings or tolerance relaxation.
+
 src/sparse_2d.rs::execute_pairs_dense ports the raw nonfolded sparse-A
 broadcast and dense-output branches of spctr_2d_general.cxx: per-block byte
 lengths and concatenated key/value payloads, unchanged local keys, fixed

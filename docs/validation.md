@@ -1,5 +1,20 @@
 # Validation evidence
 
+## Sparse CPU time and memory models (2026-09-07)
+
+sparse_cost passed its three local tests once in WSL. Exact constructed
+coefficients and dyadic fractions check all twelve CPU k0..k5 ordinary/custom
+models, raw/folded flop counts, 10x/30x traffic heuristics, per-operand integer
+truncation, sparse/dense panel payloads, layer scaling, CSR-vs-dense reduction
+model selection, replica copy thresholds, temporary-memory maxima and virtual
+composition. No MPI run is needed for these metadata-only functions. DIGIT /
+PASS for the model formulas; no precision study or repeated passing checks.
+
+Windows GNU compilation/linking passed. Native execution was attempted but
+failed before tests loaded: with the native library PATH set, exit status was
+0xc0000135 (DLL not found). The executable imports msmpi.dll, and
+C:\Windows\System32\msmpi.dll is absent. This is not a native runtime pass.
+
 ## Raw sparse-pair 2D communication (2026-09-07)
 
 distributed_sparse_2d_pairs passed once at WSL 1/2/4 ranks, world/parity.
