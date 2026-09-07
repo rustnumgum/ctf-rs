@@ -637,3 +637,8 @@ harness = false
 name = "pair_read"
 path = "tests/pair_read.rs"
 harness = false
+
+[[test]]
+name = "binary_io"
+path = "tests/binary_io.rs"
+harness = false

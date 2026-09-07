@@ -3,6 +3,8 @@ use crate::algebra::{Monoid, Wire};
 use mpi_sys as sys;
 #[path = "allgather.rs"]
 mod allgather;
+#[path = "binary_io.rs"]
+mod binary_io;
 #[path = "mpi_io.rs"]
 mod mpi_io;
 #[cfg(feature = "native-linalg")]

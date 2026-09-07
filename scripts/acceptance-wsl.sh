@@ -63,6 +63,7 @@ mpi_tests+=(subworld_transfer)
 mpi_tests+=(sparse_text_io)
 mpi_tests+=(symmetric_norms symmetric_text_io)
 mpi_tests+=(pair_read)
+mpi_tests+=(binary_io)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \

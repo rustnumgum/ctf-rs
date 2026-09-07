@@ -1,5 +1,15 @@
 # Validation evidence
 
+## Binary tensor MPI-IO (2026-09-07)
+
+`binary_io` passed once at 1/2/4 WSL ranks on world/parity contexts. Exact byte
+and value checks cover i8/i16/i32/i64/f32/f64/Complex32/Complex64, dense and sparse
+storage, virtual and replicated layouts, SY/AS/SH expansion and canonical-only
+overwrite, nonzero byte offsets, preserved prefix/suffix, empty local chunks,
+empty global dimensions and scalar tensors. DIGIT / PASS; no diagnostics or
+extra precision runs. Windows GNU compiled/linked the target once. Native MPI
+execution remains pending because the runtime is not installed.
+
 ## Explicit all-rank extraction (2026-09-07)
 
 `pair_read` passed once at 1/2/4 WSL ranks, world and parity subcommunicators.

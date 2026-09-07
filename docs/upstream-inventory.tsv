@@ -26,7 +26,7 @@ src/tensor/algstrct.cxx	src/tensor	pending
 src/tensor/algstrct.h	src/tensor	pending
 src/tensor/Makefile	Cargo/build tooling	replaced
 src/tensor/untyped_tensor_tmpl.h	src/tensor	pending
-src/tensor/untyped_tensor.cxx	src/tensor.rs; src/redist_cost.rs; src/fold_layout.rs	partial: dense storage and routed I/O/redistribution, source dense redistribution estimates, tensor::fold local packed-group metadata; optimized reshuffle and full folded storage lifecycle pending
+src/tensor/untyped_tensor.cxx	src/tensor.rs; src/redist_cost.rs; src/fold_layout.rs; src/pair_read.rs; src/binary_io.rs; src/ffi/binary_io.rs	partial: dense storage and routed I/O/redistribution, explicit all-rank extraction, consecutive-chunk binary MPI-IO for dense/sparse/compressed tensors, source dense redistribution estimates, tensor::fold local packed-group metadata; optimized reshuffle and full folded storage lifecycle pending
 src/tensor/untyped_tensor.h	src/tensor	pending
 src/shared/blas_symbs.cxx	src/shared	pending
 src/shared/blas_symbs.h	src/shared	pending

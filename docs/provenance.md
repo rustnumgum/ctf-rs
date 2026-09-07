@@ -7,6 +7,11 @@ Reference commit: f69cbb46e23bc2f39cda5722ce096f56301dab4f
 not a declaration that Edgar Solomonik authored the new Rust implementation.
 Do not stamp independently written files with the upstream author's copyright.
 
+* `src/binary_io.rs`, `src/ffi/binary_io.rs`: consecutive-rank chunks and native
+  independent-offset file I/O follow `tensor/untyped_tensor.cxx:3819-3909`.
+  Rust Wire encoding, explicit path/offset APIs and ownership replace raw pair
+  buffers and the C++ MPI_File interface. See `binary-io.md` for source corrections.
+
 * `src/pair_read.rs`, `src/ffi/allgather.rs`: explicit all-rank pair/data
   extraction follows `tensor/untyped_tensor.cxx:2443-2557`; stored sparse zeros
   and packed nonzero-only semantics follow `read_local_nnz:1880-1894` and
