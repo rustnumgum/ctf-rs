@@ -1,11 +1,11 @@
 // Adapted from cc4s contraction/{contraction,ctr_comm,ctr_2d_general}.cxx.
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
-//! Dense f64 execution for a preflight-valid raw NS mapping. This is the
+//! Dense semiring execution for a preflight-valid raw NS mapping. This is the
 //! unfolded source path: outer replication, general 2D panels, virtualization,
 //! and the sequential reference kernel.
 
 use crate::{
-    algebra::Arithmetic,
+    algebra::{Semiring, Wire},
     context::Context,
     ctr_2d::{Layers, Panel},
     mapping::{Distribution, Mapping},
@@ -37,6 +37,7 @@ struct Execution<'context> {
     block_shapes: [Vec<usize>; 3],
     virtual_phases: [Vec<usize>; 3],
     replicate: [Vec<Context<'context>>; 3],
+    has_replication: bool,
 }
 
 fn gcd(mut a: usize, mut b: usize) -> usize {
@@ -258,6 +259,8 @@ fn build_execution<'context>(
             mark_physical(mapping, &mut physical[operand]);
         }
     }
+    let has_replication = (0..topology.dimensions.len())
+        .any(|axis| (0..3).any(|operand| !physical[operand][axis]));
     let mut replicate: [Vec<Context<'context>>; 3] = std::array::from_fn(|_| Vec::new());
     for axis in 0..topology.dimensions.len() {
         if !(physical[0][axis] || physical[1][axis] || physical[2][axis]) {
@@ -358,26 +361,30 @@ fn build_execution<'context>(
         block_shapes,
         virtual_phases,
         replicate,
+        has_replication,
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_levels(
+fn execute_levels<A: Semiring>(
+    algebra: &A,
     levels: &[Level<'_>],
     level: usize,
     layers: Layers,
     block_shapes: &[Vec<usize>; 3],
     virtual_phases: &[Vec<usize>; 3],
     indices: [&str; 3],
-    a: &[f64],
-    b: &[f64],
-    c: &mut [f64],
-    alpha: f64,
-    beta: f64,
-) {
+    a: &[A::Element],
+    b: &[A::Element],
+    c: &mut [A::Element],
+    alpha: &A::Element,
+    beta: A::Element,
+) where
+    A::Element: Wire,
+{
     if level == levels.len() {
         crate::contraction::virtualized(
-            &Arithmetic::<f64>::new(),
+            algebra,
             &block_shapes[0],
             &virtual_phases[0],
             indices[0],
@@ -390,7 +397,7 @@ fn execute_levels(
             &virtual_phases[2],
             indices[2],
             c,
-            &alpha,
+            alpha,
             &beta,
         );
         return;
@@ -402,6 +409,7 @@ fn execute_levels(
         inner: current.specs[operand].inner,
     });
     crate::ctr_2d::execute(
+        algebra,
         current.edge,
         layers,
         panels[0],
@@ -413,6 +421,7 @@ fn execute_levels(
         beta,
         |a, b, c, beta, layers| {
             execute_levels(
+                algebra,
                 levels,
                 level + 1,
                 layers,
@@ -429,8 +438,13 @@ fn execute_levels(
     );
 }
 
-impl Tensor<'_, '_, Arithmetic<f64>> {
-    /// Execute `C = alpha*A*B + beta*C` using exact raw selected mappings.
+impl<A: Semiring + Clone> Tensor<'_, '_, A>
+where
+    A::Element: Wire,
+{
+    /// Execute the source contraction using raw selected mappings. Products are
+    /// right-scaled by alpha; nonscalar C is left-scaled by beta. A scalar leaf
+    /// without a replication layer retains the source right-beta special case.
     /// Inputs and output are restored to their original distributions; no
     /// aligned remapping, folding, or global tensor gather is performed.
     pub fn contract_from_mapped(
@@ -441,8 +455,8 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         b: &Self,
         indices_b: &str,
         mapped: [Distribution; 3],
-        alpha: f64,
-        beta: f64,
+        alpha: A::Element,
+        beta: A::Element,
     ) {
         assert!(std::ptr::eq(self.context(), a.context()));
         assert!(std::ptr::eq(self.context(), b.context()));
@@ -463,6 +477,7 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         let mut aa = (*a).clone();
         let mut bb = (*b).clone();
         let mut cc = self.clone();
+        let algebra = self.algebra().clone();
         aa.redistribute(mapped[0].clone());
         bb.redistribute(mapped[1].clone());
         cc.redistribute(mapped[2].clone());
@@ -473,19 +488,24 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
         for comm in &execution.replicate[1] {
             comm.broadcast(0, &mut bb.data);
         }
+        // construct_dense_ctr installs ctr_replicate when any topology axis is
+        // missing from any operand, even when an entirely unused axis gives
+        // that layer no actual communicator.
+        let has_replication = execution.has_replication;
         let output_root = execution.replicate[2]
             .iter()
             .all(|comm| comm.rank() == 0);
-        if output_root && beta != 1. {
-            if beta == 0. {
-                cc.data.fill(0.);
+        if has_replication && output_root && beta != algebra.one() {
+            if beta == algebra.zero() {
+                cc.data.fill(algebra.zero());
             } else {
                 for value in &mut cc.data {
-                    *value *= beta;
+                    *value = algebra.multiply(&beta, value);
                 }
             }
         }
         execute_levels(
+            &algebra,
             &execution.levels,
             0,
             Layers { count: 1, index: 0 },
@@ -495,11 +515,19 @@ impl Tensor<'_, '_, Arithmetic<f64>> {
             &aa.data,
             &bb.data,
             &mut cc.data,
-            alpha,
-            if output_root { 1. } else { 0. },
+            &alpha,
+            if has_replication {
+                if output_root {
+                    algebra.one()
+                } else {
+                    algebra.zero()
+                }
+            } else {
+                beta
+            },
         );
         for comm in &execution.replicate[2] {
-            comm.reduce_f64(0, &mut cc.data);
+            comm.reduce_monoid(&algebra, &mut cc.data, false, 0);
         }
         for group in execution.replicate {
             for comm in group {

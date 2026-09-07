@@ -1034,3 +1034,12 @@ execution remains a separate unfinished responsibility. SearchCache extends
 signature-based reuse to the raw selected layouts with immutable model/catalog
 configuration and explicit context lifetime. It caches no tensor contents or MPI
 subcommunicators; execution creates/closes fibers explicitly.
+
+ctr_2d::execute and raw dense execution now use the same Semiring/Wire algorithm
+for integer, complex and user elements, not parallel f64 and custom implementations.
+Panel scatter retains work + beta*old and local products retain right alpha.
+Replication-layer presence follows build_ctr's missing-axis test even if all axes
+are unused and its communicator lists are empty: that layer left-scales C by beta.
+An all-scalar leaf with topology order zero has no such layer and retains the
+source sequential right-beta special case. Ordered MPI user reductions replace
+the previous f64-only panel reduction in this generic entry point.

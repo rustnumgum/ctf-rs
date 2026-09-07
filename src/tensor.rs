@@ -88,7 +88,7 @@ impl Tensor<'_, '_, crate::algebra::Arithmetic<f64>> {
         cc.redistribute(Distribution::new(vec![m,n],topology.clone(),vec![row,column]));
         let ma = m.div_ceil(grid[0]); let nb = n.div_ceil(grid[1]); let kb = k.div_ceil(steps);
         let across_columns = topology.fiber(self.context,1); let across_rows = topology.fiber(self.context,0);
-        crate::ctr_2d::execute(steps,Layers {count:1,index:0},
+        crate::ctr_2d::execute(&crate::algebra::Arithmetic::<f64>::new(),steps,Layers {count:1,index:0},
             Panel {comm:Some(&across_columns),outer:1,inner:ma*kb},
             Panel {comm:Some(&across_rows),outer:1,inner:kb*nb},Panel {comm:None,outer:1,inner:0},
             &aa.data,&bb.data,&mut cc.data,beta,|a,b,c,beta,_| {

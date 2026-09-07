@@ -25,13 +25,17 @@ options are fixed for the cache lifetime; tensor values and alpha/beta are absen
 from the key. Misses search collectively, hits and clear are local, so ranks must
 use the same call sequence. No collective occurs in destruction.
 
-Tensor<Arithmetic<f64>>::contract_from_mapped executes the selected raw layout:
+Tensor<A>::contract_from_mapped (A: Semiring + Clone, Element: Wire) executes the selected raw layout:
 redistribution, outer replication, nested source 2D panel steps, virtual traversal,
 the unfolded sequential kernel, output reduction and original-layout restoration.
 Callers can feed SearchCache::prepare's selected distributions directly to it.
 It does not convert 2D choices to aligned maps or globally gather tensor values.
-Folded BLAS selection/execution, sparse estimates/execution, selection-scan
-diagnostics and other scalar/custom-function variants remain unfinished here.
+The shared panel executor uses ordered MPI user reductions for arbitrary algebra
+elements, including noncommuting matrix products. Set custom_reduce=true when
+modeling this reduction implementation; native predefined-MPI-op specialization
+is not yet selected automatically. Folded BLAS selection/execution, sparse
+estimates/execution, selection-scan diagnostics and custom bivariate functions
+remain unfinished here.
 
 ## Executable inner cost tree now connected
 

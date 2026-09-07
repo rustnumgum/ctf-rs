@@ -1022,6 +1022,19 @@ mapping was corrected without changing execution or tolerance, rank 2 then passe
 and previously unrun rank 4 passed. Rank 1 and old suites were not rerun. Windows
 GNU compilation/linking passed once; MS-MPI runtime acceptance remains pending.
 
+## Generic raw dense panel execution (2026-09-07)
+
+The changed shared executor was verified with dense_execution_algebra,
+dense_execution, ctr_2d and tensor_gemm at WSL 1/2/4 ranks. All passed. The new
+test covers a noncommuting 2x2 matrix algebra and i64 exactly, f32 and Complex<f64>
+at abs(error)<1e-6, all normal operand permutations, and scalar beta-side behavior
+with an unused physical axis versus topology order zero. Existing core callers
+cover nested/strided panels, cache execution, and BLAS GEMM after the API change.
+An initial compilation error was a missing Clone bound on the private generic
+panel operand helper; it was fixed before any test ran. No numerical failures or
+post-pass precision checks occurred. All four targets compiled/linked on Windows
+GNU; native MPI runtime execution remains pending.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each
