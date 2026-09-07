@@ -647,3 +647,8 @@ harness = false
 name = "schedule"
 path = "tests/schedule.rs"
 harness = false
+
+[[test]]
+name = "cyclic_reshuffle"
+path = "tests/cyclic_reshuffle.rs"
+harness = false

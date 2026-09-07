@@ -1,5 +1,16 @@
 # Validation evidence
 
+## Value-only dense cyclic reshuffle (2026-09-07)
+
+Three exact offset-stream unit tests passed once. `cyclic_reshuffle`,
+`dense_low_memory`, `typed_distributed_svd` and `schedule` passed once at 1/2/4
+WSL ranks, including subcontexts. New exact tests cover i8/bool/Complex64 and
+non-Copy custom three-byte Wire values, changing physical/virtual mappings,
+full/mixed replicas, padding, empty dimensions and scalar tensors. Affected
+low-memory and four-type SVD checks retained their existing bounds. DIGIT / PASS;
+no diagnostic runs. Native compile/link results are recorded with the stage;
+Windows MPI runtime execution remains pending.
+
 ## Distributed schedule execution (2026-09-07)
 
 Seven schedule graph/partition unit tests passed once. `schedule` passed once

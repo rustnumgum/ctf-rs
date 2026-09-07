@@ -734,24 +734,24 @@ impl<A: Monoid> Tensor<'_, '_, A> where A::Element: Wire {
     pub fn redistribute(&mut self, distribution: Distribution) {
         assert_eq!(distribution.shape, self.distribution.shape);
         assert_eq!(distribution.topology.size(), self.context.size());
+        let plan = crate::cyclic_reshuffle::Plan::new(&self.distribution, &distribution, self.context.rank());
         let mut buckets = vec![Vec::new(); self.context.size()];
-        for (key, value) in self.local_pairs() {
-            if self.distribution.owner(key) != self.context.rank() { continue; }
-            for (rank, bucket) in buckets.iter_mut().enumerate() {
-                if distribution.owns(rank, key) {
-                    (key as u64).encode(bucket); value.encode(bucket);
-                }
+        for (offsets, bucket) in plan.send.iter().zip(&mut buckets) {
+            bucket.reserve(offsets.len() * A::Element::WIDTH);
+            for &offset in offsets {
+                self.data[offset].encode(bucket);
             }
         }
         let received = self.context.inner.exchange(&buckets);
         let mut data = vec![self.algebra.zero(); distribution.local_len()];
-        for bytes in received {
-            for pair in bytes.chunks_exact(8 + A::Element::WIDTH) {
-                let key = u64::decode(&pair[..8]) as usize;
-                data[distribution.local_offset(self.context.rank(), key)] = A::Element::decode(&pair[8..]);
+        for (bytes, offsets) in received.iter().zip(&plan.receive) {
+            assert_eq!(bytes.len(), offsets.len() * A::Element::WIDTH);
+            for (value, &offset) in bytes.chunks_exact(A::Element::WIDTH).zip(offsets) {
+                data[offset] = A::Element::decode(value);
             }
         }
-        self.distribution = distribution; self.data = data;
+        self.distribution = distribution;
+        self.data = data;
     }
     pub fn reduce(&self) -> A::Element {
         let mut value = self.algebra.zero();

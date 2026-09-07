@@ -7,6 +7,11 @@ Reference commit: f69cbb46e23bc2f39cda5722ce096f56301dab4f
 not a declaration that Edgar Solomonik authored the new Rust implementation.
 Do not stamp independently written files with the upstream author's copyright.
 
+* `src/cyclic_reshuffle.rs` and dense `Tensor::redistribute`: NS physical-residue
+  traversal and ordered value-stream packing/unpacking follow
+  `redistribution/cyclic_reshuffle.cxx`. Rust local offsets encode virtual blocks;
+  explicit replica destinations retain the established Rust storage invariant.
+
 * `src/schedule.rs`, `src/schedule_graph.rs`, `src/schedule_partition.rs`:
   dependency release, cost-window partitioning and subworld execution phases
   adapted from `interface/schedule.{h,cxx}`. Rust closures replace C++ recorded
