@@ -467,51 +467,56 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A>
 where
     A::Element: Wire,
 {
-    /// Execute the source contraction using raw selected mappings. Products are
-    /// right-scaled by alpha; nonscalar C is left-scaled by beta. A scalar leaf
-    /// without a replication layer retains the source right-beta special case.
-    /// Inputs and output are restored to their original distributions; no
-    /// aligned remapping, folding, or global tensor gather is performed.
-    pub fn contract_from_mapped(
-        &mut self,
+    #[allow(clippy::too_many_arguments)]
+    fn execute_mapped(
+        c: &mut Self,
         indices_c: &str,
-        a: &Self,
+        a: &mut Self,
         indices_a: &str,
-        b: &Self,
+        b: &mut Self,
         indices_b: &str,
         mapped: [Distribution; 3],
         alpha: A::Element,
         beta: A::Element,
+        restore_inputs: bool,
     ) {
-        assert!(std::ptr::eq(self.context(), a.context()));
-        assert!(std::ptr::eq(self.context(), b.context()));
+        assert!(std::ptr::eq(c.context(), a.context()));
+        assert!(std::ptr::eq(c.context(), b.context()));
         assert_eq!(mapped[0].shape, a.distribution().shape);
         assert_eq!(mapped[1].shape, b.distribution().shape);
-        assert_eq!(mapped[2].shape, self.distribution().shape);
-        assert_eq!(mapped[0].topology.size(), self.context().size());
+        assert_eq!(mapped[2].shape, c.distribution().shape);
+        assert_eq!(mapped[0].topology.size(), c.context().size());
         assert!(crate::mapping_preflight::check(
             mapped.each_ref(),
             [indices_a, indices_b, indices_c]
         ));
 
+        let original = [
+            a.distribution().clone(),
+            b.distribution().clone(),
+            c.distribution().clone(),
+        ];
+        let algebra = c.algebra().clone();
         let execution = build_execution(
-            self.context(),
+            c.context(),
             mapped.each_ref(),
             [indices_a, indices_b, indices_c],
         );
-        let mut aa = (*a).clone();
-        let mut bb = (*b).clone();
-        let mut cc = self.clone();
-        let algebra = self.algebra().clone();
-        aa.redistribute(mapped[0].clone());
-        bb.redistribute(mapped[1].clone());
-        cc.redistribute(mapped[2].clone());
+        if a.distribution() != &mapped[0] {
+            a.redistribute(mapped[0].clone());
+        }
+        if b.distribution() != &mapped[1] {
+            b.redistribute(mapped[1].clone());
+        }
+        if c.distribution() != &mapped[2] {
+            c.redistribute(mapped[2].clone());
+        }
 
         for comm in &execution.replicate[0] {
-            comm.broadcast(0, &mut aa.data);
+            comm.broadcast(0, &mut a.data);
         }
         for comm in &execution.replicate[1] {
-            comm.broadcast(0, &mut bb.data);
+            comm.broadcast(0, &mut b.data);
         }
         // construct_dense_ctr installs ctr_replicate when any topology axis is
         // missing from any operand, even when an entirely unused axis gives
@@ -522,9 +527,9 @@ where
             .all(|comm| comm.rank() == 0);
         if has_replication && output_root && beta != algebra.one() {
             if beta == algebra.zero() {
-                cc.data.fill(algebra.zero());
+                c.data.fill(algebra.zero());
             } else {
-                for value in &mut cc.data {
+                for value in &mut c.data {
                     *value = algebra.multiply(&beta, value);
                 }
             }
@@ -556,9 +561,9 @@ where
             &execution.levels,
             0,
             Layers { count: 1, index: 0 },
-            &aa.data,
-            &bb.data,
-            &mut cc.data,
+            &a.data,
+            &b.data,
+            &mut c.data,
             if has_replication {
                 if output_root {
                     algebra.one()
@@ -571,7 +576,7 @@ where
             &mut leaf,
         );
         for comm in &execution.replicate[2] {
-            comm.reduce_monoid(&algebra, &mut cc.data, false, 0);
+            comm.reduce_monoid(&algebra, &mut c.data, false, 0);
         }
         for group in execution.replicate {
             for comm in group {
@@ -583,8 +588,86 @@ where
                 comm.close();
             }
         }
-        cc.redistribute(self.distribution().clone());
+        if c.distribution() != &original[2] {
+            c.redistribute(original[2].clone());
+        }
+        if restore_inputs {
+            if a.distribution() != &original[0] {
+                a.redistribute(original[0].clone());
+            }
+            if b.distribution() != &original[1] {
+                b.redistribute(original[1].clone());
+            }
+        }
+    }
+
+    /// Execute the source contraction using raw selected mappings. Products are
+    /// right-scaled by alpha; nonscalar C is left-scaled by beta. A scalar leaf
+    /// without a replication layer retains the source right-beta special case.
+    /// Inputs and output are restored to their original distributions; no
+    /// aligned remapping, folding, or global tensor gather is performed.
+    pub fn contract_from_mapped(
+        &mut self,
+        indices_c: &str,
+        a: &Self,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        mapped: [Distribution; 3],
+        alpha: A::Element,
+        beta: A::Element,
+    ) {
+        let mut aa = (*a).clone();
+        let mut bb = (*b).clone();
+        let mut cc = self.clone();
+        Self::execute_mapped(
+            &mut cc,
+            indices_c,
+            &mut aa,
+            indices_a,
+            &mut bb,
+            indices_b,
+            mapped,
+            alpha,
+            beta,
+            false,
+        );
         *self = cc;
+    }
+
+    /// Execute a raw selected mapping in place without retaining home-buffer
+    /// copies. A, B, and C are restored to their original distributions before
+    /// returning. The source low-memory path rejects zero-length dimensions.
+    #[allow(clippy::too_many_arguments)]
+    pub fn contract_low_memory_from_mapped(
+        &mut self,
+        indices_c: &str,
+        a: &mut Self,
+        indices_a: &str,
+        b: &mut Self,
+        indices_b: &str,
+        mapped: [Distribution; 3],
+        alpha: A::Element,
+        beta: A::Element,
+    ) {
+        assert!(
+            self.distribution().shape.iter().all(|&length| length != 0)
+                && a.distribution().shape.iter().all(|&length| length != 0)
+                && b.distribution().shape.iter().all(|&length| length != 0),
+            "source low-memory contraction does not support zero-length dimensions"
+        );
+        Self::execute_mapped(
+            self,
+            indices_c,
+            a,
+            indices_a,
+            b,
+            indices_b,
+            mapped,
+            alpha,
+            beta,
+            true,
+        );
     }
 }
 

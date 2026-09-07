@@ -237,3 +237,11 @@ execution removes those retained home copies but still allocates redistribution
 and transpose workspace; it is not a zero-allocation or hard-RSS-bound promise.
 The representative mpi_low_memory_bench example measures one contraction with
 search excluded and both redistribution/restoration included.
+
+`contract_low_memory_from_mapped` supplies the same live-buffer ownership policy
+to the raw, unfolded generic semiring executor. It retains ordered MPI user
+reductions, right alpha scaling, nonscalar left beta and the scalar/no-replication
+right-beta special case. Mutable operands restore their original distributions
+in C/A/B order. This adds integer, f32, complex and custom-algebra low-memory
+execution without routing them through f64 BLAS or introducing a backend layer.
+Generic node-aware rank reordering is still pending.

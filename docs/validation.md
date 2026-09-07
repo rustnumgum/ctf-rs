@@ -1028,6 +1028,17 @@ RSS includes MPI/runtime and planning, is not tensor workspace alone, and is not
 the source memory estimator. This single sample makes no speedup or memory-ratio
 claim. DIGIT / PASS for the acceptance set; benchmark was not a precision study.
 
+## Generic semiring low-memory execution (2026-09-07)
+
+dense_execution and the extended dense_execution_algebra passed once at WSL
+1/2/4 ranks, world/parity. Both immutable-home and mutable-low-memory modes
+cover all six raw normal mappings and scalar coefficient-side cases, with exact
+input restoration and layout checks. Noncommutative 2x2 integer matrix products
+and i64 results are exact; f32/complex checks retain their existing 1e-6 bounds.
+Both targets compiled/linked once on Windows GNU. No failures, tolerance changes
+or extra numerical runs. DIGIT / PASS; native MPI runtime and overall port
+acceptance remain outstanding.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

@@ -1138,3 +1138,8 @@ then A and B, and rejects zero-edge, sparse, custom-bivariate and aliased inputs
 Rust's distinct mutable borrows replace its pointer-identity assertions and
 manual alias flags. This stage connects that policy to the existing NS folded
 raw execution; automatic compressed-symmetry low-memory orchestration is pending.
+
+The same lowmem_contract ownership transfer now applies to the generic raw
+semiring executor. Its scalar coefficient ordering follows sym_seq_ctr rather
+than assuming multiplication commutes; MPI reductions retain the explicit
+noncommutative custom-operation flag. No f64 conversion of generic values is used.
