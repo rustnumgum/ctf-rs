@@ -118,7 +118,7 @@ src/contraction/spctr_comm.cxx	src/sparse_contract_general.rs	partial: explicit 
 src/contraction/spctr_comm.h	src/contraction	pending
 src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
-src/contraction/spctr_tsr.cxx	src/sparse_virtual.rs; src/sparse_contract_general.rs	partial: source virtual strides/order, repeated-index offsets and per-output beta-first tracking, integrated mapped sparse-A/dense-B/dense-C virtual blocks; complete sparse-output/nested panel assembly pending
+src/contraction/spctr_tsr.cxx	src/sparse_virtual.rs; src/sparse_contract_general.rs; src/sparse_gemm.rs; src/sparse_fold.rs	partial: source virtual strides/order, repeated-index offsets and per-output beta-first tracking, mapped sparse-A/dense-B/dense-C virtual blocks and native krnl5 sparse-A/dense-B/CCSR-output with folded orchestration; automatic sparse-output/nested panel assembly pending; non-inner sparse-output is a source assertion, not a working leaf
 src/contraction/spctr_tsr.h	src/contraction	pending
 src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar/custom-function reference kernels, packed custom MPI orchestration, typed canonical partial/symmetry folded BLAS residual traversal and four-type distributed integration; custom-function folded branch and automatic compressed integration pending
 src/contraction/sym_seq_ctr.h	src/contraction	pending
@@ -232,7 +232,7 @@ examples/qinformatics.cxx	tests/upstream/examples/qinformatics.rs	pending
 examples/recursive_matmul.cxx	tests/upstream/examples/recursive_matmul.rs	pending
 examples/scan.cxx	tests/upstream/examples/scan.rs	pending
 examples/sparse_mp3.cxx	tests/upstream_sparse_mp3.rs; tests/upstream_sparse_mp3_t.rs	partial: dense-T and sparse-T equation/function chains with original relative-energy tolerance; rank-seeded random fixture and benchmark driver pending
-examples/sparse_permuted_slice.cxx	tests/upstream/examples/sparse_permuted_slice.rs	pending
+examples/sparse_permuted_slice.cxx	pending: source-semantic packed permutation APIs exist	unaccepted: static full-orbit/canonical-duplicate analysis conflicts with compressed callback-copy assertion (SY/AS/SH off-diagonal 2x); no driver execution or tolerance change; see docs/upstream-known-failures.md
 examples/spectral_element.cxx	tests/upstream/examples/spectral_element.rs	pending
 examples/spmv.cxx	tests/upstream/examples/spmv.rs	pending
 examples/sssp.cxx	tests/upstream/examples/sssp.rs	pending

@@ -1,5 +1,19 @@
 # Validation evidence
 
+## Sparse-A/dense-B native sparse output (2026-09-07)
+
+distributed_sparse_dense_output and the affected distributed_sparse_gemm,
+distributed_sparse_function_output, distributed_sparse_fold targets passed once
+at WSL 1/2/4 ranks, world/parity. Exact i64 results and stored key sets cover
+CCSR represented rows, explicit zeros, old-only keys with beta=0/3, multiple k
+panels, square/rectangular grids, uneven/empty local pieces and zero inner extent.
+The high-order case includes repeated A/C labels, both A-only and B-only sums,
+off-diagonal preservation and original virtual output distribution restoration.
+CCSR output converts directly to coordinates, without a full dense C or full
+CSR row-pointer array. All four targets compiled/linked once on Windows GNU.
+DIGIT / PASS; no failures or extra numerical computations. Native runtime
+acceptance remains pending.
+
 ## Integer dense/packed random filling (2026-09-07)
 
 integer_random passed once at WSL 1/2/4 ranks, world/parity. Exact i32/i64

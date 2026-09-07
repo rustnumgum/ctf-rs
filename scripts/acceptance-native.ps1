@@ -57,6 +57,7 @@ $arguments += @('--test', 'upstream_ccsdt_map', '--test', 'upstream_ccsdt_t3_to_
 $arguments += @('--test', 'symmetric_random')
 $arguments += @('--test', 'upstream_weigh4d', '--test', 'upstream_dft', '--test', 'distributed_symmetric_function')
 $arguments += @('--test', 'integer_random')
+$arguments += @('--test', 'distributed_sparse_dense_output')
 foreach ($test in @('upstream_subworld_gemm','upstream_readall','upstream_readwrite','upstream_sptensor_sum')) { $arguments += @('--test', $test) }
 foreach ($test in @('typed_grid_blas','typed_randomized_svd','typed_distributed_eigh','typed_tensor_svd','typed_multilinear','tttp_memory','tensor_norms','storage_conversion','sparse_random_fill','subworld_transfer','sparse_text_io','symmetric_norms','symmetric_text_io','pair_read')) { $arguments += @('--test', $test) }
 foreach ($ranks in 1,2,4) {

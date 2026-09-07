@@ -1,5 +1,18 @@
 # Reproduced pinned-source failures
 
+## Related sparse_permuted_slice expectation (static finding only)
+
+The callback-copy expectation in `examples/sparse_permuted_slice.cxx` has the
+same full-orbit/canonical-write multiplicity conflict. Each off-diagonal child
+entry is requested in both orientations. SY/SH accumulate x+x; AS applies the
+parent-read sign and destination-write sign, also accumulating x+x. Thus a
+nonzero compressed callback becomes 2x rather than x. This is a static inference
+from the source-compatible transfer steps, **not an executed result for this
+example**. Its draft Rust driver was not registered or run; no normalization,
+tolerance relaxation, or branch removal was used to claim a pass. The example
+remains unaccepted. The source order-three singleton callback's `ij` notation
+would use explicit `ijk` in Rust without preserving C++ string ABI behavior.
+
 These are failures of the unmodified C++ reference, not Rust acceptance passes.
 Do not relax tolerances or change the Rust semantics merely to hide them.
 

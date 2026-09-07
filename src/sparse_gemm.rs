@@ -41,9 +41,8 @@ impl Layout {
         };
         Distribution::new(shape, topology, maps)
     }
-    fn output_pairs<E: Clone>(&self, matrix: &Csr<E>, rank: usize) -> Vec<(usize, E)> {
-        let coo = matrix.to_coo();
-        let mut pairs: Vec<_> = coo.entries().iter().filter_map(|(row, col, value)| {
+    fn output_pairs<E: Clone>(&self, matrix: &Coo<E>, rank: usize) -> Vec<(usize, E)> {
+        let mut pairs: Vec<_> = matrix.entries().iter().filter_map(|(row, col, value)| {
             let i = (row - 1) * self.grid[0] + rank % self.grid[0];
             let j = (col - 1) * self.grid[1] + rank / self.grid[0];
             (i < self.shape[0] && j < self.shape[2]).then(|| (i + self.shape[0] * j, value.clone()))
@@ -165,7 +164,30 @@ impl<A: Semiring + Clone> SparseTensor<'_, '_, A> where A::Element: Wire {
         sparse_panels(a, b, &layout, |a, b, step| {
             c = a.multiply_sparse(b, &alpha, if step == 0 { &beta } else { &one }, Some(&c), &algebra);
         });
-        self.blocks = vec![layout.output_pairs(&c, self.context().rank())];
+        self.blocks = vec![layout.output_pairs(&c.to_coo(), self.context().rank())];
+        self.redistribute(original);
+    }
+
+    /// Explicit-grid sparse-by-dense matrix product with sparse CCSR output.
+    /// Represented rows follow sparse A; structural zero results are retained.
+    pub fn gemm_sparse_dense(&mut self, a: &Self, b: &Tensor<'_, '_, A>, grid: [usize; 2],
+        alpha: A::Element, beta: A::Element) {
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
+        let original = self.distribution().clone();
+        self.redistribute(layout.distribution(2));
+        let entries = self.local_pairs().into_iter().map(|(key, value)| (
+            key % layout.shape[0] / grid[0] + 1,
+            key / layout.shape[0] / grid[1] + 1, value)).collect();
+        let mut c = Coo::new(layout.local[0], layout.local[2], entries).to_ccsr();
+        let algebra = self.algebra().clone();
+        let one = algebra.one();
+        sparse_dense_panels(a, b, &layout, |a, b, step| {
+            let a = a.to_coo().to_ccsr();
+            c = a.multiply_dense(layout.local[2], b, &alpha,
+                if step == 0 { &beta } else { &one }, Some(&c), &algebra);
+        });
+        self.blocks = vec![layout.output_pairs(&c.to_coo(), self.context().rank())];
         self.redistribute(original);
     }
 
@@ -186,7 +208,7 @@ impl<A: Semiring + Clone> SparseTensor<'_, '_, A> where A::Element: Wire {
         // Source home_contract computes into empty C_buf, then sparse-sums it
         // into old C. This retains old-only zero keys and right-scales by beta.
         let mut product = Self::new(self.context(),layout.distribution(2),algebra);
-        product.blocks = vec![layout.output_pairs(&c,self.context().rank())];
+        product.blocks = vec![layout.output_pairs(&c.to_coo(),self.context().rank())];
         self.sum_from("ij",&product,"ij",one,beta);
     }
 }

@@ -79,6 +79,7 @@ mpi_tests+=(upstream_ccsdt_map upstream_ccsdt_t3_to_t2)
 mpi_tests+=(symmetric_random)
 mpi_tests+=(upstream_weigh4d upstream_dft distributed_symmetric_function)
 mpi_tests+=(integer_random)
+mpi_tests+=(distributed_sparse_dense_output)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \

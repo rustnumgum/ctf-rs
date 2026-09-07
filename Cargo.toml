@@ -752,3 +752,8 @@ harness = false
 name = "integer_random"
 path = "tests/integer_random.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_dense_output"
+path = "tests/distributed_sparse_dense_output.rs"
+harness = false

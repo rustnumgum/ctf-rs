@@ -1,5 +1,11 @@
 # Source provenance
 
+Sparse-output krnl5 dispatch follows contraction.cxx:4313-4327 and
+spctr_tsr.cxx:505-524. sparse_gemm.rs reuses source-style sparse/dense panel
+communication with the existing gen_ccsrmm port; sparse_fold.rs applies the
+same input reduction/diagonal/fold pipeline to its sparse result. Unsupported
+non-inner sparse-output source branches are distinguished in sparse-output.md.
+
 Integer `fill_random` in random.rs and symmetric_random.rs ports the int/int64_t
 specializations at interface/tensor.cxx:1612-1620. Unlike the real scalar sample
 cast, the integer cast occurs after multiplying by the span in double precision.
