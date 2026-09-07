@@ -1024,3 +1024,13 @@ selection gathers one time/memory pair per rank, broadcasts the winner rank and
 ID/cost payload, and rebuilds that ID locally. Full structural topology/node
 facts replace pointer identity. No timing probes or alternate mapping fallback
 are introduced during candidate selection.
+
+dense_execution.rs retains the dense build_ctr/ctr_2d_gen_build metadata needed
+at runtime: physical fiber axis, outer strip count, contiguous inner strip size,
+panel edge length, and residual virtual phases. It executes existing ctr_2d and
+contraction kernels, not a replacement aligned contraction. Input/output owner
+redistribution uses the existing key-routed Rust path; optimized source reshuffle
+execution remains a separate unfinished responsibility. SearchCache extends
+signature-based reuse to the raw selected layouts with immutable model/catalog
+configuration and explicit context lifetime. It caches no tensor contents or MPI
+subcommunicators; execution creates/closes fibers explicitly.

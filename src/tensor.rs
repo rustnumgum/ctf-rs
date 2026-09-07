@@ -355,7 +355,7 @@ pub struct Tensor<'context, 'runtime, A: Monoid> {
     context: &'context Context<'runtime>,
     algebra: A,
     distribution: Distribution,
-    data: Vec<A::Element>,
+    pub(crate) data: Vec<A::Element>,
 }
 
 impl<'c, 'r, A: Monoid> Tensor<'c, 'r, A> {

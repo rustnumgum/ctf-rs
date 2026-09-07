@@ -1006,6 +1006,22 @@ studies. Windows GNU compilation/linking passed once; native MPI runtime remains
 pending. These checks validate selection/model logic, not contraction execution
 or performance speedup.
 
+## Raw dense execution and search cache (2026-09-07)
+
+dense_execution passed WSL 1/2/4 ranks with world/parity communicators. It checks
+all six normal mapping permutations, input/output-moving raw variants, nested
+panel levels including a rectangular physical pair, virtual batch traversal,
+padding/empty true fragments, original output layout, and finite reconstruction
+values at abs(error)<1e-6. Cached search reuses a plan with changed input values
+and alpha/beta, recognizes index alpha-renaming, misses after input redistribution,
+and re-searches after clear; hit/miss counts are exact.
+
+Rank 1 passed initially. Rank 2 first rejected the manually constructed nested
+test layout: its [2,1] physical pair lacked B's required virtual factor 2. The test
+mapping was corrected without changing execution or tolerance, rank 2 then passed,
+and previously unrun rank 4 passed. Rank 1 and old suites were not rerun. Windows
+GNU compilation/linking passed once; MS-MPI runtime acceptance remains pending.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each

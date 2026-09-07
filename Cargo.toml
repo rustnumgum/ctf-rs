@@ -463,3 +463,8 @@ path = "tests/mapped_cost.rs"
 name = "dense_search"
 path = "tests/dense_search.rs"
 harness = false
+
+[[test]]
+name = "dense_execution"
+path = "tests/dense_execution.rs"
+harness = false

@@ -2,7 +2,8 @@
 // selection and refinement (lines 2834-3190 and 3280-3342).
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Collective dense-unfolded mapping search. This module deliberately excludes
-//! folding, cached candidates, and the aligned `GridPlan` search space.
+//! folding and the aligned `GridPlan` search space. SearchCache retains selected
+//! raw layouts for a fixed context and immutable search configuration.
 
 use crate::{
     context::Context,
@@ -40,6 +41,51 @@ pub struct Selected {
     pub seconds: f64,
     pub memory_bytes: u64,
     pub distributions: [Distribution; 3],
+}
+
+/// Context-scoped cache for this search configuration. Models and topology facts
+/// are borrowed immutably so a stored estimate cannot silently acquire different
+/// coefficients or node counts. Alpha, beta and tensor values are not cache keys.
+///
+/// A miss performs collective search; a hit and clear are local. As with source
+/// collective planning, ranks must call prepare/clear in the same sequence.
+pub struct SearchCache<'context,'runtime> {
+    context: &'context Context<'runtime>,
+    catalog: &'context [TopologyFacts],
+    models: &'context Models,
+    element_bytes: usize,
+    local_custom: bool,
+    custom_reduce: bool,
+    options: Options,
+    plans: std::collections::HashMap<(crate::planning::Signature,[Vec<usize>;3]),Selected>,
+    stats: crate::planning::CacheStats,
+}
+impl<'context,'runtime> SearchCache<'context,'runtime> {
+    pub fn new(context:&'context Context<'runtime>,catalog:&'context [TopologyFacts],
+        models:&'context Models,element_bytes:usize,local_custom:bool,custom_reduce:bool,options:Options)->Self{
+        Self{context,catalog,models,element_bytes,local_custom,custom_reduce,options,
+            plans:std::collections::HashMap::new(),stats:crate::planning::CacheStats::default()}
+    }
+    pub fn stats(&self)->crate::planning::CacheStats{self.stats}
+    pub fn len(&self)->usize{self.plans.len()}
+    pub fn is_empty(&self)->bool{self.plans.is_empty()}
+    pub fn clear(&mut self){self.plans.clear();}
+    pub fn prepare(&mut self,old:[&Distribution;3],old_nodes:[&[usize];3],indices:[&str;3])
+        ->Result<Option<&Selected>,Error>{
+        let signature=crate::planning::Signature::new(old,indices,old[0].topology.clone());
+        let key=(signature,old_nodes.map(|nodes|nodes.to_vec()));
+        match self.plans.entry(key){
+            std::collections::hash_map::Entry::Occupied(entry)=>{
+                self.stats.hits+=1;Ok(Some(entry.into_mut()))
+            },
+            std::collections::hash_map::Entry::Vacant(entry)=>{
+                self.stats.misses+=1;
+                let Some(selected)=search_dense_unfolded(self.context,old,old_nodes,indices,self.catalog,self.models,
+                    self.element_bytes,self.local_custom,self.custom_reduce,self.options)?else{return Ok(None)};
+                Ok(Some(entry.insert(selected)))
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

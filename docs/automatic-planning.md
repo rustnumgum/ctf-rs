@@ -19,9 +19,19 @@ element limits precede ranking. Equal scores retain source local order and then
 rank order. Only local winner costs and the winning ID are communicated, not all
 candidate maps or tensor values.
 
-The result is a selected mapping with modeled time/memory, not yet a cached
-executable automatic contraction. Folding, sparse estimates, selection-scan
-diagnostics and the full mapping-to-execution connection remain unfinished.
+SearchCache retains these selected mappings using the structural contraction
+signature and old node facts. Context, catalog, model coefficients and search
+options are fixed for the cache lifetime; tensor values and alpha/beta are absent
+from the key. Misses search collectively, hits and clear are local, so ranks must
+use the same call sequence. No collective occurs in destruction.
+
+Tensor<Arithmetic<f64>>::contract_from_mapped executes the selected raw layout:
+redistribution, outer replication, nested source 2D panel steps, virtual traversal,
+the unfolded sequential kernel, output reduction and original-layout restoration.
+Callers can feed SearchCache::prepare's selected distributions directly to it.
+It does not convert 2D choices to aligned maps or globally gather tensor values.
+Folded BLAS selection/execution, sparse estimates/execution, selection-scan
+diagnostics and other scalar/custom-function variants remain unfinished here.
 
 ## Executable inner cost tree now connected
 
