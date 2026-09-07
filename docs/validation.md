@@ -967,6 +967,15 @@ scales and merges old entries. Output distribution is unchanged. DIGIT / PASS,
 no failures or extra numerical runs. Both targets compiled/linked on Windows GNU;
 native runtime remains unaccepted.
 
+## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
+
+upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each
+passed once at 1/2/4 WSL ranks, world/parity subcommunicators. All three source
+identities retain strict abs(error)<1e-6; typed scalar broadcast and repeated-output
+diagonal transform additionally match exact representable values, including empty
+local shards. DIGIT / PASS; no failures or extra numerical runs. All three targets
+compiled and linked once on Windows GNU. Native runtime acceptance remains open.
+
 ## High-order sparse custom contraction (2026-09-07)
 
 distributed_sparse_fold_function passed once at 1/2/4 WSL ranks, world/parity,

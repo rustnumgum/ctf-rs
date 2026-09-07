@@ -36,7 +36,8 @@ $mpiTests = @(
     'distributed_sparse_multilinear','distributed_sparse_solve_factor','distributed_sparse_input_reduction',
     'distributed_sparse_general','distributed_sparse_function','distributed_sparse_gemm_function',
     'distributed_sparse_function_output','distributed_sparse_fold_function',
-    'upstream_bivar_function','distributed_dense_function'
+    'upstream_bivar_function','distributed_dense_function',
+    'upstream_univar_function','upstream_endomorphism','upstream_bivar_transform'
 )
 $arguments = @()
 foreach ($test in $mpiTests) { $arguments += @('--test', $test) }

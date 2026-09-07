@@ -169,7 +169,7 @@ src/scaling/strp_tsr.h	src/scaling	pending
 src/scaling/sym_seq_scl.cxx	src/symmetry.rs; src/symmetric_operations.rs	partial: local and distributed packed indexed right scaling and transforms; automatic scaling remapping pending
 src/scaling/sym_seq_scl.h	src/scaling	pending
 test/bivar_function.cxx	tests/upstream_bivar_function.rs	ported: original four-dimensional beta=.5 bivariate identity and strict abs(error)<1e-6; deterministic global-key fixture replaces rank-seeded random initialization
-test/bivar_transform.cxx	tests/upstream/test/bivar_transform.rs	pending
+test/bivar_transform.cxx	tests/upstream_bivar_transform.rs; src/dense_transform.rs	ported: original mutable-output identity, n=5 and strict abs(error)<1e-6; deterministic global-key fixtures; extra typed/diagonal Rust coverage
 test/ccsdt_map_test.cxx	tests/upstream/test/ccsdt_map_test.rs	pending
 test/ccsdt_t3_to_t2.cxx	tests/upstream/test/ccsdt_t3_to_t2.rs	pending
 test/dft.cxx	tests/upstream/test/dft.rs	pending
@@ -177,7 +177,7 @@ test/diag_ctr.cxx	tests/upstream_dense.rs; tests/upstream_diag_ctr.rs	identity p
 test/diag_sym.cxx	tests/upstream_diag_sym.rs	ported paired-SY diagonal identity, original norm<1e-10, deterministic fixture; WSL 1/2/4 ranks pass
 test/endomorphism_cust_sp.cxx	tests/upstream/test/endomorphism_cust_sp.rs	pending
 test/endomorphism_cust.cxx	tests/upstream/test/endomorphism_cust.rs	pending
-test/endomorphism.cxx	tests/upstream/test/endomorphism.rs	pending
+test/endomorphism.cxx	tests/upstream_endomorphism.rs	ported: original indexed cube transform, n=5 and strict abs(error)<1e-6; deterministic global-key fixture
 test/gemm_4D.cxx	tests/upstream_gemm4d.rs	NS associativity port PASS WSL 1/2/4; SY/AS branches pending
 test/Makefile	Cargo/build tooling	replaced
 test/multi_tsr_sym.cxx	tests/upstream_multi_tsr_sym.rs	ported NS/SY Gram equality, original norm<1e-6; WSL 1/2/4 pass
@@ -192,7 +192,7 @@ test/sptensor_sum.cxx	tests/upstream/test/sptensor_sum.rs	pending
 test/subworld_gemm.cxx	tests/upstream/test/subworld_gemm.rs	pending
 test/sy_times_ns.cxx	tests/upstream_sy_times_ns.rs	ported literal zero-input source and separately adapted nonzero fixture, original norm<1e-10; WSL 1/2/4 pass
 test/test_suite.cxx	tests/upstream/test/test_suite.rs	pending
-test/univar_function.cxx	tests/upstream/test/univar_function.rs	pending
+test/univar_function.cxx	tests/upstream_univar_function.rs	ported: original .25*A+A^4 identity, n=5 and strict abs(error)<1e-6; deterministic global-key fixture
 test/weigh_4D.cxx	tests/upstream/test/weigh_4D.rs	pending
 test/python/test_base.py	Rust semantic tests (no Python interface)	pending
 test/python/test_dot.py	Rust semantic tests (no Python interface)	pending

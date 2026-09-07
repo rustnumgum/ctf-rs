@@ -921,3 +921,20 @@ upstream_bivar_function preserves test/bivar_function.cxx's n=5 shape [6,5,7,8],
 f(a,b)=a*b+b*a, beta=.5 update, and strict absolute error <1e-6. A clone expresses
 the source aliased old-A operand in Rust. Global-key values replace rank-seeded
 random data; the acceptance reference is the original per-element identity.
+
+## Indexed dense accumulator transforms and unary source tests
+
+dense_transform.rs provides mutable-output bivariate transforms with independently
+typed dense inputs. Each input's indices must occur in the output; repeated output
+indices select its diagonal. Required input keys are read collectively, then the
+function updates each selected local output exactly once, retaining its layout.
+This pointwise/subset path does not convert an accumulator into additive function
+contributions or assume a reduction law. It uses current indexed I/O; optimized
+source redistribution/broadcast transform plans remain to be integrated.
+
+The source bivar_transform identity c=a*c*a+b*c*b, endomorphism cube, and
+univar_function .25*a+a^4 use original n=5 shapes and strict abs(error)<1e-6.
+Global-key fixtures replace rank-seeded random initialization. The source unary
+function's printed cube label is a typo; the test and implementation use its actual
+fourth-power formula. Additional typed scalar-broadcast/diagonal checks in the
+bivariate transform test are explicitly separate from the original source case.
