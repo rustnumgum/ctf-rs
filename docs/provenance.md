@@ -1073,3 +1073,18 @@ order. partial_fold.rs composes get_fold_ctr/select_ctr_perm/map_fold metadata
 residual groups participate in estimates; group-terminal fold-index holes remain
 explicit and are never converted to fictitious dimensions. Role membership is
 independent of role order; transpose cost addition retains source role order.
+
+partial_fold_kernel.rs adapts sym_seq_ctr_inr (sym_seq_ctr.cxx:746-930), folded
+dimension collapse (ctr_tsr.cxx:253-320), and shared/iter_tsr.h GET_MIN_MAX,
+CHECK_SYM and RESET_IDX. It preserves label-zero-fast traversal, initial call
+before symmetry checks, non-SEQ nondecreasing linked-coordinate checks, source
+packed-offset recurrence and beta-once scaling before batched GEMM.
+The pinned CMakeLists.txt:86-120 does not define SEQ; strict AS/SH CHECK_SYM is
+the alternate branch at iter_tsr.h:30-50, while this default port follows 51-64.
+
+Source reinspection corrected a prior fold-metadata error: tensor::fold and
+RESET_IDX use sy_packed_size (shared/util.cxx:10-35), which increments its group
+extent for all link kinds. They do not use packed_size (38 onward), which shrinks
+AS/SH extents. FoldLayout now retains local AS/SH diagonal holes with SY capacity;
+the kernel shares that exact recurrence. Logical compact symmetry Layout remains
+unchanged. This is a source-layout correction, not a tolerance adjustment.

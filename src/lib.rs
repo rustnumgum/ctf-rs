@@ -55,3 +55,4 @@ mod dense_execution;
 pub mod fold_indices;
 pub mod fold_layout;
 pub mod partial_fold;
+pub mod partial_fold_kernel;

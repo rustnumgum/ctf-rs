@@ -65,6 +65,14 @@ the residual/unfolded dimensions in transpose costs. Its descriptor exposes the
 packed lnmk parameters, transpose flags and selected storage ordering. The source
 partially folded local kernel and distributed folded execution are still pending.
 
+partial_fold_kernel::execute<K> now performs one local f64 partial-fold block:
+owned storage transpose, selected-dimension collapse, source residual-index
+traversal and packed offsets, beta-once scaling, repeated batched BLAS calls and
+inverse C transpose. This is the canonical inner kernel; symmetry multiplicity,
+diagonal prescaling and distributed folded orchestration are not supplied by it.
+AS/SH fold groups use source sy_packed_size capacity, retaining diagonal holes,
+not the smaller logical packed_size domain.
+
 ## Executable inner cost tree now connected
 
 GridPlan::cost_tree derives the aligned unfolded dense execution tree from the

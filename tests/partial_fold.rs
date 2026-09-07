@@ -19,7 +19,7 @@ fn residual_dimensions_participate_in_transpose_cost_and_storage_order(){
 }
 #[test]
 fn symmetric_groups_become_packed_gemm_dimensions(){
-    for(kind,k)in[(SY,6),(AS,3),(SH,3)]{
+    for(kind,k)in[(SY,6),(AS,6),(SH,6)]{
         let Outcome::Selected(d)=partial_fold::select([&[3,3,2],&[3,3,4],&[2,4]],
             [&[kind,NS,NS],&[kind,NS,NS],&[NS,NS]],["abi","abj","ij"],&models(),[1;3]).unwrap()else{panic!("symmetric fold rejected")};
         assert_eq!((d.m,d.n,d.k,d.batches),(2,4,k,1));assert_eq!(d.permutation,0);

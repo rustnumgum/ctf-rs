@@ -1,7 +1,21 @@
 // Adapted from cc4s tensor/untyped_tensor.cxx:2922-3006 and permute_target.
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Local tensor::fold metadata. This does not transpose or alias tensor storage.
-use crate::symmetry::{Layout,Symmetry};
+use crate::symmetry::Symmetry;
+
+// shared/util.cxx::sy_packed_size, not packed_size: local AS/SH storage
+// retains the same diagonal slots as SY. Those slots are structural holes.
+pub(crate) fn storage_len(lengths:&[usize],links:&[Symmetry])->usize{
+    if lengths.is_empty(){return 1;}
+    let(mut k,mut temporary,mut size,mut maximum)=(1,1,1,lengths[0]);
+    for axis in 0..lengths.len(){
+        temporary=temporary*maximum/k;k+=1;maximum+=1;
+        if links[axis]==Symmetry::NS{
+            size*=temporary;k=1;temporary=1;
+            if axis+1<lengths.len(){maximum=lengths[axis+1];}
+        }
+    }size*temporary
+}
 
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum Direction { Forward, Backward }
@@ -26,7 +40,7 @@ impl FoldLayout {
         let mut group_lengths=Vec::new();let mut folded_shape=Vec::new();let mut folded_indices=Vec::new();
         let mut selected=Vec::new();let mut remaining=Vec::new();let mut start=0;
         for end in 0..links.len(){if links[end]==Symmetry::NS{
-            let length=Layout::new(local_shape[start..=end].to_vec(),links[start..=end].to_vec()).len();
+            let length=storage_len(&local_shape[start..=end],&links[start..=end]);
             let group=group_lengths.len();group_lengths.push(length);
             if let Some(label)=fold_labels.iter().position(|&label|label==indices[end]){
                 selected.push(group);folded_shape.push(length);folded_indices.push(label);

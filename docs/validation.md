@@ -1065,9 +1065,27 @@ non-Copy String elements, scalar and zero-size storage. Partial NS selection
 includes the residual x dimension of xik/kj/ij in its source transpose cost
 (permutation1, [24,0,0]) and verifies the resulting storage offsets. SY/AS/SH
 contracted pairs produce packed k lengths 6/3/3 with unchanged zero-cost layouts.
+That AS/SH oracle was subsequently found to use logical packed_size rather than
+the source fold storage's sy_packed_size; the correction is recorded below.
 No failures, floating-point studies or old MPI reruns. Both targets compiled and
 linked on Windows GNU. These are local fold/storage stages, not proof of complete
 partial-folded contraction execution.
+
+## Local partial-fold BLAS kernel and source storage correction (2026-09-07)
+
+partial_fold_kernel passed four local WSL tests: singleton residual dimensions,
+shared residual SY coordinates, residual SY output, folded batches, packed
+SY/AS/SH contraction and beta=0 with NaN prior C. Output must be finite and within
+abs(error)<1e-6 of the fixed canonical-inner reference. Full symmetry multiplicity
+is deliberately not claimed by an inner-kernel test.
+
+Source sy_packed_size inspection exposed and corrected the earlier AS/SH storage
+capacity oracle: a linked 3x3 fold group occupies 6 local slots for all three
+kinds, with structural diagonal holes for AS/SH. Affected fold_layout,
+fold_storage and partial_fold tests passed once after correction, with exact
+layout/offset checks. No other passing numerical suite was rerun. All four targets
+compiled/linked on Windows GNU. Distributed partial-fold execution and native MPI
+runtime acceptance remain pending.
 
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
