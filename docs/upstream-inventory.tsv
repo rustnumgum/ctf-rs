@@ -66,11 +66,11 @@ src/interface/idx_tensor.h	src/interface	pending
 src/interface/kernel.h	src/sparse_coo.rs; src/kernel.rs; src/sparse_2d.rs	partial: mixed-type Kernel<f,g> COO, dense GEMM, CSR/dense, CSR/CSR dense/sparse-output loops plus Monoid strided xpy; explicit typed COO 2D communication, arbitrary accumulator and source coefficient restrictions; automatic distributed mixed-type dispatch pending
 src/interface/logger.h	src/interface	pending
 src/interface/Makefile	Cargo/build tooling	replaced
-src/interface/matrix.cxx	src/matrix.rs; src/ffi/scalapack.rs	partial: four-type distributed thin/truncated/randomized SVD, QR, Cholesky, triangular/positive-definite solves and square-subworld symmetric/Hermitian eigh; remaining routines pending
+src/interface/matrix.cxx	src/matrix.rs; src/sparse_svd.rs; src/ffi/scalapack.rs	partial: four-type distributed thin/truncated/randomized SVD, sparse randomized SVD with sparse Gram/projection products and source mutable guess lifecycle, QR, Cholesky, triangular/positive-definite solves and square-subworld symmetric/Hermitian eigh; remaining routines pending
 src/interface/matrix.h	src/matrix.rs	partial direct Rust Tensor matrix APIs
 src/interface/monoid.cxx	src/interface	pending
 src/interface/monoid.h	src/interface	pending
-src/interface/multilinear.cxx	src/multilinear.rs; src/multilinear_factor.rs; src/multilinear_kernel.rs; src/sparse_multilinear.rs; src/tttp_blocking.rs; src/solve_factor.rs; src/tensor_svd.rs	partial: generic semiring dense/sparse TTTP with factor-fiber broadcast, source auxiliary blocking from explicit rank-local available bytes, fiber-grouped MTTKRP, f64 weighted Solve_Factor, four-type dense indexed SVD and sparse truncated indexed SVD with sparse permutation/reshape to native boundary; sparse randomized SVD, remaining scalar kernels, vector memory diagnostic and process memory accounting pending
+src/interface/multilinear.cxx	src/multilinear.rs; src/multilinear_factor.rs; src/multilinear_kernel.rs; src/sparse_multilinear.rs; src/tttp_blocking.rs; src/solve_factor.rs; src/tensor_svd.rs; src/sparse_svd.rs	partial: generic semiring dense/sparse TTTP with factor-fiber broadcast, source auxiliary blocking from explicit rank-local available bytes, fiber-grouped MTTKRP, f64 weighted Solve_Factor, four-type dense/sparse truncated and randomized indexed SVD with sparse permutation/reshape and sparse Gram/projection products; remaining scalar kernels, vector memory diagnostic and process memory accounting pending
 src/interface/multilinear.h	src/multilinear.rs; src/tensor_svd.rs	partial: direct Rust TTTP/MTTKRP/tensor SVD APIs
 src/interface/partition.cxx	src/interface	pending
 src/interface/partition.h	src/interface	pending

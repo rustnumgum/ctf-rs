@@ -9,8 +9,20 @@ and reshape operate on stored keys; dense storage is materialized only for the
 distributed native matrix decomposition. There is no full-tensor gather and no
 C++ dependency. Inputs remain unchanged, and factors borrow the same context.
 
-Sparse randomized SVD is not implemented by this new API. It must retain the
-source sparse products rather than silently call the dense randomized path.
+`SparseTensor::svd_randomized` and `tensor_svd_randomized` retain sparse input
+through the source subspace iteration and projection. The matrix method accepts
+an optional mutable dense initial subspace. Without it, a real-valued random
+subspace is QR-orthogonalized; with it, the initial QR is skipped. Iterations
+compute A*A^T times the subspace and then QR. A supplied guess receives the
+oversampled iterate only when iterations are positive; zero iterations leave it
+unchanged. After cropping, U^T*A is decomposed and the left factor is rotated.
+Both transposes are plain, even for complex values, as in matrix.cxx:1151-1198.
+
+The Gram product uses sparse-by-sparse MPI kernels into distributed dense
+storage, and the projection uses dense-by-sparse kernels. The original matrix
+is never densified or gathered. Dense Gram/subspace/projected matrices are
+source intermediates, not a promise of sparse-sized working memory. The tensor
+entry point performs sparse permutation/reshape before this matrix algorithm.
 
 `tests/upstream_hosvd.rs` ports the working `examples/hosvd.cxx` algorithm,
 not the unfinished C++ HoSVD class: four successive indexed SVDs retain ranks

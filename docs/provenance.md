@@ -5,8 +5,10 @@ input label permutation and column-major matrix reshape preserve sparse keys,
 then the native distributed matrix decomposition materializes dense storage.
 The factors are dense, with the requested auxiliary-axis positions restored.
 The implementation shares index-layout and factor-reshape logic with the dense
-tensor SVD instead of duplicating the algorithm. Sparse randomized SVD is not
-advertised or routed through a dense fallback by this new entry point.
+tensor SVD instead of duplicating the algorithm. The separately named sparse
+randomized matrix/tensor entry points now port matrix.cxx:1151-1198 using native
+sparse Gram/projection products, with plain transpose and the source mutable
+guess lifecycle. They never replace sparse input by a dense fallback.
 
 The three custom sparse-left GEMM production paths now use source
 matricization and sparse_2d, retaining the custom CSR identity-alpha rule,

@@ -7,7 +7,7 @@ macro_rules! scalar_case {
             let value=$value;let conjugate=$conjugate;let norm2=$norm2;let algebra=Arithmetic::<$t>::new();
             let grid=if context.size()==4{[2,2]}else{[context.size(),1]};let topology=Topology::new(grid.to_vec());
             let make=|shape|Tensor::new(context,Distribution::cyclic(shape,context.size()),algebra.clone());
-            for (randomized,sparse) in [(false,false),(true,false),(false,true)] {
+            for (randomized,sparse) in [(false,false),(true,false),(false,true),(true,true)] {
                 let mut a=make(vec![3,2,2]);
                 let input=|key:usize|{let(i,j,k)=(key%3,key/3%2,key/6);
                     if sparse && key%3==0{algebra.zero()}
@@ -19,7 +19,9 @@ macro_rules! scalar_case {
                 let(mut left,s,right)=if sparse {
                     let sparse_a=a.clone().into_sparse(|value|*value!=algebra.zero());
                     let original=sparse_a.local_pairs();
-                    let factors=sparse_a.tensor_svd_truncated("ijk","rki",'r',"jr",grid,None,0.).unwrap();
+                    let factors=if randomized {
+                        sparse_a.tensor_svd_randomized("ijk","rki",'r',"jr",grid,1,1,1,19).unwrap()
+                    }else{sparse_a.tensor_svd_truncated("ijk","rki",'r',"jr",grid,None,0.).unwrap()};
                     assert_eq!(sparse_a.local_pairs(),original);
                     factors
                 } else {a.tensor_svd("ijk","rki",'r',"jr",grid,method).unwrap()};
@@ -56,5 +58,5 @@ scalar_case!(complex64,Complex<f64>,|r:f64,i:f64|Complex::new(r,i),|x:Complex<f6
 fn run(c:&Context<'_>){real32(c);real64(c);complex32(c);complex64(c);}
 fn main(){let runtime=Runtime::initialize();let world=runtime.world();run(&world);
     let child=world.split(Some((world.rank()%2)as i32),world.rank()as i32).unwrap();run(&child);child.close();
-    if world.rank()==0{println!("DIGIT / PASS typed_tensor_svd: four scalar types, sparse/dense permuted factor indices, dense truncated/randomized and sparse truncated paths, normalized reconstruction<1e-6 and original orthogonality bounds; world+parity");}
+    if world.rank()==0{println!("DIGIT / PASS typed_tensor_svd: four scalar types, sparse/dense permuted factor indices, truncated/randomized paths, normalized reconstruction<1e-6 and original orthogonality bounds; world+parity");}
     world.close();runtime.finalize();}

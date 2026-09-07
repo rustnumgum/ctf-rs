@@ -164,6 +164,31 @@ impl<'c, 'r> SparseTensor<'c, 'r, Arithmetic<$scalar>> {
         let (u_matrix, singular, vt_matrix) = matrix.svd_truncated(grid, rank, threshold)?;
         Ok(finish_svd(layout, u_matrix, singular, vt_matrix))
     }
+
+    /// Randomized tensor SVD using sparse matrix products throughout the source
+    /// subspace algorithm. The tensor remains sparse through matricization.
+    pub fn tensor_svd_randomized(
+        &self,
+        indices: &str,
+        left: &str,
+        auxiliary: char,
+        right: &str,
+        grid: [usize; 2],
+        rank: usize,
+        iterations: usize,
+        oversampling: usize,
+        seed: u64,
+    ) -> Result<(Tensor<'c, 'r, Arithmetic<$scalar>>,
+        Tensor<'c, 'r, Arithmetic<$scalar>>,
+        Tensor<'c, 'r, Arithmetic<$scalar>>), i32> {
+        let layout = TensorSvdLayout::new(self.distribution(), indices, left, auxiliary, right);
+        let reordered = self.permute_axes(&layout.input_axes);
+        let sparse_matrix = reordered.reshape(layout.matrix_distribution(self.context().size()));
+        let (u_matrix, singular, vt_matrix) = sparse_matrix.svd_randomized(
+            grid, rank, iterations, oversampling, seed, None,
+        )?;
+        Ok(finish_svd(layout, u_matrix, singular, vt_matrix))
+    }
 }
 };
 }

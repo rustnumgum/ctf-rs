@@ -1,5 +1,19 @@
 # Validation evidence
 
+## Sparse randomized matrix/tensor SVD (2026-09-08)
+
+typed_randomized_svd and typed_tensor_svd passed once at WSL 1/2/4 ranks,
+world/parity, covering all four scalar types. The sparse matrix remains sparse
+during Gram and projection products. Tests cover a missing row (rank 1 has an
+empty sparse shard at four ranks), real automatic rank-two fixtures, complex
+plain-transpose projection from a supplied guess, oversampled guess writeback,
+and exact zero-iteration guess/distribution preservation plus reconstruction.
+The tensor test adds sparse randomized input permutation and unchanged stored
+pairs. Existing Frobenius m*n*n*1e-6 and tensor normalized <1e-6/factor criteria
+remain unchanged. DIGIT / PASS; no failures or additional precision studies.
+Both targets compiled/linked once on Windows GNU; native MPI runtime acceptance
+remains outstanding.
+
 ## Sparse tensor SVD and sequential HOSVD (2026-09-08)
 
 typed_tensor_svd and upstream_hosvd passed once each at WSL 1/2/4 ranks,
