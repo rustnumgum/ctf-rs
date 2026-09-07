@@ -837,3 +837,8 @@ harness = false
 name = "upstream_jacobi"
 path = "tests/upstream_jacobi.rs"
 harness = false
+
+[[test]]
+name = "upstream_hosvd"
+path = "tests/upstream_hosvd.rs"
+harness = false

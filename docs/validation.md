@@ -1,5 +1,20 @@
 # Validation evidence
 
+## Sparse tensor SVD and sequential HOSVD (2026-09-08)
+
+typed_tensor_svd and upstream_hosvd passed once each at WSL 1/2/4 ranks,
+including parity subcommunicators. Four scalar types cover sparse input
+permutation/reshape, unchanged stored pairs, dense factor output, and existing
+dense truncated/randomized behavior after sharing index/factor layout code.
+The existing normalized reconstruction <1e-6 and factor criteria are unchanged.
+The HOSVD driver covers dense and sparse [2,3,4,5] tensors, R=1/2, four
+successive source mode SVDs and singular scaling, with the original finite
+residual bound input_norm*(1-(R/n)^4)+1e-4. No vector phase comparison,
+tolerance adjustment or diagnostic computation was needed. DIGIT / PASS.
+Both targets compiled/linked on Windows GNU; native runtime acceptance remains
+outstanding. Sparse randomized SVD remains unimplemented, not densified behind
+the new explicitly truncated sparse API.
+
 ## Sparse density/redistribution estimates and Jacobi (2026-09-08)
 
 redist_cost (three tests) and sparse_cost (four tests) passed once in WSL.

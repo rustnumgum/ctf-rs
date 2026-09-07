@@ -1,5 +1,13 @@
 # Source provenance
 
+SparseTensor::tensor_svd_truncated follows interface/multilinear.cxx:280-378:
+input label permutation and column-major matrix reshape preserve sparse keys,
+then the native distributed matrix decomposition materializes dense storage.
+The factors are dense, with the requested auxiliary-axis positions restored.
+The implementation shares index-layout and factor-reshape logic with the dense
+tensor SVD instead of duplicating the algorithm. Sparse randomized SVD is not
+advertised or routed through a dense fallback by this new entry point.
+
 The three custom sparse-left GEMM production paths now use source
 matricization and sparse_2d, retaining the custom CSR identity-alpha rule,
 first-panel dense beta, and empty temporary/top-level sum for sparse C.
