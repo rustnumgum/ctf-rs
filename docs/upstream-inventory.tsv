@@ -170,8 +170,8 @@ src/scaling/sym_seq_scl.cxx	src/symmetry.rs; src/symmetric_operations.rs	partial
 src/scaling/sym_seq_scl.h	src/scaling	pending
 test/bivar_function.cxx	tests/upstream_bivar_function.rs	ported: original four-dimensional beta=.5 bivariate identity and strict abs(error)<1e-6; deterministic global-key fixture replaces rank-seeded random initialization
 test/bivar_transform.cxx	tests/upstream_bivar_transform.rs; src/dense_transform.rs	ported: original mutable-output identity, n=5 and strict abs(error)<1e-6; deterministic global-key fixtures; extra typed/diagonal Rust coverage
-test/ccsdt_map_test.cxx	tests/upstream/test/ccsdt_map_test.rs	pending
-test/ccsdt_t3_to_t2.cxx	tests/upstream/test/ccsdt_t3_to_t2.rs	pending
+test/ccsdt_map_test.cxx	tests/upstream_ccsdt_map.rs	ported source n=4 zero-input six-order contraction mapping smoke via native BLAS grid planning; PASS WSL 1/2/4 world/parity; native compile/link only; source has no nonzero numerical assertion and niter is unused
+test/ccsdt_t3_to_t2.cxx	tests/upstream_ccsdt_t3_to_t2.rs	ported active AS versus partially AS reference equation chain at bounded n=3,m=4 with deterministic fixtures; preserves NS_B/NS_C partial AS groups, dot/norm <1e-6 and residual <=1e-6; PASS WSL 1/2/4 world/parity; original random fixture/CLI driver pending
 test/dft.cxx	tests/upstream/test/dft.rs	pending
 test/diag_ctr.cxx	tests/upstream_dense.rs; tests/upstream_diag_ctr.rs	identity ported through dense and compressed tensor APIs; original 1e-10 checks, WSL 1/2/4 pass
 test/diag_sym.cxx	tests/upstream_diag_sym.rs	ported paired-SY diagonal identity, original norm<1e-10, deterministic fixture; WSL 1/2/4 ranks pass

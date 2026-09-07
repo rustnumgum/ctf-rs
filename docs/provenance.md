@@ -1,5 +1,19 @@
 # Source provenance
 
+`src/symmetric_random.rs` ports interface/tensor.cxx:1578-1608
+fill_random_base for four real/complex types to packed storage. It consumes
+the existing source-compatible Generator once per allocated slot before
+clearing padding, rather than visiting only valid canonical values.
+
+`tests/upstream_ccsdt_t3_to_t2.rs` ports the active pinned CCSDT T3-to-T2
+equations, including the misleadingly named NS_B/NS_C tensors' partial AS
+compression. Dimensions and input fixture are bounded/deterministic; the
+source norm and residual inequalities are unchanged.
+
+`tests/upstream_ccsdt_map.rs` reimplements pinned `test/ccsdt_map_test.cxx` at
+its default n=4. It preserves the zero-initialized six-order contraction rather
+than inventing a nonzero accuracy criterion absent from the original driver.
+
 `tests/upstream_scalar.rs` and `tests/upstream_speye.rs` reimplement the active
 fixtures in pinned `test/scalar.cxx` and `test/speye.cxx`. They preserve the source
 acceptance inequalities with bounded dimensions (scalar n=3; speye n=4/order=3),

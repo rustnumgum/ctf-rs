@@ -1,5 +1,36 @@
 # Validation evidence
 
+## Packed symmetric random filling (2026-09-07)
+
+Added local SymmetricTensor::fill_random for f32/f64/Complex32/Complex64.
+Every packed allocation slot consumes one MT19937-64 draw in offset order;
+padding/noncanonical slots are then cleared without further draws. The exact
+typed sequence and subsequent generator state passed once in symmetric_random
+at WSL 1/2/4 ranks, world/parity, covering SY/AS/SH, virtual padding, empty local
+fragments, scalar and zero extents. Windows GNU compile/link passed once.
+DIGIT / PASS; exact discrete sequence closed without precision studies.
+Integer packed filling and native runtime acceptance are not established here.
+
+## Upstream CCSDT mapping smoke (2026-09-07)
+
+The separate upstream_ccsdt_t3_to_t2 target passed at WSL 1/2/4 ranks,
+world/parity, using bounded n=3,m=4 deterministic inputs. Both the fully AS
+and explicitly partially expanded reference retain their original compressed
+layouts: NS_B still has its first AS pair, as does NS_C. Indexed summation
+initializes those references; two reference contractions antisymmetrize i/j.
+Dot-product versus norm comparisons retain <1e-6, and the final residual
+retains <=1e-6. No global gather or fully dense reference substitution is used.
+The source random fixture/CLI remains distinct from this bounded equation port.
+Windows GNU compile/link passed once for this target as well; no native runtime
+acceptance is claimed. DIGIT / PASS; numerical verification closed.
+
+upstream_ccsdt_map passed once at WSL 1/2/4 ranks, world/parity, with the source
+n=4 and zero-initialized W/T/Z. The source six-order update Z[hijmno]+=W[hijk]*T[kmno]
+executes through grid mapping and native BLAS. Exact retained zeros are checked;
+neither the original driver nor this result establishes nonzero CCSDT accuracy.
+The source niter option is unused. Windows GNU compile/link passed once;
+native MPI execution remains pending. DIGIT / PASS; no further precision checks.
+
 ## Upstream scalar/sparse identity and baseline permutation (2026-09-07)
 
 upstream_scalar and upstream_speye passed once at WSL 1/2/4 ranks, including

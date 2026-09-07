@@ -25,6 +25,8 @@ mod sy_summation;
 mod contraction;
 #[path = "symmetric_contract.rs"]
 mod symmetric_contraction;
+#[path = "symmetric_random.rs"]
+mod random;
 
 impl<'c, 'r, A: Group + crate::algebra::Semiring> SymmetricTensor<'c, 'r, A>
 where A::Element: Wire {
