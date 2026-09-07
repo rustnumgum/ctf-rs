@@ -1,7 +1,7 @@
 // Adapted from cc4s CTF ctr_virt and ctr_replicate.
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 use crate::{algebra::{Group,Semiring,Wire},context::Context,summation::Indices,
-    symmetry::Layout,symmetric_contraction::sequential};
+    symmetry::Layout,symmetric_contraction::sequential_function};
 
 /// Raw packed virtual blocks, with caller-aligned label phases and local
 /// extents. Beta applies once per visited output block.
@@ -10,6 +10,16 @@ pub fn virtualized<A:Group+Semiring>(algebra:&A,
     lb:&Layout,vb:&[usize],ib:&str,b:&[A::Element],
     lc:&Layout,vc:&[usize],ic:&str,c:&mut[A::Element],
     alpha:&A::Element,beta:&A::Element) {
+    virtualized_function(algebra,la,va,ia,a,lb,vb,ib,b,lc,vc,ic,c,alpha,beta,
+        &|a,b|algebra.multiply(a,b));
+}
+
+pub(crate) fn virtualized_function<A:Group+Semiring>(algebra:&A,
+    la:&Layout,va:&[usize],ia:&str,a:&[A::Element],
+    lb:&Layout,vb:&[usize],ib:&str,b:&[A::Element],
+    lc:&Layout,vc:&[usize],ic:&str,c:&mut[A::Element],
+    alpha:&A::Element,beta:&A::Element,
+    function:&impl Fn(&A::Element,&A::Element)->A::Element) {
     for (layout,phases) in [(la,va),(lb,vb),(lc,vc)] {
         assert_eq!(layout.shape().len(),phases.len());
         assert!(phases.iter().all(|&p|p>0));
@@ -22,8 +32,8 @@ pub fn virtualized<A:Group+Semiring>(algebra:&A,
     let mut visited=vec![false;nc];let one=algebra.one();
     space.for_each(|offsets| {
         let (xa,xb,xc)=(offsets[0],offsets[1],offsets[2]);
-        sequential(algebra,la,ia,&a[xa*sa..(xa+1)*sa],lb,ib,&b[xb*sb..(xb+1)*sb],
-            lc,ic,&mut c[xc*sc..(xc+1)*sc],alpha,if visited[xc]{&one}else{beta});
+        sequential_function(algebra,la,ia,&a[xa*sa..(xa+1)*sa],lb,ib,&b[xb*sb..(xb+1)*sb],
+            lc,ic,&mut c[xc*sc..(xc+1)*sc],alpha,if visited[xc]{&one}else{beta},function);
         visited[xc]=true;
     });
 }
@@ -38,6 +48,17 @@ pub fn replicated<A:Group+Semiring>(algebra:&A,
     lb:&Layout,vb:&[usize],ib:&str,b:&mut[A::Element],
     lc:&Layout,vc:&[usize],ic:&str,c:&mut[A::Element],
     alpha:&A::Element,beta:&A::Element,commutative:bool) where A::Element:Wire {
+    replicated_function(algebra,a_comms,b_comms,c_comms,la,va,ia,a,lb,vb,ib,b,
+        lc,vc,ic,c,alpha,beta,commutative,&|a,b|algebra.multiply(a,b));
+}
+
+pub(crate) fn replicated_function<A:Group+Semiring>(algebra:&A,
+    a_comms:&[&Context<'_>],b_comms:&[&Context<'_>],c_comms:&[&Context<'_>],
+    la:&Layout,va:&[usize],ia:&str,a:&mut[A::Element],
+    lb:&Layout,vb:&[usize],ib:&str,b:&mut[A::Element],
+    lc:&Layout,vc:&[usize],ic:&str,c:&mut[A::Element],
+    alpha:&A::Element,beta:&A::Element,commutative:bool,
+    function:&impl Fn(&A::Element,&A::Element)->A::Element) where A::Element:Wire {
     for comm in a_comms {comm.broadcast(0,a);}
     for comm in b_comms {comm.broadcast(0,b);}
     let root=c_comms.iter().all(|comm|comm.rank()==0);
@@ -47,7 +68,7 @@ pub fn replicated<A:Group+Semiring>(algebra:&A,
         }
     }
     let child_beta=if root{algebra.one()}else{algebra.zero()};
-    virtualized(algebra,la,va,ia,a,lb,vb,ib,b,lc,vc,ic,c,alpha,&child_beta);
+    virtualized_function(algebra,la,va,ia,a,lb,vb,ib,b,lc,vc,ic,c,alpha,&child_beta,function);
     for comm in c_comms {comm.reduce_monoid(algebra,c,commutative,0);}
     if a_comms.iter().any(|comm|comm.rank()!=0) {a.fill(algebra.zero());}
     if b_comms.iter().any(|comm|comm.rank()!=0) {b.fill(algebra.zero());}

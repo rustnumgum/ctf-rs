@@ -1,16 +1,15 @@
-# Pending compressed custom-function contraction
+# Compressed custom-function contraction
 
 Pinned source: `f69cbb46e23bc2f39cda5722ce096f56301dab4f`.
-This is an identified implementation gap, not an implemented or accepted API.
-`Tensor::contract_function_on` supports dense custom functions, but the packed
-`SymmetricTensor` orchestration currently only supplies algebra multiplication.
-The compressed branches of `test/weigh_4D.cxx` and the active custom scalar
-reduction in `test/dft.cxx` therefore remain pending.
+`SymmetricTensor::contract_function_from_on` now threads a homogeneous local
+binary function through the packed CPU/MPI path. It takes the ordinary explicit
+mapping/alpha/beta/MPI-commutativity arguments followed by the function.
+Ordinary multiplication shares the same generic implementation; no dense
+unpack fallback or additional backend is introduced.
 
-## Required literal port
+## Implemented literal port
 
-Thread a local function reference through existing orchestration rather than
-unpacking tensors or substituting a new contraction algorithm:
+A local function reference passes through existing orchestration:
 
 1. `symmetric_contract.rs`: repeated-index extraction/reinsertion,
    `contract_sy_recursive`, `contract_raw_on`, and prescaled operand branches.

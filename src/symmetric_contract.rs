@@ -329,6 +329,7 @@ where
         alpha: A::Element,
         beta: A::Element,
         commutative: bool,
+        function: &impl Fn(&A::Element, &A::Element) -> A::Element,
     ) -> Result<(), crate::map_tensor::Rejected> {
         let mapped_sizes = mapping_supported(
             [
@@ -374,7 +375,7 @@ where
             prescale_masks(t_indices, t_links, v_indices, v_links, c_indices);
 
         if t_masks.is_empty() && v_masks.is_empty() {
-            return self.contract_canonical_on(
+            return self.contract_canonical_function_on(
                 labels(c_indices),
                 a,
                 labels(a_indices),
@@ -385,6 +386,7 @@ where
                 alpha,
                 beta,
                 commutative,
+                function,
             );
         }
 
@@ -405,7 +407,7 @@ where
                 scaled_a.scale_diagonals(mask);
             }
         }
-        self.contract_canonical_on(
+        self.contract_canonical_function_on(
             labels(c_indices),
             &scaled_a,
             labels(a_indices),
@@ -416,6 +418,7 @@ where
             alpha,
             beta,
             commutative,
+            function,
         )
     }
 
@@ -436,6 +439,71 @@ where
         alpha: A::Element,
         beta: A::Element,
         commutative: bool,
+    ) -> Result<(), crate::map_tensor::Rejected> {
+        let algebra = self.algebra.clone();
+        self.contract_with_on(
+            indices_c,
+            a,
+            indices_a,
+            b,
+            indices_b,
+            topology,
+            physical_labels,
+            alpha,
+            beta,
+            commutative,
+            &|a, b| algebra.multiply(a, b),
+        )
+    }
+
+    /// Symmetry-aware contraction with a custom bivariate element function on
+    /// an explicit label-to-grid mapping.
+    /// Uses the pinned source's sign/factor and coincidence-prescaling rules:
+    /// symmetry signs and overcount stay in alpha, and diagonal prescaling
+    /// precedes function evaluation. This does not promise arbitrary nonlinear
+    /// equivariance. `commutative` describes MPI addition, not the function.
+    pub fn contract_function_from_on(
+        &mut self,
+        indices_c: &str,
+        a: &Self,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        topology: Topology,
+        physical_labels: &str,
+        alpha: A::Element,
+        beta: A::Element,
+        commutative: bool,
+        function: impl Fn(&A::Element, &A::Element) -> A::Element,
+    ) -> Result<(), crate::map_tensor::Rejected> {
+        self.contract_with_on(
+            indices_c,
+            a,
+            indices_a,
+            b,
+            indices_b,
+            topology,
+            physical_labels,
+            alpha,
+            beta,
+            commutative,
+            &function,
+        )
+    }
+
+    fn contract_with_on(
+        &mut self,
+        indices_c: &str,
+        a: &Self,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        topology: Topology,
+        physical_labels: &str,
+        alpha: A::Element,
+        beta: A::Element,
+        commutative: bool,
+        function: &impl Fn(&A::Element, &A::Element) -> A::Element,
     ) -> Result<(), crate::map_tensor::Rejected> {
         assert!(std::ptr::eq(self.context, a.context));
         assert!(std::ptr::eq(self.context, b.context));
@@ -478,7 +546,7 @@ where
             let (a, indices_a) = a.extract_diagonal(indices_a);
             let (b, indices_b) = b.extract_diagonal(indices_b);
             let (mut c, indices_c) = self.extract_diagonal(indices_c);
-            c.contract_from_on(
+            c.contract_with_on(
                 &indices_c,
                 &a,
                 &indices_a,
@@ -489,6 +557,7 @@ where
                 alpha,
                 beta,
                 commutative,
+                function,
             )?;
             self.replace_diagonal(original_indices_c, &c);
             return Ok(());
@@ -505,6 +574,7 @@ where
             alpha,
             beta,
             commutative,
+            function,
         )
     }
 
@@ -520,6 +590,7 @@ where
         alpha: A::Element,
         beta: A::Element,
         commutative: bool,
+        function: &impl Fn(&A::Element, &A::Element) -> A::Element,
     ) -> Result<(), crate::map_tensor::Rejected> {
         let mut b_indices = b_indices.to_vec();
         let mut c_indices = c_indices.to_vec();
@@ -568,6 +639,7 @@ where
                 adjusted_alpha,
                 beta,
                 commutative,
+                function,
             );
         };
 
@@ -609,6 +681,7 @@ where
                         align_alpha,
                         beta,
                         commutative,
+                        function,
                     )?;
                 }
                 BrokenLink::B(_) => {
@@ -624,6 +697,7 @@ where
                         align_alpha,
                         beta,
                         commutative,
+                        function,
                     )?;
                 }
                 BrokenLink::C(_) => {
@@ -639,6 +713,7 @@ where
                         align_alpha,
                         beta.clone(),
                         commutative,
+                        function,
                     )?;
                     self.scale(&beta);
                     self.symmetrize_from(&relaxed, &c_indices);
@@ -673,6 +748,7 @@ where
                 task_alpha,
                 task_beta,
                 commutative,
+                function,
             )?;
             task_beta = self.algebra.one();
         }

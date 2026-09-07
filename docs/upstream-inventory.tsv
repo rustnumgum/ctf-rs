@@ -120,7 +120,7 @@ src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
 src/contraction/spctr_tsr.cxx	src/sparse_virtual.rs; src/sparse_contract_general.rs	partial: source virtual strides/order, repeated-index offsets and per-output beta-first tracking, integrated mapped sparse-A/dense-B/dense-C virtual blocks; complete sparse-output/nested panel assembly pending
 src/contraction/spctr_tsr.h	src/contraction	pending
-src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar reference kernels, typed canonical partial/symmetry folded BLAS residual traversal and four-type distributed integration; custom-function folded branch and automatic compressed integration pending
+src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs	partial: NS/folded and packed scalar/custom-function reference kernels, packed custom MPI orchestration, typed canonical partial/symmetry folded BLAS residual traversal and four-type distributed integration; custom-function folded branch and automatic compressed integration pending
 src/contraction/sym_seq_ctr.h	src/contraction	pending
 src/redistribution/cyclic_reshuffle.cxx	src/cyclic_reshuffle.rs; src/symmetric_reshuffle.rs; src/subworld.rs; src/symmetric_subworld.rs; src/tensor.rs; src/symmetric_tensor.rs; tests/cyclic_reshuffle.rs; tests/symmetric_reshuffle.rs	partial: NS and symmetry-bounded physical-residue traversal, ordered value-only peer streams, virtual blocks, packed holes/padding, replica restoration and rank-oriented subworld streams; closed-form bucket counts, buffer reuse and offset/permutation arguments pending
 src/redistribution/cyclic_reshuffle.h	src/redistribution	pending
@@ -172,7 +172,7 @@ test/bivar_function.cxx	tests/upstream_bivar_function.rs	ported: original four-d
 test/bivar_transform.cxx	tests/upstream_bivar_transform.rs; src/dense_transform.rs	ported: original mutable-output identity, n=5 and strict abs(error)<1e-6; deterministic global-key fixtures; extra typed/diagonal Rust coverage
 test/ccsdt_map_test.cxx	tests/upstream_ccsdt_map.rs	ported source n=4 zero-input six-order contraction mapping smoke via native BLAS grid planning; PASS WSL 1/2/4 world/parity; native compile/link only; source has no nonzero numerical assertion and niter is unused
 test/ccsdt_t3_to_t2.cxx	tests/upstream_ccsdt_t3_to_t2.rs	ported active AS versus partially AS reference equation chain at bounded n=3,m=4 with deterministic fixtures; preserves NS_B/NS_C partial AS groups, dot/norm <1e-6 and residual <=1e-6; PASS WSL 1/2/4 world/parity; original random fixture/CLI driver pending
-test/dft.cxx	tests/upstream/test/dft.rs	pending
+test/dft.cxx	tests/upstream_dft.rs	ported SY complex DFT/inverse and active custom scalar reduction at bounded n=8; source factor 0.5 and real-error <1e-9; PASS WSL 1/2/4 world/parity, native compile/link; int/int64 C++ ABI overloads excluded
 test/diag_ctr.cxx	tests/upstream_dense.rs; tests/upstream_diag_ctr.rs	identity ported through dense and compressed tensor APIs; original 1e-10 checks, WSL 1/2/4 pass
 test/diag_sym.cxx	tests/upstream_diag_sym.rs	ported paired-SY diagonal identity, original norm<1e-10, deterministic fixture; WSL 1/2/4 ranks pass
 test/endomorphism_cust_sp.cxx	tests/upstream_endomorphism_cust_sp.rs	ported: stored custom-name length transform, exact criterion; deterministic unique global keys replace random source sparse writes
@@ -193,7 +193,7 @@ test/subworld_gemm.cxx	tests/upstream_subworld_gemm.rs	ported source defaults17x
 test/sy_times_ns.cxx	tests/upstream_sy_times_ns.rs	ported literal zero-input source and separately adapted nonzero fixture, original norm<1e-10; WSL 1/2/4 pass
 test/test_suite.cxx	tests/upstream/test/test_suite.rs	pending
 test/univar_function.cxx	tests/upstream_univar_function.rs	ported: original .25*A+A^4 identity, n=5 and strict abs(error)<1e-6; deterministic global-key fixture
-test/weigh_4D.cxx	tests/upstream/test/weigh_4D.rs	pending
+test/weigh_4D.cxx	tests/upstream_weigh4d.rs	ported active NS/SY/AS product/division at bounded n=3, source drand48 recurrence and signed-denominator criterion; packed custom-function MPI path; PASS WSL 1/2/4 world/parity, native compile/link
 test/python/test_base.py	Rust semantic tests (no Python interface)	pending
 test/python/test_dot.py	Rust semantic tests (no Python interface)	pending
 test/python/test_einsum.py	Rust semantic tests (no Python interface)	pending

@@ -732,3 +732,18 @@ harness = false
 name = "symmetric_random"
 path = "tests/symmetric_random.rs"
 harness = false
+
+[[test]]
+name = "upstream_weigh4d"
+path = "tests/upstream_weigh4d.rs"
+harness = false
+
+[[test]]
+name = "upstream_dft"
+path = "tests/upstream_dft.rs"
+harness = false
+
+[[test]]
+name = "distributed_symmetric_function"
+path = "tests/distributed_symmetric_function.rs"
+harness = false

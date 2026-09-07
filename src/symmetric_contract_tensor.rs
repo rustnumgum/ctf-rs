@@ -34,6 +34,36 @@ where
         beta: A::Element,
         commutative: bool,
     ) -> Result<(), crate::map_tensor::Rejected> {
+        let algebra = self.algebra.clone();
+        self.contract_canonical_function_on(
+            indices_c,
+            a,
+            indices_a,
+            b,
+            indices_b,
+            topology,
+            physical_labels,
+            alpha,
+            beta,
+            commutative,
+            &|a, b| algebra.multiply(a, b),
+        )
+    }
+
+    pub(super) fn contract_canonical_function_on(
+        &mut self,
+        indices_c: &str,
+        a: &Self,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        topology: Topology,
+        physical_labels: &str,
+        alpha: A::Element,
+        beta: A::Element,
+        commutative: bool,
+        function: &impl Fn(&A::Element, &A::Element) -> A::Element,
+    ) -> Result<(), crate::map_tensor::Rejected> {
         assert!(std::ptr::eq(self.context, a.context));
         assert!(std::ptr::eq(self.context, b.context));
         assert_eq!(topology.size(), self.context.size());
@@ -170,7 +200,7 @@ where
         let communicator_refs: [Vec<&Context<'_>>; 3] =
             std::array::from_fn(|operand| communicators[operand].iter().collect());
 
-        crate::symmetric_contraction_comm::replicated(
+        crate::symmetric_contraction_comm::replicated_function(
             &self.algebra,
             &communicator_refs[0],
             &communicator_refs[1],
@@ -190,6 +220,7 @@ where
             &alpha,
             &beta,
             commutative,
+            function,
         );
 
         drop(communicator_refs);

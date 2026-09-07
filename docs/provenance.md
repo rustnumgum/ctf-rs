@@ -1,5 +1,12 @@
 # Source provenance
 
+Packed custom function dispatch follows contraction/{contraction,ctr_tsr,
+sym_seq_ctr}.cxx, with source evidence and symmetry quirks in
+compressed-functions.md. Ordinary and custom functions share existing Rust
+packed communication/traversal. tests/upstream_weigh4d.rs and upstream_dft.rs
+port the pinned active drivers at bounded dimensions; source comparison
+inequalities, complex transpose convention, and DFT factor 0.5 are retained.
+
 `src/symmetric_random.rs` ports interface/tensor.cxx:1578-1608
 fill_random_base for four real/complex types to packed storage. It consumes
 the existing source-compatible Generator once per allocated slot before

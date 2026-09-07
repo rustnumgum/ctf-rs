@@ -148,6 +148,40 @@ pub fn sequential<A: Group + Semiring>(
     alpha: &A::Element,
     beta: &A::Element,
 ) {
+    sequential_function(
+        algebra,
+        layout_a,
+        indices_a,
+        a,
+        layout_b,
+        indices_b,
+        b,
+        layout_c,
+        indices_c,
+        c,
+        alpha,
+        beta,
+        &|a, b| algebra.multiply(a, b),
+    );
+}
+
+/// Custom packed contraction with the same traversal and coefficient ordering
+/// as [`sequential`], replacing only the elementwise product with `function`.
+pub fn sequential_function<A: Group + Semiring>(
+    algebra: &A,
+    layout_a: &Layout,
+    indices_a: &str,
+    a: &[A::Element],
+    layout_b: &Layout,
+    indices_b: &str,
+    b: &[A::Element],
+    layout_c: &Layout,
+    indices_c: &str,
+    c: &mut [A::Element],
+    alpha: &A::Element,
+    beta: &A::Element,
+    function: &impl Fn(&A::Element, &A::Element) -> A::Element,
+) {
     assert_eq!(a.len(), layout_a.symmetric_len());
     assert_eq!(b.len(), layout_b.symmetric_len());
     assert_eq!(c.len(), layout_c.symmetric_len());
@@ -159,7 +193,7 @@ pub fn sequential<A: Group + Semiring>(
     ]);
 
     if space.dimensions.is_empty() {
-        let product = algebra.multiply(&a[0], &b[0]);
+        let product = function(&a[0], &b[0]);
         let scaled = algebra.multiply(&product, alpha);
         let old = algebra.multiply(&c[0], beta);
         c[0] = algebra.add(&scaled, &old);
@@ -179,7 +213,7 @@ pub fn sequential<A: Group + Semiring>(
         let offset_a = symmetric_offset(layout_a, &space.operands[0], index);
         let offset_b = symmetric_offset(layout_b, &space.operands[1], index);
         let offset_c = symmetric_offset(layout_c, &space.operands[2], index);
-        let product = algebra.multiply(&a[offset_a], &b[offset_b]);
+        let product = function(&a[offset_a], &b[offset_b]);
         let scaled = if alpha_is_one {
             product
         } else {

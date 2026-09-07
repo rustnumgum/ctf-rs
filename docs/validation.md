@@ -1,5 +1,33 @@
 # Validation evidence
 
+## Compressed custom-function CPU/MPI contraction (2026-09-07)
+
+The new function path shares ordinary packed symmetry/diagonal orchestration,
+canonical redistribution, replicated communication and virtualized traversal.
+No global gather, dense unpack fallback or replacement algorithm is used.
+
+Eleven affected targets passed once at WSL 1/2/4 ranks, world/parity:
+upstream_weigh4d, upstream_dft, distributed_symmetric_function,
+distributed_packed_contraction, distributed_canonical_contraction,
+distributed_symmetric_contraction, upstream_multi_tsr_sym, upstream_sy_times_ns,
+upstream_ccsdt_t3_to_t2, upstream_readwrite and upstream_scalar.
+
+weigh4d retains NS/SY/AS, n=3, rank-seeded drand48 values and the literal source
+signed-denominator predicate abs(actual-expected)/expected >1e-10 when
+abs(expected)>1e-10; it does not replace that predicate by absolute relative
+error. DFT uses bounded n=8, SY complex DFT/inverse, the source factor 0.5,
+active custom scalar reduction and strict real-component error <1e-9.
+Exact integer checks cover a non-distributive polynomial, repeated input/output
+labels, physical i/j/k mappings and retained off-diagonal output values/layouts.
+Raw packed custom checks retain whole-buffer beta prescale and scalar execution.
+All existing affected checks retain their original bounds. An initial test-only
+SymmetricDistribution equality compile error was fixed by comparing its explicit
+distribution and links; no numerical execution occurred before that fix.
+
+All eleven targets compiled/linked once on native Windows GNU. Native MPI
+runtime acceptance is still pending. DIGIT / PASS; no failed numerical criteria,
+extra precision checks or additional diagnostic computations.
+
 ## Packed symmetric random filling (2026-09-07)
 
 Added local SymmetricTensor::fill_random for f32/f64/Complex32/Complex64.

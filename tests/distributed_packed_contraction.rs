@@ -1,9 +1,19 @@
 use ctf::{algebra::Arithmetic,context::{Context,Runtime},symmetry::{Layout,Symmetry::*},
-    symmetric_contraction::sequential,symmetric_contraction_comm::{replicated,virtualized}};
+    symmetric_contraction::{sequential,sequential_function},symmetric_contraction_comm::{replicated,virtualized}};
 fn run(context:&Context<'_>) {
     let algebra=Arithmetic::<i64>::new();let scalar=Layout::new(vec![],vec![]);
     let sy=Layout::new(vec![3,3],vec![SY,NS]);let ns=Layout::new(vec![3,3],vec![NS,NS]);
     let a=vec![1,2,3,4,5,6];let b=vec![2,3,4,5,6,7];
+    let function=|a:&i64,b:&i64|a+b+1;
+    let mut custom=vec![10;6];
+    sequential_function(&algebra,&sy,"ij",&a,&sy,"ij",&b,&sy,"ij",&mut custom,&2,&3,&function);
+    assert_eq!(custom,vec![38,42,46,50,54,58]);
+    let mut custom_diagonal=vec![10;6];
+    sequential_function(&algebra,&sy,"ii",&a,&sy,"ii",&b,&sy,"ii",&mut custom_diagonal,&2,&3,&function);
+    assert_eq!(custom_diagonal,vec![38,30,46,30,30,58]);
+    let mut custom_scalar=vec![10];
+    sequential_function(&algebra,&scalar,"",&[2],&scalar,"",&[3],&scalar,"",&mut custom_scalar,&2,&3,&function);
+    assert_eq!(custom_scalar,vec![42]);
     let mut c=vec![10;9];
     sequential(&algebra,&sy,"ik",&a,&sy,"kj",&b,&ns,"ij",&mut c,&2,&3);
     // Raw canonical constraints i<=k<=j, not a full symmetric matrix product.
