@@ -61,3 +61,4 @@ pub mod node_reordering;
 pub mod random;
 mod norms;
 mod subworld;
+mod sparse_text;

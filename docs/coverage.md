@@ -17,7 +17,7 @@ Statuses below describe implementation, not acceptance passes.
 | 4 | interface/{functions,fun_term}; transforms in tensor | algebra; tensor; sparse_functions; sparse_function_kernel; sparse_fold_function | univar_function, bivar_function, bivar_transform, endomorphism* | local transforms, typed sparse maps, subset-index accumulators, distributed CSR custom products and fullyfoldable high-order sparse custom contractions implemented; general dense function dispatch, other kernels and full upstream function tests pending |
 | 5 | interface/matrix; shared/lapack_symbs | matrix; ffi/linalg; ffi/scalapack | qr, svd, eigh, Cholesky, SPD/triangular solves, randomized SVD | f32/f64/complex32/complex64 distributed Cholesky/triangular solve/thin QR/SVD, truncated/randomized SVD, padded virtual-column SPD and square-subworld symmetric/Hermitian eigh implemented; typed local decompositions and remaining routines pending |
 | 5 | interface/multilinear | multilinear; multilinear_factor; sparse_multilinear; solve_factor; tensor_svd; reshape | TTTP, MTTKRP, Solve_Factor, tensor SVD | generic semiring dense/sparse TTTP with source budget-selected auxiliary blocks and mode-fiber factor broadcast, source fiber-grouped MTTKRP, f64 distributed weighted Solve_Factor, four-type indexed tensor SVD and key-based reshape implemented; optimized reshape communication, other multilinear scalar kernels and process memory discovery/accounting pending |
-| 5 | interface/schedule; tensor persistence/graph I/O; shared diagnostics | schedule; tensor; shared | schedules, checkpoint, graph input, diagnostics | pending |
+| 5 | interface/schedule; tensor persistence/graph I/O; shared diagnostics | schedule; tensor; shared; sparse_text; ffi/mpi_io | schedules, checkpoint, graph input, diagnostics | four-type dense/sparse coordinate text MPI-IO implemented; compressed text export, binary persistence, scheduling and remaining diagnostics pending |
 
 All CPU test, example, benchmark and study files are inventoried separately;
 the test suite includes examples and studies, not only `test/*.cxx`.
@@ -31,8 +31,10 @@ CUDA/offload code and Python/C++ API compatibility are excluded, not CPU paths.
   implemented as consuming Tensor::into_sparse(predicate), including primary
   layers and padding filter order. SparseTensor::into_dense is collective;
   SparseTensor::sparsify separately filters existing sparse storage.
-- Sparse text I/O: tensor.cxx:945-1015 and graph_io_aux.cxx:45-248; MPI-IO
-  line partitioning and coordinate codecs are not yet ported.
+- Sparse text I/O: tensor.cxx:945-1015 and graph_io_aux.cxx:45-248; four-type
+  dense/sparse codecs and communicator-scoped MPI-IO are implemented, including
+  source overlap, rank-prefix writes, reversed indices and no-value records.
+  Compressed-symmetry export remains open.
 - Generic dense cross-world accumulation: tensor.cxx:1019-1062; reusable
   add_to/from_subworld APIs now support explicit child distributions and arbitrary
   child-rank orientation, and are used by the square-subworld eigensolver.

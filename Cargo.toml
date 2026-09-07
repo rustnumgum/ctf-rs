@@ -617,3 +617,8 @@ harness = false
 name = "subworld_transfer"
 path = "tests/subworld_transfer.rs"
 harness = false
+
+[[test]]
+name = "sparse_text_io"
+path = "tests/sparse_text_io.rs"
+harness = false

@@ -1142,6 +1142,24 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## Communicator-scoped sparse text MPI-IO (2026-09-07)
+
+Five sparse_text codec unit tests passed for coordinate order, absent values,
+reversed indices, six-decimal real formatting and typed integer parsing.
+sparse_text_io passed once at WSL 1/2/4 ranks, world/parity subcontexts, for
+f32/f64/i32/i64 dense and sparse tensors. Exact fixtures cover additive reads,
+duplicate keys, no-value reads/writes, reversed coordinates, overwrite of longer
+existing files, virtual layouts, tiny files shorter than the source overlap,
+and empty files. Temporary test files were removed by the successful tests.
+
+The first compile exposed a missing Monoid import after removal of forwarding
+helpers; the import was fixed before any numerical execution. No numerical
+failures or precision studies occurred. Library tests and the integration target
+compiled/linked on Windows GNU once. MPI-IO uses the supplied communicator,
+clamped EOF reads and typed value parsing rather than reproducing the source's
+MPI_COMM_WORLD and scanf pointer bugs. DIGIT / PASS; native MPI execution,
+compressed-symmetry text export and full-port acceptance remain outstanding.
+
 ## Generic cross-world accumulation and eigensolver integration (2026-09-07)
 
 subworld_transfer passed once at WSL 1/2/4 ranks, world/parity. Both directions

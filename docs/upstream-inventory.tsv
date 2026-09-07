@@ -59,7 +59,7 @@ src/interface/flop_counter.cxx	src/interface	pending
 src/interface/fun_term.cxx	src/interface	pending
 src/interface/fun_term.h	src/interface	pending
 src/interface/functions.h	src/sparse_function_kernel.rs; src/sparse_gemm.rs; src/sparse_fold_function.rs	partial: Bivar_Function CSR sparse/dense and sparse/sparse dense/sparse-output kernels with distributed panels and fullyfoldable high-order custom dispatch; remaining function kernels and general dense dispatch pending
-src/interface/graph_io_aux.cxx	src/interface	pending
+src/interface/graph_io_aux.cxx	src/sparse_text.rs; src/ffi/mpi_io.rs	implemented: four typed coordinate codecs and communicator-scoped MPI-IO; fixed source overlap and prefix writes; unsafe EOF, MPI_COMM_WORLD and scanf-pointer behavior corrected; WSL1/2/4 PASS, native compile PASS/runtime pending
 src/interface/group.h	src/interface	pending
 src/interface/idx_tensor.cxx	src/interface	pending
 src/interface/idx_tensor.h	src/interface	pending
@@ -86,7 +86,7 @@ src/interface/set.cxx	src/interface	pending
 src/interface/set.h	src/sparse_formats.rs	partial: seq_coo_to_csr, seq_coo_to_ccsr, seq_csr_to_coo; remaining set responsibilities pending
 src/interface/sparse_tensor.cxx	src/interface	pending
 src/interface/sparse_tensor.h	src/interface	pending
-src/interface/tensor.cxx	src/tensor.rs; src/sparse.rs; src/random.rs; src/norms.rs; src/subworld.rs	partial: direct dense operations, ownership dense/sparse conversion, four-type dense random fill, seven-type sparse-pattern random fill for both storages, dense/sparse real norms and bool/complex NS norm2, generic dense cross-world accumulation; sparse text I/O, sparse/compressed cross-world paths, all-pair extraction, bool 1/infinity and compressed norms pending
+src/interface/tensor.cxx	src/tensor.rs; src/sparse.rs; src/random.rs; src/norms.rs; src/subworld.rs; src/sparse_text.rs	partial: direct dense operations, ownership dense/sparse conversion, four-type dense random fill, seven-type sparse-pattern random fill for both storages, dense/sparse real norms and bool/complex NS norm2, generic dense cross-world accumulation, four-type dense/sparse text MPI-IO; compressed text export, sparse/compressed cross-world paths, all-pair extraction, bool 1/infinity and compressed norms pending
 src/interface/tensor.h	src/interface	pending
 src/interface/term.cxx	src/interface	pending
 src/interface/term.h	src/interface	pending

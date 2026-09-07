@@ -1,6 +1,8 @@
 //! The only module allowed to use MPI's raw handles and native entry points.
 use crate::algebra::{Monoid, Wire};
 use mpi_sys as sys;
+#[path = "mpi_io.rs"]
+mod mpi_io;
 #[cfg(feature = "native-linalg")]
 #[path = "factor_mpi.rs"]
 mod factor_mpi;

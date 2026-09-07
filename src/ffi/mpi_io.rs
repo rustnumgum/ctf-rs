@@ -1,0 +1,144 @@
+// Adapted from cc4s CTF interface/graph_io_aux.cxx read_data_mpiio and
+// write_data_mpiio. Copyright (c) 2011, Edgar Solomonik. See LICENSE.
+//! Communicator-scoped MPI-IO for newline-terminated sparse text records.
+
+use super::{check, Comm};
+use mpi_sys as sys;
+use std::{ffi::CString, path::Path};
+
+const OVERLAP: sys::MPI_Offset = 300;
+
+fn mpi_path(path: &Path) -> CString {
+    CString::new(path.to_str().unwrap()).unwrap()
+}
+
+impl Comm {
+    /// Collectively reads the complete newline-terminated records assigned to
+    /// this rank by the source's fixed 300-byte overlap partition.
+    pub(crate) fn read_sparse_text(&self, path: &Path) -> Vec<u8> {
+        let path = mpi_path(path);
+        unsafe {
+            let mut file = sys::RSMPI_FILE_NULL;
+            check(sys::MPI_File_open(
+                self.raw,
+                path.as_ptr(),
+                sys::MPI_MODE_RDONLY as i32,
+                sys::RSMPI_INFO_NULL,
+                &mut file,
+            ));
+
+            let mut file_size: sys::MPI_Offset = 0;
+            check(sys::MPI_File_get_size(file, &mut file_size));
+            assert!(file_size >= 0);
+            if file_size == 0 {
+                check(sys::MPI_File_close(&mut file));
+                return Vec::new();
+            }
+
+            let rank: sys::MPI_Offset = self.rank().try_into().unwrap();
+            let size: sys::MPI_Offset = self.size().try_into().unwrap();
+            let block = file_size / size;
+            let start = rank * block;
+            let owned_end = start + block;
+            let read_end = if rank + 1 == size {
+                file_size
+            } else {
+                (owned_end + OVERLAP).min(file_size)
+            };
+            let requested: usize = (read_end - start).try_into().unwrap();
+            let mut bytes = vec![0u8; requested];
+            let mut status: sys::MPI_Status = std::mem::zeroed();
+            check(sys::MPI_File_read_at_all(
+                file,
+                start,
+                bytes.as_mut_ptr().cast(),
+                requested.try_into().unwrap(),
+                sys::RSMPI_UINT8_T,
+                &mut status,
+            ));
+            let mut actual = 0;
+            check(sys::MPI_Get_count(
+                &status,
+                sys::RSMPI_UINT8_T,
+                &mut actual,
+            ));
+            assert!(actual >= 0);
+            bytes.truncate(actual as usize);
+            check(sys::MPI_File_close(&mut file));
+
+            let mut first = 0;
+            let mut last = bytes.len();
+            let mut invalid = None;
+            if rank != 0 {
+                match bytes.iter().position(|&byte| byte == b'\n') {
+                    Some(position) => first = position + 1,
+                    None => invalid = Some("sparse text record exceeds the 300-byte overlap"),
+                }
+            }
+            if rank + 1 != size {
+                let boundary: usize = block.try_into().unwrap();
+                match bytes
+                    .get(boundary..)
+                    .and_then(|tail| tail.iter().position(|&byte| byte == b'\n'))
+                {
+                    Some(position) => last = boundary + position + 1,
+                    None => invalid = Some("sparse text record exceeds the 300-byte overlap"),
+                }
+            } else if bytes.last() != Some(&b'\n') {
+                invalid = Some("sparse text file must end with a newline");
+            }
+            if let Some(message) = invalid {
+                panic!("{message}");
+            }
+            assert!(first <= last);
+            bytes[first..last].to_vec()
+        }
+    }
+
+    /// Collectively replaces `path` with the concatenation of each rank's
+    /// already newline-terminated sparse text records, in communicator order.
+    pub(crate) fn write_sparse_text(&self, path: &Path, bytes: &[u8]) {
+        let path = mpi_path(path);
+        unsafe {
+            let mut file = sys::RSMPI_FILE_NULL;
+            check(sys::MPI_File_open(
+                self.raw,
+                path.as_ptr(),
+                (sys::MPI_MODE_WRONLY | sys::MPI_MODE_CREATE | sys::MPI_MODE_DELETE_ON_CLOSE)
+                    as i32,
+                sys::RSMPI_INFO_NULL,
+                &mut file,
+            ));
+            check(sys::MPI_File_close(&mut file));
+            check(sys::MPI_File_open(
+                self.raw,
+                path.as_ptr(),
+                (sys::MPI_MODE_WRONLY | sys::MPI_MODE_CREATE) as i32,
+                sys::RSMPI_INFO_NULL,
+                &mut file,
+            ));
+
+            let length: i64 = bytes.len().try_into().unwrap();
+            let mut inclusive = 0i64;
+            check(sys::MPI_Scan(
+                (&length as *const i64).cast(),
+                (&mut inclusive as *mut i64).cast(),
+                1,
+                sys::RSMPI_INT64_T,
+                sys::RSMPI_SUM,
+                self.raw,
+            ));
+            let offset: sys::MPI_Offset = inclusive - length;
+            let mut status: sys::MPI_Status = std::mem::zeroed();
+            check(sys::MPI_File_write_at_all(
+                file,
+                offset,
+                bytes.as_ptr().cast(),
+                bytes.len().try_into().unwrap(),
+                sys::RSMPI_UINT8_T,
+                &mut status,
+            ));
+            check(sys::MPI_File_close(&mut file));
+        }
+    }
+}

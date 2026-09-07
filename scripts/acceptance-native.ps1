@@ -42,7 +42,7 @@ $mpiTests = @(
 )
 $arguments = @()
 foreach ($test in $mpiTests) { $arguments += @('--test', $test) }
-foreach ($test in @('typed_grid_blas','typed_randomized_svd','typed_distributed_eigh','typed_tensor_svd','typed_multilinear','tttp_memory','tensor_norms','storage_conversion','sparse_random_fill','subworld_transfer')) { $arguments += @('--test', $test) }
+foreach ($test in @('typed_grid_blas','typed_randomized_svd','typed_distributed_eigh','typed_tensor_svd','typed_multilinear','tttp_memory','tensor_norms','storage_conversion','sparse_random_fill','subworld_transfer','sparse_text_io')) { $arguments += @('--test', $test) }
 foreach ($ranks in 1,2,4) {
     $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = "mpiexec -n $ranks"
     cargo test @arguments
@@ -50,6 +50,8 @@ foreach ($ranks in 1,2,4) {
 }
 Remove-Item Env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER
 cargo test --lib tttp_blocking
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo test --lib sparse_text
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cargo test --test narrow_algebra
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
