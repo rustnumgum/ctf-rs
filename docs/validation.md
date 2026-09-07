@@ -1142,6 +1142,24 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## Compressed unpack, norms and coordinate text I/O (2026-09-07)
+
+symmetric_norms and symmetric_text_io passed once at WSL 1/2/4 ranks,
+world/parity. Distributed unpack checks exact SY/AS/SH values and signs on
+virtual/padded layouts without a root gather. Real norms cover i8/i16/i32/i64/
+f32/f64; complex norm2 covers both precisions. All-NS storage keeps manual f64
+accumulation, while compressed norms expand, square and sum in the original
+scalar precision before the source final conversion/sqrt. Existing finite
+abs<1e-6 bounds pass, including hollow singleton/empty local cases.
+
+Four-type symmetric text I/O exports only canonical nonzero pairs, matching
+get_local_pairs(nonzeros_only=true, unpack_sym=false). Exact tests cover packed
+round trips, reverse indices, signed accumulation of equivalent input permutations
+and reading the packed export into an ordinary dense tensor. Temporary files
+were removed. Both targets compiled and linked on Windows GNU once. No failures
+or precision studies. DIGIT / PASS; bool norm contracts, native MPI execution
+and full-port acceptance remain outstanding.
+
 ## Communicator-scoped sparse text MPI-IO (2026-09-07)
 
 Five sparse_text codec unit tests passed for coordinate order, absent values,

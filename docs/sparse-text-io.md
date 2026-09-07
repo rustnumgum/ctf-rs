@@ -1,6 +1,6 @@
 # Sparse coordinate text I/O
 
-`Tensor` and `SparseTensor` provide `read_sparse_from_file` and
+`Tensor`, `SparseTensor` and `SymmetricTensor` provide `read_sparse_from_file` and
 `write_sparse_to_file` for f32, f64, i32 and i64. Both operations are collective
 on the tensor's explicit context, including subcontexts.
 
@@ -10,6 +10,9 @@ order; `with_values=false` omits values when writing and reads each record as
 the multiplicative identity. Reads add records to existing data and combine
 duplicate keys. Writers emit only canonical nonzero pairs, in rank/local order.
 Real values use the source's fixed six fractional digits, not lossless encoding.
+Compressed tensors write canonical packed entries, not expanded symmetry orbits.
+Symmetric reads canonicalize input permutations and their signs. Shape and
+symmetry metadata are supplied by the caller, not stored in this text format.
 
 MPI-IO reads retain the pinned 300-byte overlap and newline ownership rule.
 Small reads are clamped at EOF and empty files are supported. A boundary record

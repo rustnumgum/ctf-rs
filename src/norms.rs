@@ -3,8 +3,11 @@
 //! Dense and sparse tensor norms for the source's specialized scalar families.
 
 use crate::{
-    algebra::{Arithmetic, Complex, Monoid},
+    algebra::{Arithmetic, Complex, Monoid, Semiring, Wire},
+    mapping::Distribution,
     sparse::SparseTensor,
+    symmetric_tensor::SymmetricTensor,
+    symmetry::Symmetry,
     tensor::Tensor,
 };
 
@@ -121,6 +124,43 @@ fn sparse_manual_norm2<A: Monoid>(
     squared.sqrt()
 }
 
+fn symmetric_manual_norm2<A: Monoid>(
+    tensor: &SymmetricTensor<'_, '_, A>,
+    to_double: impl Fn(&A::Element) -> f64,
+) -> f64
+where
+    A: crate::algebra::Group,
+{
+    let mut squared = 0.0;
+    for value in tensor.local_storage() {
+        let value = to_double(value);
+        squared += value * value;
+    }
+    tensor.context().sum_f64(std::slice::from_mut(&mut squared));
+    squared.sqrt()
+}
+
+fn dense_typed_sum<A: Monoid>(
+    tensor: &Tensor<'_, '_, A>,
+    transform: impl Fn(&A::Element) -> A::Element,
+) -> A::Element
+where
+    A::Element: Wire,
+{
+    let algebra = tensor.algebra();
+    let rank = tensor.context().rank();
+    let mut result = algebra.zero();
+    for (key, value) in tensor.local_pairs() {
+        if tensor.distribution().owner(key) == rank {
+            result = algebra.add(&result, &transform(&value));
+        }
+    }
+    tensor
+        .context()
+        .all_reduce_monoid(algebra, std::slice::from_mut(&mut result), true);
+    result
+}
+
 macro_rules! real_norms {
     ($scalar:ty, $norm1:expr, $max_identity:expr, $norm_infty:expr, $norm2:expr) => {
         impl Tensor<'_, '_, Arithmetic<$scalar>> {
@@ -148,6 +188,44 @@ macro_rules! real_norms {
 
             pub fn norm_infty(&self) -> f64 {
                 sparse_logical_max(self, $max_identity, $norm_infty)
+            }
+        }
+
+
+        impl SymmetricTensor<'_, '_, Arithmetic<$scalar>> {
+            pub fn norm1(&self) -> f64 {
+                let expanded = self.unpack(Distribution::cyclic(
+                    self.distribution().distribution().shape.clone(),
+                    self.context().size(),
+                ));
+                dense_logical_sum(&expanded, $norm1)
+            }
+
+            pub fn norm2(&self) -> f64 {
+                if self
+                    .distribution()
+                    .links()
+                    .iter()
+                    .all(|&link| link == Symmetry::NS)
+                {
+                    return symmetric_manual_norm2(self, $norm2);
+                }
+                let expanded = self.unpack(Distribution::cyclic(
+                    self.distribution().distribution().shape.clone(),
+                    self.context().size(),
+                ));
+                let squared = dense_typed_sum(&expanded, |value| {
+                    expanded.algebra().multiply(value, value)
+                });
+                (squared as f64).sqrt()
+            }
+
+            pub fn norm_infty(&self) -> f64 {
+                let expanded = self.unpack(Distribution::cyclic(
+                    self.distribution().distribution().shape.clone(),
+                    self.context().size(),
+                ));
+                dense_logical_max(&expanded, $max_identity, $norm_infty)
             }
         }
     };
@@ -215,3 +293,34 @@ macro_rules! norm2_only {
 norm2_only!(bool, |value: &bool| if *value { 1.0 } else { 0.0 });
 norm2_only!(Complex<f32>, |value: &Complex<f32>| value.re.hypot(value.im) as f64);
 norm2_only!(Complex<f64>, |value: &Complex<f64>| value.re.hypot(value.im));
+
+macro_rules! symmetric_complex_norm2 {
+    ($scalar:ty, $real:ty) => {
+        impl SymmetricTensor<'_, '_, Arithmetic<Complex<$scalar>>> {
+            pub fn norm2(&self) -> f64 {
+                if self
+                    .distribution()
+                    .links()
+                    .iter()
+                    .all(|&link| link == Symmetry::NS)
+                {
+                    return symmetric_manual_norm2(self, |value: &Complex<$scalar>| {
+                        value.re.hypot(value.im) as f64
+                    });
+                }
+                let expanded = self.unpack(Distribution::cyclic(
+                    self.distribution().distribution().shape.clone(),
+                    self.context().size(),
+                ));
+                let squared = dense_typed_sum(&expanded, |value| {
+                    let magnitude: $real = value.re.hypot(value.im);
+                    Complex::new(magnitude * magnitude, 0.)
+                });
+                squared.re.hypot(squared.im).sqrt() as f64
+            }
+        }
+    };
+}
+
+symmetric_complex_norm2!(f32, f32);
+symmetric_complex_norm2!(f64, f64);

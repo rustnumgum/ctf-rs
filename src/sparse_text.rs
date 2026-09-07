@@ -7,6 +7,7 @@ use crate::{
     algebra::{Arithmetic, Monoid, Semiring},
     mapping::Distribution,
     sparse::SparseTensor,
+    symmetric_tensor::SymmetricTensor,
     tensor::Tensor,
 };
 
@@ -177,6 +178,51 @@ macro_rules! sparse_text_apis {
                     .collect();
                 let bytes = serialize_sparse_text(
                     self.distribution(),
+                    &pairs,
+                    with_values,
+                    reverse_order,
+                );
+                self.context().inner.write_sparse_text(path, &bytes);
+            }
+        }
+
+        impl<'c, 'r> SymmetricTensor<'c, 'r, Arithmetic<$scalar>> {
+            pub fn read_sparse_from_file(
+                &mut self,
+                path: &Path,
+                with_values: bool,
+                reverse_order: bool,
+            ) {
+                let bytes = self.context().inner.read_sparse_text(path);
+                let algebra = Arithmetic::<$scalar>::new();
+                let pairs = parse_sparse_text(
+                    &bytes,
+                    self.distribution().distribution(),
+                    &algebra,
+                    with_values,
+                    reverse_order,
+                );
+                self.write_add(&pairs);
+            }
+
+            pub fn write_sparse_to_file(
+                &self,
+                path: &Path,
+                with_values: bool,
+                reverse_order: bool,
+            ) {
+                let algebra = Arithmetic::<$scalar>::new();
+                let rank = self.context().rank();
+                let pairs: Vec<_> = self
+                    .local_pairs()
+                    .into_iter()
+                    .filter(|(key, value)| {
+                        self.distribution().distribution().owner(*key) == rank
+                            && value != &algebra.zero()
+                    })
+                    .collect();
+                let bytes = serialize_sparse_text(
+                    self.distribution().distribution(),
                     &pairs,
                     with_values,
                     reverse_order,

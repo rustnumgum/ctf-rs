@@ -622,3 +622,13 @@ harness = false
 name = "sparse_text_io"
 path = "tests/sparse_text_io.rs"
 harness = false
+
+[[test]]
+name = "symmetric_norms"
+path = "tests/symmetric_norms.rs"
+harness = false
+
+[[test]]
+name = "symmetric_text_io"
+path = "tests/symmetric_text_io.rs"
+harness = false
