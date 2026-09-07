@@ -1053,3 +1053,14 @@ to original operands, and dense <= comparison chooses the last tie. The six
 source transpose flags drive existing folded_f64 and its transposed-output swap.
 Sparse permutation restrictions and partially folded symmetric tensors remain
 separate unfinished paths.
+
+fold_indices.rs adapts get_fold_indices/can_fold (contraction.cxx:405-594).
+Original normalized IDs, literal relative-position comparisons, A/C/B traversal,
+and scans starting at every dimension through its remaining symmetry group are
+preserved. The sparse predicate is the literal odd-order or half-order<nfold
+condition, not a corrected requirement that every label fold; triple/weigh labels
+are rejected separately. fold_layout.rs adapts tensor::fold
+(untyped_tensor.cxx:2922-3006): calc_dim local lengths are supplied explicitly,
+sy_packed_size is evaluated per adjacent symmetry group, and selection uses the
+terminal label. Folded index IDs are positions in the global fold list. No alias
+buffer lifetime, local transpose or implicit unfolding is invented by this stage.

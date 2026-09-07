@@ -1046,6 +1046,17 @@ finite abs(error)<1e-6 acceptance. Existing folding tests passed once and affect
 tensor_blas_fold passed WSL 1/2/4 ranks. No failures or extra precision studies.
 All three targets compiled/linked on Windows GNU; native runtime remains pending.
 
+## Partial/symmetry fold metadata (2026-09-07)
+
+fold_indices and fold_layout passed four local exact tests in WSL. Cases cover
+partial NS folds, sparse/custom/repeated-index decisions, SY/AS/SH matching and
+reversed-group rejection, common three-operand groups, compressed group lengths,
+fold-list index positions, stable residual order, selected-prefix permutation and
+scalar metadata. An eligible partial SY contraction also feeds FoldLayout.
+No floating-point computation or MPI execution is introduced by these modules,
+so no old MPI/numerical suite was rerun. Both targets compiled/linked once on
+Windows GNU. Full partial/symmetric folded execution remains unaccepted.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each

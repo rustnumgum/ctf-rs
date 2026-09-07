@@ -52,3 +52,5 @@ pub mod normal_search;
 pub mod mapped_cost;
 pub mod dense_search;
 mod dense_execution;
+pub mod fold_indices;
+pub mod fold_layout;

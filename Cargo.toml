@@ -477,3 +477,11 @@ harness = false
 [[test]]
 name = "fold_selection"
 path = "tests/fold_selection.rs"
+
+[[test]]
+name = "fold_indices"
+path = "tests/fold_indices.rs"
+
+[[test]]
+name = "fold_layout"
+path = "tests/fold_layout.rs"

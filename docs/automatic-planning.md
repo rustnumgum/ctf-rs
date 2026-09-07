@@ -49,6 +49,14 @@ compile-time LocalKernels boundary (native BLAS initially).
 This is the fully-foldable local NS stage, not yet map_fold's full distributed
 partial/symmetry folding or its integration into automatic total-cost search.
 
+fold_indices::select now supplies the source get_fold_indices/can_fold stage for
+NS/SY/AS/SH links, including partial groups, repeated-label/dense-custom early
+rejection and sparse restrictions. fold_layout::FoldLayout supplies tensor::fold
+metadata from local virtual-block lengths: packed symmetry-group lengths, the
+selected rec_tsr shape and index IDs, and selected-first inner ordering. Its
+permutation changes only the selected prefix. These metadata stages do not yet
+transpose distributed packed storage or execute partially folded contractions.
+
 ## Executable inner cost tree now connected
 
 GridPlan::cost_tree derives the aligned unfolded dense execution tree from the
