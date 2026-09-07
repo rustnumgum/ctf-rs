@@ -1,6 +1,6 @@
 # Validation evidence
 
-## D6 dense drivers and native runtime handoff (2026-09-08)
+## D6 dense drivers and native runtime close (2026-09-08)
 
 The pinned dense `test_suite.cxx` subset now asserts every active dense
 criterion directly instead of trusting the source program's unconditional
@@ -32,12 +32,12 @@ assertions. No fixture size, metric or tolerance changed. At four ranks,
 `bench_contraction` reported 0.00014722066666666666 s/iteration and the dense
 `model_trainer` subset reported 29.087425941 s; each timing ran once.
 
-The full native Windows GNU test/example set compiled and linked once. The
-single native dense runtime attempt stopped before executing its first target,
-`d4_blas_flops`, because `mpiexec` was not found. No native numerical value was
-produced and no fallback was used. DIGIT / HANDOFF; open question: can the
-Microsoft MPI runtime/launcher be installed on this host so the D6 native
-1/2/4-rank dense runtime can execute?
+The full native Windows GNU test/example set compiled and linked once. After
+Microsoft MPI was installed, the prescribed native dense runtime gate passed
+once at 1/2/4 ranks. Every invoked driver reported DIGIT / PASS within its
+fixed exact or numerical bound, including `d4_blas_flops`, `dense_low_memory`,
+`distributed_symmetric_repack`, the dense test-suite subset and all eleven D6
+examples. No tolerance, fixture or fallback changed. DIGIT / PASS; open: none.
 
 ## D5 native interface and FFT close (2026-09-08)
 
