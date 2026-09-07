@@ -976,3 +976,14 @@ missing sparse values versus dense zeros, separate l batches, off-diagonal input
 exclusion, output off-diagonal preservation and original distributions are
 checked. DIGIT / PASS; no failures or further precision runs. The target compiled
 and linked once on Windows GNU; native runtime acceptance remains outstanding.
+
+## Distributed dense custom functions and upstream bivar_function (2026-09-07)
+
+upstream_bivar_function and distributed_dense_function passed once at 1/2/4 WSL
+ranks, world/parity. The upstream four-dimensional identity retains its strict
+abs(error)<1e-6 rule with finite results. The exact i64 custom test checks a
+non-distributive f(a,b)=a+b+1, physical i/j/k mappings, output-only axes, repeated
+output diagonals and off-diagonal preservation. In particular k=3 at four ranks
+must contribute no padded function evaluations. DIGIT / PASS; no failures or
+additional numerical runs. Both targets compiled/linked once on Windows GNU;
+native runtime remains unaccepted.

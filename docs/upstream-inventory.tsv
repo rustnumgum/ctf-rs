@@ -168,7 +168,7 @@ src/scaling/strp_tsr.cxx	src/scaling	pending
 src/scaling/strp_tsr.h	src/scaling	pending
 src/scaling/sym_seq_scl.cxx	src/symmetry.rs; src/symmetric_operations.rs	partial: local and distributed packed indexed right scaling and transforms; automatic scaling remapping pending
 src/scaling/sym_seq_scl.h	src/scaling	pending
-test/bivar_function.cxx	tests/upstream/test/bivar_function.rs	pending
+test/bivar_function.cxx	tests/upstream_bivar_function.rs	ported: original four-dimensional beta=.5 bivariate identity and strict abs(error)<1e-6; deterministic global-key fixture replaces rank-seeded random initialization
 test/bivar_transform.cxx	tests/upstream/test/bivar_transform.rs	pending
 test/ccsdt_map_test.cxx	tests/upstream/test/ccsdt_map_test.rs	pending
 test/ccsdt_t3_to_t2.cxx	tests/upstream/test/ccsdt_t3_to_t2.rs	pending

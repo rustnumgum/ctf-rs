@@ -904,3 +904,20 @@ reinserted without modifying off-diagonal values. Projected Plan validation
 occurs before communication. Unit alpha follows custom CSR dispatch. Input-only
 pre-reduction is deliberately not performed for arbitrary functions, whose
 distributivity cannot be assumed; nonfoldable indices remain an explicit error.
+
+## Distributed dense bivariate contraction
+
+dense_function.rs exposes explicit physical-label mapping and source broadcast /
+local recursive custom kernel / output reduction. Its recursive leaf uses the
+existing sequential_function, matching sym_seq_ctr.cxx:241-265: f(A,B), right
+alpha scaling, then contribution-first addition. Canonical mapped roots read
+only valid local keys. Rank-specific extents exclude cyclic padding before any
+function evaluation, which is necessary for functions not annihilating zero.
+Input/output repeated labels use diagonal extraction and output reinsertion.
+No distributive pre-sum is performed; singleton labels remain physically unmapped.
+Final canonical output contributions restore the original distribution by I/O.
+
+upstream_bivar_function preserves test/bivar_function.cxx's n=5 shape [6,5,7,8],
+f(a,b)=a*b+b*a, beta=.5 update, and strict absolute error <1e-6. A clone expresses
+the source aliased old-A operand in Rust. Global-key values replace rank-seeded
+random data; the acceptance reference is the original per-element identity.

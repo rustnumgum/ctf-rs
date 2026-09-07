@@ -380,3 +380,13 @@ harness = false
 name = "distributed_sparse_fold_function"
 path = "tests/distributed_sparse_fold_function.rs"
 harness = false
+
+[[test]]
+name = "upstream_bivar_function"
+path = "tests/upstream_bivar_function.rs"
+harness = false
+
+[[test]]
+name = "distributed_dense_function"
+path = "tests/distributed_dense_function.rs"
+harness = false

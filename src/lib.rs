@@ -41,3 +41,4 @@ pub mod symmetric_contraction_comm;
 pub mod scalar_conversion;
 pub mod sparse_sequential;
 pub mod sparse_function_kernel;
+mod dense_function;

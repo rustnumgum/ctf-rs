@@ -34,6 +34,7 @@ mpi_tests+=(distributed_sparse_function)
 mpi_tests+=(distributed_sparse_gemm_function)
 mpi_tests+=(distributed_sparse_function_output)
 mpi_tests+=(distributed_sparse_fold_function)
+mpi_tests+=(upstream_bivar_function distributed_dense_function)
 for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
 for ranks in 1 2 4; do
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
