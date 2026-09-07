@@ -8,7 +8,7 @@
 //! multiplication: absent sparse structure is never evaluated, while explicit
 //! stored zeros and dense zeros are passed to the function.
 
-use crate::{algebra::Semiring, sparse_formats::Csr};
+use crate::{algebra::Semiring, sparse_formats::{Coo, Csr}};
 
 fn prescale<A: Semiring>(algebra: &A, c: &mut [A::Element], beta: &A::Element) {
     let one = algebra.one();
@@ -103,4 +103,70 @@ pub fn csr_sparse<
             }
         }
     }
+}
+
+/// Source `Bivar_Function::csrmultcsr`: sparse A and sparse B into sparse C.
+/// Product structure is the symbolic row-wise union of reachable B columns;
+/// the first numeric path writes `function(A, B)` directly and later paths add
+/// on the right. Existing C is the left operand of the final source `csr_add`.
+/// Alpha and beta are deliberately absent:
+/// custom CSR dispatch requires identity alpha and passes identity beta, while
+/// the pinned high-level sparse-output path handles beta in a separate sparse
+/// summation.
+pub fn csr_sparse_output<
+    A: Semiring,
+    F: Fn(&A::Element, &A::Element) -> A::Element,
+>(
+    algebra: &A,
+    a: &Csr<A::Element>,
+    b: &Csr<A::Element>,
+    c: &Csr<A::Element>,
+    function: F,
+) -> Csr<A::Element> {
+    let (m, k) = a.shape();
+    let (rows_b, n) = b.shape();
+    assert_eq!(k, rows_b);
+    assert_eq!(c.shape(), (m, n));
+
+    let mut entries = Vec::new();
+    let mut present = vec![false; n];
+    let mut values: Vec<Option<A::Element>> = vec![None; n];
+    for row_a in 0..m {
+        present.fill(false);
+        let start_a = a.row_offsets()[row_a] - 1;
+        let end_a = a.row_offsets()[row_a + 1] - 1;
+        for entry_a in start_a..end_a {
+            let row_b = a.columns()[entry_a] - 1;
+            let start_b = b.row_offsets()[row_b] - 1;
+            let end_b = b.row_offsets()[row_b + 1] - 1;
+            for entry_b in start_b..end_b {
+                present[b.columns()[entry_b] - 1] = true;
+            }
+        }
+
+        for value in &mut values {
+            *value = None;
+        }
+        for entry_a in start_a..end_a {
+            let row_b = a.columns()[entry_a] - 1;
+            let start_b = b.row_offsets()[row_b] - 1;
+            let end_b = b.row_offsets()[row_b + 1] - 1;
+            for entry_b in start_b..end_b {
+                let col_b = b.columns()[entry_b] - 1;
+                let value = function(&a.values()[entry_a], &b.values()[entry_b]);
+                values[col_b] = Some(match values[col_b].take() {
+                    Some(previous) => algebra.add(&previous, &value),
+                    None => value,
+                });
+            }
+        }
+        for col_b in 0..n {
+            if present[col_b] {
+                entries.push((row_a + 1, col_b + 1, values[col_b].take().unwrap()));
+            }
+        }
+    }
+
+    let product = Coo::new(m, n, entries).to_csr();
+    c.add(&product, algebra)
 }

@@ -168,6 +168,27 @@ impl<A: Semiring + Clone> SparseTensor<'_, '_, A> where A::Element: Wire {
         self.blocks = vec![layout.output_pairs(&c, self.context().rank())];
         self.redistribute(original);
     }
+
+    /// Custom sparse matrix product with sparse output throughout. Structural
+    /// products, including zero-valued results, are retained as in source CSR.
+    pub fn gemm_sparse_function(&mut self, a: &Self, b: &Self, grid: [usize; 2],
+        alpha: A::Element, beta: A::Element,
+        function: impl Fn(&A::Element, &A::Element) -> A::Element) {
+        assert!(std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context()));
+        let layout = Layout::new(a.distribution(), b.distribution(), self.distribution(), grid, self.context().size());
+        let algebra = self.algebra().clone();
+        let one = algebra.one();
+        assert!(alpha == one,"source custom CSR kernel requires identity alpha");
+        let mut c = Coo::new(layout.local[0],layout.local[2],Vec::new()).to_csr();
+        sparse_panels(a, b, &layout, |a, b, _| {
+            c = crate::sparse_function_kernel::csr_sparse_output(&algebra,a,b,&c,&function);
+        });
+        // Source home_contract computes into empty C_buf, then sparse-sums it
+        // into old C. This retains old-only zero keys and right-scales by beta.
+        let mut product = Self::new(self.context(),layout.distribution(2),algebra);
+        product.blocks = vec![layout.output_pairs(&c,self.context().rank())];
+        self.sum_from("ij",&product,"ij",one,beta);
+    }
 }
 
 impl<A: Semiring + Clone> Tensor<'_, '_, A> where A::Element: Wire {

@@ -878,3 +878,17 @@ gemm_sparse_dense_function and gemm_sparse_function reuse the existing source
 beta; subsequent panels use one. Sparse and dense layouts remain distinct; a
 user function is not disguised as a semiring multiplication implementation.
 Output is restored to its original distribution after panel execution.
+
+## Custom CSR sparse output
+
+csr_sparse_output ports functions.h:255-333 symbolic reachable-column discovery,
+direct first numeric write, subsequent ordered additions, and final old-CSR-first
+csr_add. It exposes the raw source kernel without alpha/beta parameters. The
+distributed SparseTensor::gemm_sparse_function requires unit alpha, accumulates
+panels into an empty sparse product, then uses indexed sparse summation to update
+the existing output, following home_contract at contraction.cxx:5275-5288.
+This high-level merge right-multiplies old values by beta and adds product first
+on collisions (spr_seq_sum.cxx:235-285). Old-only coordinates remain present with
+zero values when beta=zero. This ordering is deliberately distinguished from
+both the raw csr_add and existing ordinary sparse GEMM's beta convention.
+No dense m*n intermediate is allocated; symbolic row workspace is O(n).

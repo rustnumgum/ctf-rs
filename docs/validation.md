@@ -955,3 +955,14 @@ entries and preserving dense zero evaluations. Empty sparse A, padded/empty loca
 panels, 2x2 grid at four ranks, and original output distribution are covered.
 DIGIT / PASS; no failures or diagnostic runs. All three targets compiled and
 linked once on Windows GNU; native runtime acceptance remains outstanding.
+
+## Custom sparse-output CSR contraction (2026-09-07)
+
+The new sparse_function_kernel sparse-output case passed once, covering multiple
+numeric paths, structural zero retention and old CSR row merge. Previously passed
+unchanged dense-output cases were filtered out. distributed_sparse_function_output
+passed once at 1/2/4 WSL ranks, world/parity, with exact local keys and i64 values.
+Beta=zero retains old-only zero coordinates per pinned sparse summation; beta=3
+scales and merges old entries. Output distribution is unchanged. DIGIT / PASS,
+no failures or extra numerical runs. Both targets compiled/linked on Windows GNU;
+native runtime remains unaccepted.

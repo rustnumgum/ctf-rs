@@ -370,3 +370,8 @@ path = "tests/sparse_function_kernel.rs"
 name = "distributed_sparse_gemm_function"
 path = "tests/distributed_sparse_gemm_function.rs"
 harness = false
+
+[[test]]
+name = "distributed_sparse_function_output"
+path = "tests/distributed_sparse_function_output.rs"
+harness = false
