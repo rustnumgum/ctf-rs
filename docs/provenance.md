@@ -7,6 +7,12 @@ Reference commit: f69cbb46e23bc2f39cda5722ce096f56301dab4f
 not a declaration that Edgar Solomonik authored the new Rust implementation.
 Do not stamp independently written files with the upstream author's copyright.
 
+* `tests/upstream_{readall,readwrite,sptensor_sum,subworld_gemm}.rs`:
+  migrate the matching pinned `test/{readall_test,readwrite_test,sptensor_sum,
+  subworld_gemm}.cxx` driver equations and acceptance rules. Source RNG uses its
+  POSIX recurrence directly in Rust; fixture sizes and literal quirks are recorded
+  in the inventory and validation evidence.
+
 * `src/sparse_virtual.rs` and mapped sparse contraction integration:
   operand/union strides, block offset updates and beta-once state follow
   `contraction/spctr_tsr.cxx:699-898`; owned sparse block vectors replace byte

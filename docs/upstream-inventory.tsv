@@ -182,14 +182,14 @@ test/gemm_4D.cxx	tests/upstream_gemm4d.rs	NS associativity port PASS WSL 1/2/4; 
 test/Makefile	Cargo/build tooling	replaced
 test/multi_tsr_sym.cxx	tests/upstream_multi_tsr_sym.rs	ported NS/SY Gram equality, original norm<1e-6; WSL 1/2/4 pass
 test/permute_multiworld.cxx	tests/upstream/test/permute_multiworld.rs	pending
-test/readall_test.cxx	tests/upstream/test/readall_test.rs	pending
-test/readwrite_test.cxx	tests/upstream/test/readwrite_test.rs	pending
+test/readall_test.cxx	tests/upstream_readall.rs	ported bounded 2x3x2x3: source seed-zero drand48, root-only child transfer, explicit all-data read; abs<=1e-10 PASS WSL1/2/4 world/parity
+test/readwrite_test.cxx	tests/upstream_readwrite.rs	ported bounded n3: NS/SY/SH and source-literal AS=SH diagonal writes, distributed reductions and NS/SY self contractions; abs<=1e-10 PASS WSL1/2/4 world/parity
 test/reduce_bcast.cxx	tests/upstream_dense.rs; tests/upstream_reduce_bcast.rs	both identities through dense and compressed tensor APIs; original norm<=1e-6, WSL 1/2/4 pass
 test/repack.cxx	tests/distributed_symmetric_repack.rs	canonical-only source repack semantics ported; exact SY/AS/SH and partial-group WSL checks at 1/2/4 ranks; original random driver pending
 test/scalar.cxx	tests/upstream/test/scalar.rs	pending
 test/speye.cxx	tests/upstream/test/speye.rs	pending
-test/sptensor_sum.cxx	tests/upstream/test/sptensor_sum.rs	pending
-test/subworld_gemm.cxx	tests/upstream/test/subworld_gemm.rs	pending
+test/sptensor_sum.cxx	tests/upstream_sptensor_sum.rs	ported bounded n2: exact source sparse fixtures/union, overlap66, abs<=1e-9 PASS WSL1/2/4 world/parity
+test/subworld_gemm.cxx	tests/upstream_subworld_gemm.rs	ported source defaults17x23x31 plus tiny2x3x1, divisions1/2/4, POSIX drand48 recurrence, distributed child GEMM accumulation identity; Frobenius<1e-9 PASS WSL1/2/4 world/parity
 test/sy_times_ns.cxx	tests/upstream_sy_times_ns.rs	ported literal zero-input source and separately adapted nonzero fixture, original norm<1e-10; WSL 1/2/4 pass
 test/test_suite.cxx	tests/upstream/test/test_suite.rs	pending
 test/univar_function.cxx	tests/upstream_univar_function.rs	ported: original .25*A+A^4 identity, n=5 and strict abs(error)<1e-6; deterministic global-key fixture

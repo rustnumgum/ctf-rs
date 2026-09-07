@@ -667,3 +667,23 @@ harness = false
 name = "symmetric_subworld"
 path = "tests/symmetric_subworld.rs"
 harness = false
+
+[[test]]
+name = "upstream_subworld_gemm"
+path = "tests/upstream_subworld_gemm.rs"
+harness = false
+
+[[test]]
+name = "upstream_readall"
+path = "tests/upstream_readall.rs"
+harness = false
+
+[[test]]
+name = "upstream_readwrite"
+path = "tests/upstream_readwrite.rs"
+harness = false
+
+[[test]]
+name = "upstream_sptensor_sum"
+path = "tests/upstream_sptensor_sum.rs"
+harness = false

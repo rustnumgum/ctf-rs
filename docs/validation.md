@@ -1,5 +1,19 @@
 # Validation evidence
 
+## Upstream read/write, sparse sum and subworld GEMM drivers (2026-09-07)
+
+`upstream_readall`, `upstream_readwrite`, `upstream_sptensor_sum` and
+`upstream_subworld_gemm` passed once at 1/2/4 WSL ranks, world/parity. The first
+two retain source abs<=1e-10, sparse sum abs<=1e-9, and subworld GEMM Frobenius
+error<1e-9. Random fixtures use the source POSIX 48-bit recurrence in Rust.
+Read/write uses real distributed NS and compressed self-contractions, not
+all-gathered serial arithmetic. Its source `shape_AS4` is literally SH, preserved
+and documented rather than falsely counted as a new AS case. Sparse sum keeps
+the complete original key/value fixture at n2. GEMM keeps default m17/n23/k31
+plus tiny shards and divisor1/2/4 cases. DIGIT / PASS; no diagnostics or precision
+reruns. Windows native runtime remains pending; compile/link is separate evidence.
+All four driver targets compiled and linked once on Windows GNU.
+
 ## Sparse virtual execution (2026-09-07)
 
 Four exact `sparse_virtual` unit tests passed once: block order, beta-first
