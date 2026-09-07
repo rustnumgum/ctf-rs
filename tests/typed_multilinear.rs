@@ -48,7 +48,7 @@ fn exercise<A:Semiring+Clone>(context:&Context<'_>,algebra:A,value:impl Fn(i32,i
         let(d0,d2)=(f0.local_storage().to_vec(),f2.local_storage().to_vec());
         let(mut dense,mut sparse)=make_source();let keys:Vec<_>=sparse.local_pairs().iter().map(|p|p.0).collect();
         if width.is_none(){dense.tttp_vectors(&[(0,&f0),(2,&f2)]);sparse.tttp_vectors(&[(0,&f0),(2,&f2)]);}
-        else{dense.tttp_matrices(&[(0,&f0),(2,&f2)],first,2);sparse.tttp_matrices(&[(0,&f0),(2,&f2)],first,2);}
+        else{dense.tttp_matrices(&[(0,&f0),(2,&f2)],first,ctf::multilinear::TttpBlocking::Divisions(2));sparse.tttp_matrices(&[(0,&f0),(2,&f2)],first,ctf::multilinear::TttpBlocking::Divisions(2));}
         let expected=|key|{
             let mut weight=algebra.zero();for r in 0..width.unwrap_or(1){
                 weight=algebra.add(&weight,&algebra.multiply(&factor_value(0,coordinate(key,0),r),&factor_value(2,coordinate(key,2),r)));

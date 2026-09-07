@@ -588,3 +588,8 @@ harness = false
 name = "typed_multilinear"
 path = "tests/typed_multilinear.rs"
 harness = false
+
+[[test]]
+name = "tttp_memory"
+path = "tests/tttp_memory.rs"
+harness = false

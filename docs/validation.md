@@ -1142,6 +1142,27 @@ or extra numerical studies. New target and updated distributed_svd_paths caller
 compiled/linked on Windows GNU once; native MPI runtime remains pending.
 DIGIT / PASS for the guess contract; random-generator fidelity remains open.
 
+## TTTP budget-selected auxiliary blocking (2026-09-07)
+
+Matrix TTTP now takes TttpBlocking::Divisions or AvailableBytes. The latter
+uses the pinned per-mode integer-truncated two-factor-buffer estimate, adds
+the local pair accumulator only beyond one division, doubles divisions capped
+at k, and collectively selects their maximum. Available bytes are supplied by
+the caller per rank; this is not OS-memory discovery or a process peak cap.
+Dense accumulator allocation now counts only valid local entries, not padding.
+
+Five exact tttp_blocking unit tests passed once: term-wise integer truncation,
+doubling/cap, accumulator accounting, equality boundary and insufficient memory.
+tttp_memory and the affected typed_multilinear target passed once at WSL 1/2/4
+ranks, world/parity. Rank zero forces four blocks while others admit one;
+dense/sparse results remain exact on uneven virtual layouts, both factor
+orientations and stored sparse zeros. The generic regression retains finite
+abs<1e-6 for all four floating types and exact integer/matrix-semiring results.
+The library unit-test target and four corresponding integration targets compiled
+and linked on Windows GNU. No failures or additional precision studies.
+DIGIT / PASS; native MPI execution, OS/process memory accounting, vector TTTP's
+source memory diagnostic and full-port completion remain outstanding.
+
 ## Generic semiring dense/sparse TTTP and MTTKRP (2026-09-07)
 
 typed_multilinear passed once at WSL 1/2/4 ranks, world/parity subcontexts.

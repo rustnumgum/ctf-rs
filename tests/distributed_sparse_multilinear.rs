@@ -29,7 +29,7 @@ fn run(c:&Context<'_>){
     close(t.read(&keys),expected);assert_eq!(t.local_pairs().into_iter().map(|p|p.0).collect::<Vec<_>>(),old_keys);
     for first in [true,false]{
         let f0=factor(c,0,3,Some(5),first);let f2=factor(c,2,4,Some(5),first);
-        let mut t=source(c);t.tttp_matrices(&[(0,&f0),(2,&f2)],first,2);
+        let mut t=source(c);t.tttp_matrices(&[(0,&f0),(2,&f2)],first,ctf::multilinear::TttpBlocking::Divisions(2));
         let mut expected:Vec<_>=entries.iter().map(|&(key,v)|v*(0..5).map(|r|matrix(0,key%3,r)*matrix(2,key/6,r)).sum::<f64>()).collect();expected.push(0.);
         close(t.read(&keys),expected);
     }

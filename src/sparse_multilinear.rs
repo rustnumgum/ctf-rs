@@ -8,7 +8,11 @@ use crate::{
     tensor::Tensor,
 };
 
-use crate::multilinear::factor_alignment::{aligned_factor, physical_mapping};
+use crate::multilinear::{
+    TttpBlocking,
+    factor_alignment::{aligned_factor, physical_mapping},
+    tttp_blocking,
+};
 
 impl<'c, 'r, A> SparseTensor<'c, 'r, A>
 where
@@ -47,13 +51,14 @@ where
     }
 
     /// Multiply stored entries by `sum_k product_mode M_mode[coordinate,k]`.
-    /// `aux_mode_first` selects `[k, coordinate]` factor storage. `divisions`
-    /// selects balanced auxiliary-index blocks without densifying the tensor.
+    /// `aux_mode_first` selects `[k, coordinate]` factor storage. Blocking either
+    /// supplies balanced auxiliary divisions or a per-rank available-byte fact;
+    /// the latter is collectively maximized and never probes operating-system memory.
     pub fn tttp_matrices(
         &mut self,
         factors: &[(usize, &Tensor<'_, '_, A>)],
         aux_mode_first: bool,
-        divisions: usize,
+        blocking: TttpBlocking,
     ) {
         assert!(!factors.is_empty());
         let distribution = self.distribution().clone();
@@ -61,7 +66,6 @@ where
         let auxiliary_axis = 1 - mode_axis;
         assert_eq!(factors[0].1.distribution().shape.len(), 2);
         let auxiliary_length = factors[0].1.distribution().shape[auxiliary_axis];
-        assert!(divisions > 0 && divisions <= auxiliary_length);
         for (index, &(mode, factor)) in factors.iter().enumerate() {
             assert!(std::ptr::eq(self.context(), factor.context()));
             assert!(mode < distribution.shape.len());
@@ -72,6 +76,16 @@ where
         }
 
         let rank = self.context().rank();
+        let modes: Vec<_> = factors.iter().map(|(mode, _)| *mode).collect();
+        let divisions = tttp_blocking::resolve(
+            self.context(),
+            &distribution,
+            &modes,
+            auxiliary_length,
+            self.local_nnz(),
+            std::mem::size_of::<A::Element>(),
+            blocking,
+        );
         let algebra = self.algebra().clone();
         let zero = algebra.zero();
         let one = algebra.one();

@@ -172,7 +172,7 @@ fn exercise_matrices(
         .iter()
         .map(|&(mode, ref factor)| (mode, factor))
         .collect();
-    tensor.tttp_matrices(&references, aux_mode_first, divisions);
+    tensor.tttp_matrices(&references, aux_mode_first, ctf::multilinear::TttpBlocking::Divisions(divisions));
     assert_matrices(&tensor, &shape, modes, k);
 }
 
@@ -195,7 +195,7 @@ fn exercise_empty_shards(context: &Context<'_>) {
             .iter()
             .map(|&(mode, ref factor)| (mode, factor))
             .collect();
-        tensor.tttp_matrices(&references, aux_mode_first, 3);
+        tensor.tttp_matrices(&references, aux_mode_first, ctf::multilinear::TttpBlocking::Divisions(3));
         assert_matrices(&tensor, &shape, &modes, 5);
     }
 }

@@ -14,6 +14,10 @@ use factor_alignment::{aligned_factor, physical_mapping};
 #[path = "multilinear_kernel.rs"]
 pub(crate) mod kernel;
 
+#[path = "tttp_blocking.rs"]
+pub(crate) mod tttp_blocking;
+pub use tttp_blocking::TttpBlocking;
+
 #[path = "reshape.rs"]
 mod reshape;
 #[cfg(feature = "native-scalapack")]
@@ -139,12 +143,12 @@ where
     }
 
     /// Multiply entries by sum_k product_mode M_mode[coordinate,k].
-    /// `aux_mode_first` selects [k,coordinate] factor storage. `divisions`
-    /// explicitly selects the source's balanced k-blocks (1 through k), bounding
-    /// resident redistributed factor storage without gathering the tensor.
-    /// Automatic available-memory selection is not implemented here.
+    /// `aux_mode_first` selects [k,coordinate] factor storage. Blocking either
+    /// supplies the source's balanced k-block count or a per-rank available-byte
+    /// fact; the latter doubles locally and collectively selects the maximum.
+    /// No operating-system memory probe is performed.
     pub fn tttp_matrices(&mut self, factors: &[(usize, &Self)],
-        aux_mode_first: bool, divisions: usize) {
+        aux_mode_first: bool, blocking: TttpBlocking) {
         assert!(!factors.is_empty());
         let algebra = self.algebra().clone();
         let distribution = self.distribution().clone();
@@ -152,7 +156,6 @@ where
         let auxiliary_axis = 1 - mode_axis;
         assert_eq!(factors[0].1.distribution().shape.len(), 2);
         let k = factors[0].1.distribution().shape[auxiliary_axis];
-        assert!(divisions > 0 && divisions <= k);
         for (index, &(mode, factor)) in factors.iter().enumerate() {
             assert!(std::ptr::eq(self.context(), factor.context()));
             assert!(mode < distribution.shape.len());
@@ -162,8 +165,21 @@ where
             assert_eq!(factor.distribution().shape[auxiliary_axis], k);
         }
         let rank = self.context().rank();
+        let modes: Vec<_> = factors.iter().map(|(mode, _)| *mode).collect();
+        let local_pairs = (0..self.local_storage().len())
+            .filter(|&offset| distribution.global_key(rank, offset).is_some())
+            .count();
+        let divisions = tttp_blocking::resolve(
+            self.context(),
+            &distribution,
+            &modes,
+            k,
+            local_pairs,
+            std::mem::size_of::<A::Element>(),
+            blocking,
+        );
         let mut accumulated = if divisions > 1 {
-            vec![algebra.zero(); self.local_storage().len()]
+            vec![algebra.zero(); local_pairs]
         } else { Vec::new() };
         let mut start = 0;
         for block in 0..divisions {
@@ -174,6 +190,7 @@ where
                     &distribution, mode, factor, start, Some(width), aux_mode_first);
                 mapped.push((mode, factor_distribution, values));
             }
+            let mut entry = 0;
             self.transform(|key, value| {
                 let coordinates = distribution.decode_key(key);
                 let mut sum = algebra.zero();
@@ -196,18 +213,17 @@ where
                 if divisions == 1 {
                     *value = algebra.multiply(value, &sum);
                 } else {
-                    let offset = distribution.local_offset(rank, key);
-                    accumulated[offset] = algebra.add(&accumulated[offset], &sum);
+                    accumulated[entry] = algebra.add(&accumulated[entry], &sum);
                 }
+                entry += 1;
             });
             start += width;
         }
         if divisions > 1 {
-            self.transform(|key, value| {
-                *value = algebra.multiply(
-                    value,
-                    &accumulated[distribution.local_offset(rank, key)],
-                )
+            let mut entry = 0;
+            self.transform(|_, value| {
+                *value = algebra.multiply(value, &accumulated[entry]);
+                entry += 1;
             });
         }
     }
