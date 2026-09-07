@@ -523,6 +523,267 @@ typed_qr_family!(
     |value: Complex<f64>| value.re as usize
 );
 
+macro_rules! real_svd_family {
+    ($scalar:ty, $gesvd:ident, $svd:ident, $zero:expr, $query_len:expr) => {
+        unsafe extern "C" {
+            fn $gesvd(
+                job_u: *const c_char,
+                job_vt: *const c_char,
+                m: *const i32,
+                n: *const i32,
+                a: *mut $scalar,
+                ia: *const i32,
+                ja: *const i32,
+                desc_a: *const i32,
+                s: *mut $scalar,
+                u: *mut $scalar,
+                iu: *const i32,
+                ju: *const i32,
+                desc_u: *const i32,
+                vt: *mut $scalar,
+                ivt: *const i32,
+                jvt: *const i32,
+                desc_vt: *const i32,
+                work: *mut $scalar,
+                lwork: *const i32,
+                info: *mut i32,
+            );
+        }
+
+        impl Grid {
+            #[allow(clippy::too_many_arguments)]
+            pub(crate) fn $svd(
+                &self,
+                m: usize,
+                n: usize,
+                a: &[$scalar],
+                desc_a: &[i32; 9],
+                u: &mut [$scalar],
+                desc_u: &[i32; 9],
+                vt: &mut [$scalar],
+                desc_vt: &[i32; 9],
+            ) -> Result<Vec<$scalar>, i32> {
+                self.validate_matrix(desc_a, a.len());
+                self.validate_matrix(desc_u, u.len());
+                self.validate_matrix(desc_vt, vt.len());
+                let (m, n) = (int(m), int(n));
+                let k = m.min(n);
+                assert!(m <= desc_a[2] && n <= desc_a[3]);
+                assert!(m <= desc_u[2] && k <= desc_u[3]);
+                assert!(k <= desc_vt[2] && n <= desc_vt[3]);
+
+                let mut a = a.to_vec();
+                let mut s = vec![$zero; k as usize];
+                let vectors = b'V' as c_char;
+                let one = 1;
+                let query = -1;
+                let mut work_query = [$zero];
+                let mut info = 0;
+                unsafe {
+                    $gesvd(
+                        &vectors,
+                        &vectors,
+                        &m,
+                        &n,
+                        a.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_a.as_ptr(),
+                        s.as_mut_ptr(),
+                        u.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_u.as_ptr(),
+                        vt.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_vt.as_ptr(),
+                        work_query.as_mut_ptr(),
+                        &query,
+                        &mut info,
+                    );
+                }
+                result(info)?;
+
+                let lwork = int(($query_len)(work_query[0]));
+                let mut work = vec![$zero; lwork as usize];
+                unsafe {
+                    $gesvd(
+                        &vectors,
+                        &vectors,
+                        &m,
+                        &n,
+                        a.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_a.as_ptr(),
+                        s.as_mut_ptr(),
+                        u.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_u.as_ptr(),
+                        vt.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_vt.as_ptr(),
+                        work.as_mut_ptr(),
+                        &lwork,
+                        &mut info,
+                    );
+                }
+                result(info).map(|()| s)
+            }
+        }
+    };
+}
+
+macro_rules! complex_svd_family {
+    (
+        $scalar:ty,
+        $real:ty,
+        $gesvd:ident,
+        $svd:ident,
+        $scalar_zero:expr,
+        $real_zero:expr
+    ) => {
+        unsafe extern "C" {
+            fn $gesvd(
+                job_u: *const c_char,
+                job_vt: *const c_char,
+                m: *const i32,
+                n: *const i32,
+                a: *mut $scalar,
+                ia: *const i32,
+                ja: *const i32,
+                desc_a: *const i32,
+                s: *mut $real,
+                u: *mut $scalar,
+                iu: *const i32,
+                ju: *const i32,
+                desc_u: *const i32,
+                vt: *mut $scalar,
+                ivt: *const i32,
+                jvt: *const i32,
+                desc_vt: *const i32,
+                work: *mut $scalar,
+                lwork: *const i32,
+                rwork: *mut $real,
+                info: *mut i32,
+            );
+        }
+
+        impl Grid {
+            #[allow(clippy::too_many_arguments)]
+            pub(crate) fn $svd(
+                &self,
+                m: usize,
+                n: usize,
+                a: &[$scalar],
+                desc_a: &[i32; 9],
+                u: &mut [$scalar],
+                desc_u: &[i32; 9],
+                vt: &mut [$scalar],
+                desc_vt: &[i32; 9],
+            ) -> Result<Vec<$scalar>, i32> {
+                self.validate_matrix(desc_a, a.len());
+                self.validate_matrix(desc_u, u.len());
+                self.validate_matrix(desc_vt, vt.len());
+                let (m, n) = (int(m), int(n));
+                let k = m.min(n);
+                assert!(m <= desc_a[2] && n <= desc_a[3]);
+                assert!(m <= desc_u[2] && k <= desc_u[3]);
+                assert!(k <= desc_vt[2] && n <= desc_vt[3]);
+
+                let mut a = a.to_vec();
+                let mut s = vec![$real_zero; k as usize];
+                let mut rwork = vec![$real_zero; 4 * m.max(n) as usize + 1];
+                let vectors = b'V' as c_char;
+                let one = 1;
+                let query = -1;
+                let mut work_query = [$scalar_zero];
+                let mut info = 0;
+                unsafe {
+                    $gesvd(
+                        &vectors,
+                        &vectors,
+                        &m,
+                        &n,
+                        a.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_a.as_ptr(),
+                        s.as_mut_ptr(),
+                        u.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_u.as_ptr(),
+                        vt.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_vt.as_ptr(),
+                        work_query.as_mut_ptr(),
+                        &query,
+                        rwork.as_mut_ptr(),
+                        &mut info,
+                    );
+                }
+                result(info)?;
+
+                let lwork = int(work_query[0].re as usize);
+                let mut work = vec![$scalar_zero; lwork as usize];
+                unsafe {
+                    $gesvd(
+                        &vectors,
+                        &vectors,
+                        &m,
+                        &n,
+                        a.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_a.as_ptr(),
+                        s.as_mut_ptr(),
+                        u.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_u.as_ptr(),
+                        vt.as_mut_ptr(),
+                        &one,
+                        &one,
+                        desc_vt.as_ptr(),
+                        work.as_mut_ptr(),
+                        &lwork,
+                        rwork.as_mut_ptr(),
+                        &mut info,
+                    );
+                }
+                result(info).map(|()| {
+                    s.into_iter()
+                        .map(|value| Complex::new(value, $real_zero))
+                        .collect()
+                })
+            }
+        }
+    };
+}
+
+real_svd_family!(f32, psgesvd_, svd_f32, 0.0, |value: f32| value as usize);
+complex_svd_family!(
+    Complex<f32>,
+    f32,
+    pcgesvd_,
+    svd_c32,
+    Complex::new(0.0, 0.0),
+    0.0
+);
+complex_svd_family!(
+    Complex<f64>,
+    f64,
+    pzgesvd_,
+    svd_c64,
+    Complex::new(0.0, 0.0),
+    0.0
+);
+
 fn int(value: usize) -> i32 {
     value.try_into().unwrap()
 }

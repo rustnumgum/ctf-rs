@@ -1105,6 +1105,19 @@ existing combined distributed_qr_svd target compiled/linked on Windows GNU;
 unchanged SVD numerical checks were not rerun. Native MPI runtime is pending.
 DIGIT / PASS for typed QR; typed SVD/eigh and full-port acceptance remain open.
 
+## Four-type distributed thin SVD (2026-09-07)
+
+typed_distributed_svd passed once at WSL 1/2/4 ranks, world/parity. All four
+native GESVD types cover 13x7, 5x8, 1x1 and 1x3 matrices, including zero local
+shards and one-row native grid adjustment/restoration. Inputs are exact;
+singular values are finite, nonnegative, descending and have zero imaginary
+part. Matrix factors remain distributed; only the singular-value vector is read.
+Finite reconstruction uses m*n*n*1e-6 and U/V orthogonality uses m*n*1e-6,
+the existing source Frobenius criteria. No failures or extra precision checks.
+The new target and existing distributed_qr_svd/distributed_svd_paths compiled
+and linked once on Windows GNU. Native MPI runtime is pending. DIGIT / PASS;
+typed truncated/randomized SVD, eigensolve and full-port acceptance remain open.
+
 ## Normal mapping search (2026-09-07)
 
 normal_mapping: two exact local tests passed for explicit 2D paired maps,

@@ -539,3 +539,8 @@ harness = false
 name = "typed_distributed_qr"
 path = "tests/typed_distributed_qr.rs"
 harness = false
+
+[[test]]
+name = "typed_distributed_svd"
+path = "tests/typed_distributed_svd.rs"
+harness = false

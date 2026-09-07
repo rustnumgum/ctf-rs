@@ -203,72 +203,17 @@ impl<'c, 'r> Tensor<'c, 'r, Arithmetic<f64>> {
         left.gemm_2d::<crate::linalg::Native>(&u, &rotation, grid, 1., 0.);
         Ok((left, s, vt))
     }
-    /// Collective thin SVD returning distributed U, singular-value vector, VT.
-    /// Native replicated singular values are assigned directly to their owners;
-    /// matrix factors stay distributed throughout PDGESVD and reconstruction.
-    /// One-row matrices use a one-column native grid to avoid PBLAS's
-    /// single-element row-norm ambiguity, then restore the requested layout.
-    pub fn svd(&self, grid: [usize; 2]) -> Result<(Self, Self, Self), i32> {
-        assert_eq!(self.distribution().shape.len(), 2);
-        let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
-        let k = m.min(n);
-        assert_eq!(grid[0] * grid[1], self.context().size());
-        let requested_grid = grid;
-        // PDLARFG calls PDNRM2 with N=MX=INCX=1 for the tail of a 1x2
-        // matrix. Only its owner receives the norm, so NPCOL>1 produces
-        // inconsistent TAUP and mismatched PDLARF collective participation.
-        let grid = if m == 1 && n > 1 && grid[1] > 1 {
-            [self.context().size(), 1]
-        } else { grid };
-        let mut source = self.clone();
-        source.redistribute(distribution(&[m, n], grid));
-        let mut u = Self::new(
-            self.context(),
-            distribution(&[m, k], grid),
-            Arithmetic::new(),
-        );
-        let mut vt = Self::new(
-            self.context(),
-            distribution(&[k, n], grid),
-            Arithmetic::new(),
-        );
-        let mut singular = Self::new(
-            self.context(),
-            Distribution::cyclic(vec![k], self.context().size()),
-            Arithmetic::new(),
-        );
-        let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
-        let operation: Result<(), i32> = (|| {
-            let lda = m.div_ceil(grid[0]).max(1);
-            let ldvt = k.div_ceil(grid[0]).max(1);
-            let da = blacs.descriptor(m, n, 1, 1, lda)?;
-            let du = blacs.descriptor(m, k, 1, 1, lda)?;
-            let dvt = blacs.descriptor(k, n, 1, 1, ldvt)?;
-            let mut input = source.local_storage().to_vec();
-            input.resize((lda * n.div_ceil(grid[1])).max(1), 0.);
-            let mut uv = vec![0.; (lda * k.div_ceil(grid[1])).max(1)];
-            let mut vtv = vec![0.; (ldvt * n.div_ceil(grid[1])).max(1)];
-            let values = blacs.svd(m, n, &input, &da, &mut uv, &du, &mut vtv, &dvt)?;
-            let ud = u.distribution().clone();
-            let vd = vt.distribution().clone();
-            let rank = self.context().rank();
-            u.transform(|key, value| *value = uv[ud.local_offset(rank, key)]);
-            vt.transform(|key, value| *value = vtv[vd.local_offset(rank, key)]);
-            singular.transform(|key, value| *value = values[key]);
-            Ok(())
-        })();
-        blacs.close();
-        operation?;
-        if grid != requested_grid {
-            u.redistribute(distribution(&[m, k], requested_grid));
-            vt.redistribute(distribution(&[k, n], requested_grid));
-        }
-        Ok((u, singular, vt))
-    }
 }
 
 macro_rules! matrix_factor_methods {
-    ($scalar:ty, $cholesky:ident, $solve_tri:ident, $solve_spd:ident, $qr:ident) => {
+    (
+        $scalar:ty,
+        $cholesky:ident,
+        $solve_tri:ident,
+        $solve_spd:ident,
+        $qr:ident,
+        $svd:ident
+    ) => {
         impl<'c, 'r> Tensor<'c, 'r, Arithmetic<$scalar>> {
             /// Solve A X = self for positive definite A (lower triangle):
             /// symmetric for real scalars, Hermitian for complex scalars.
@@ -489,23 +434,99 @@ macro_rules! matrix_factor_methods {
                 blacs.close();
                 operation
             }
+
+            /// Collective thin SVD returning distributed U, singular-value vector, V^T
+            /// (V^H for complex scalars).
+            /// Native replicated singular values are assigned directly to their owners;
+            /// matrix factors stay distributed throughout PDGESVD and reconstruction.
+            /// One-row matrices use a one-column native grid to avoid PBLAS's
+            /// single-element row-norm ambiguity, then restore the requested layout.
+            pub fn svd(&self, grid: [usize; 2]) -> Result<(Self, Self, Self), i32> {
+                assert_eq!(self.distribution().shape.len(), 2);
+                let (m, n) = (self.distribution().shape[0], self.distribution().shape[1]);
+                let k = m.min(n);
+                assert_eq!(grid[0] * grid[1], self.context().size());
+                let requested_grid = grid;
+                // PDLARFG calls PDNRM2 with N=MX=INCX=1 for the tail of a 1x2
+                // matrix. Only its owner receives the norm, so NPCOL>1 produces
+                // inconsistent TAUP and mismatched PDLARF collective participation.
+                let grid = if m == 1 && n > 1 && grid[1] > 1 {
+                    [self.context().size(), 1]
+                } else {
+                    grid
+                };
+                let mut source = self.clone();
+                source.redistribute(distribution(&[m, n], grid));
+                let mut u = Self::new(
+                    self.context(),
+                    distribution(&[m, k], grid),
+                    Arithmetic::new(),
+                );
+                let mut vt = Self::new(
+                    self.context(),
+                    distribution(&[k, n], grid),
+                    Arithmetic::new(),
+                );
+                let mut singular = Self::new(
+                    self.context(),
+                    Distribution::cyclic(vec![k], self.context().size()),
+                    Arithmetic::new(),
+                );
+                let blacs = self.context().inner.scalapack_grid(grid[0], grid[1]);
+                let operation: Result<(), i32> = (|| {
+                    let lda = m.div_ceil(grid[0]).max(1);
+                    let ldvt = k.div_ceil(grid[0]).max(1);
+                    let da = blacs.descriptor(m, n, 1, 1, lda)?;
+                    let du = blacs.descriptor(m, k, 1, 1, lda)?;
+                    let dvt = blacs.descriptor(k, n, 1, 1, ldvt)?;
+                    let mut input = source.local_storage().to_vec();
+                    let zero = Arithmetic::<$scalar>::new().zero();
+                    input.resize((lda * n.div_ceil(grid[1])).max(1), zero);
+                    let mut uv = vec![zero; (lda * k.div_ceil(grid[1])).max(1)];
+                    let mut vtv = vec![zero; (ldvt * n.div_ceil(grid[1])).max(1)];
+                    let values = blacs.$svd(m, n, &input, &da, &mut uv, &du, &mut vtv, &dvt)?;
+                    let ud = u.distribution().clone();
+                    let vd = vt.distribution().clone();
+                    let rank = self.context().rank();
+                    u.transform(|key, value| *value = uv[ud.local_offset(rank, key)]);
+                    vt.transform(|key, value| *value = vtv[vd.local_offset(rank, key)]);
+                    singular.transform(|key, value| *value = values[key]);
+                    Ok(())
+                })();
+                blacs.close();
+                operation?;
+                if grid != requested_grid {
+                    u.redistribute(distribution(&[m, k], requested_grid));
+                    vt.redistribute(distribution(&[k, n], requested_grid));
+                }
+                Ok((u, singular, vt))
+            }
         }
     };
 }
 
-matrix_factor_methods!(f64, cholesky, solve_tri, solve_spd, qr);
-matrix_factor_methods!(f32, cholesky_f32, solve_tri_f32, solve_spd_f32, qr_f32);
+matrix_factor_methods!(f64, cholesky, solve_tri, solve_spd, qr, svd);
+matrix_factor_methods!(
+    f32,
+    cholesky_f32,
+    solve_tri_f32,
+    solve_spd_f32,
+    qr_f32,
+    svd_f32
+);
 matrix_factor_methods!(
     Complex<f32>,
     cholesky_c32,
     solve_tri_c32,
     solve_spd_c32,
-    qr_c32
+    qr_c32,
+    svd_c32
 );
 matrix_factor_methods!(
     Complex<f64>,
     cholesky_c64,
     solve_tri_c64,
     solve_spd_c64,
-    qr_c64
+    qr_c64,
+    svd_c64
 );

@@ -1182,3 +1182,11 @@ retained packed R, explicit Q generation, and triangle extraction into thin
 distributed factors. Reflector tau uses the source column-distributed numroc
 layout. Both native workspace queries are honored; complex query sizes are
 read from the real component without converting matrix data to a real type.
+
+Thin distributed SVD now dispatches all S/D/C/Z GESVD families. The complex
+bindings follow lapack_symbs.cxx:618-690: native singular values and auxiliary
+RWORK are real, RWORK has 4*max(m,n)+1 entries, and returned tensor singular
+values have zero imaginary part. Rust uses separate owned buffers instead of
+the source's overlapping real/complex pointer aliases. The right factor is V^H
+for complex scalars. The established one-row native grid adjustment and
+requested-grid restoration remain, without gathering either matrix factor.
