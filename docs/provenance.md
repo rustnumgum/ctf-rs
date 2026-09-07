@@ -7,6 +7,12 @@ Reference commit: f69cbb46e23bc2f39cda5722ce096f56301dab4f
 not a declaration that Edgar Solomonik authored the new Rust implementation.
 Do not stamp independently written files with the upstream author's copyright.
 
+* `src/symmetric_permuted_io.rs`, `src/sparse_permuted_io.rs`: mixed-storage
+  coordinate read/write phases follow `untyped_tensor.cxx:928-992`. Compressed
+  full-orbit gather and canonical-only scatter follow `read_local:2349-2395`
+  versus `read_local_nnz:1848-1894`; signed canonical duplicates follow
+  `sparse_rw.cxx:962-1063`. No implicit normalization or sparse-target gather.
+
 * `src/permuted_io.rs`: `tensor/untyped_tensor.cxx:928-992` coordinate permutation
   read/write phases, with Option maps replacing -1 coordinates and explicit
   optional children replacing dummy scalars. Dense/packed indexed write order

@@ -697,3 +697,13 @@ harness = false
 name = "indexed_write_order"
 path = "tests/indexed_write_order.rs"
 harness = false
+
+[[test]]
+name = "symmetric_permuted_io"
+path = "tests/symmetric_permuted_io.rs"
+harness = false
+
+[[test]]
+name = "sparse_permuted_io"
+path = "tests/sparse_permuted_io.rs"
+harness = false

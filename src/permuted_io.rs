@@ -7,7 +7,7 @@ use crate::{
     tensor::Tensor,
 };
 
-fn validate_maps(parent: &Distribution, child: &Distribution, maps: &[Vec<Option<usize>>]) {
+pub(crate) fn validate_maps(parent: &Distribution, child: &Distribution, maps: &[Vec<Option<usize>>]) {
     assert_eq!(maps.len(), child.shape.len());
     assert_eq!(maps.len(), parent.shape.len());
     for (axis, coordinates) in maps.iter().enumerate() {
@@ -18,7 +18,7 @@ fn validate_maps(parent: &Distribution, child: &Distribution, maps: &[Vec<Option
     }
 }
 
-fn validate_parent_maps(parent: &Distribution, maps: &[Vec<Option<usize>>]) {
+pub(crate) fn validate_parent_maps(parent: &Distribution, maps: &[Vec<Option<usize>>]) {
     assert_eq!(maps.len(), parent.shape.len());
     assert!(maps.iter().enumerate().all(|(axis, coordinates)| {
         coordinates
@@ -27,7 +27,7 @@ fn validate_parent_maps(parent: &Distribution, maps: &[Vec<Option<usize>>]) {
     }));
 }
 
-fn mapped_key(
+pub(crate) fn mapped_key(
     parent: &Distribution,
     child: &Distribution,
     maps: &[Vec<Option<usize>>],

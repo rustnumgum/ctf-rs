@@ -1,5 +1,17 @@
 # Validation evidence
 
+## Mixed-storage coordinate permutation (2026-09-07)
+
+`symmetric_permuted_io` and `sparse_permuted_io` passed once at 1/2/4 WSL ranks,
+world/parity. Exact i64 checks cover all thirteen newly implemented packed/sparse
+combinations: signed full-orbit gather, canonical scatter, implicit versus stored
+zeros, masked/reversed coordinates, beta-once, root-only/reordered children and
+replicas. No numerical failures or extra precision runs. DIGIT / PASS. The source
+multiworld driver's compressed expected-copy assertions remain a separate open
+reconciliation item; these tests do not mislabel them as passing. Windows native
+MPI runtime acceptance remains pending.
+Both mixed-storage targets compiled and linked once on Windows GNU.
+
 ## Coordinate multiworld permutation and indexed-write order (2026-09-07)
 
 `upstream_permute_multiworld`, `indexed_write_order`, `dense_semantics`,

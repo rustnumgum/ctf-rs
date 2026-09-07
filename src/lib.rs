@@ -69,3 +69,5 @@ mod cyclic_reshuffle;
 mod symmetric_reshuffle;
 pub mod sparse_virtual;
 mod permuted_io;
+mod symmetric_permuted_io;
+mod sparse_permuted_io;

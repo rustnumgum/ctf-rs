@@ -26,7 +26,7 @@ src/tensor/algstrct.cxx	src/tensor	pending
 src/tensor/algstrct.h	src/tensor	pending
 src/tensor/Makefile	Cargo/build tooling	replaced
 src/tensor/untyped_tensor_tmpl.h	src/tensor	pending
-src/tensor/untyped_tensor.cxx	src/tensor.rs; src/redist_cost.rs; src/fold_layout.rs; src/pair_read.rs; src/binary_io.rs; src/ffi/binary_io.rs	partial: dense storage and routed I/O/redistribution, explicit all-rank extraction, consecutive-chunk binary MPI-IO for dense/sparse/compressed tensors, source dense redistribution estimates, tensor::fold local packed-group metadata; optimized reshuffle and full folded storage lifecycle pending
+src/tensor/untyped_tensor.cxx	src/tensor.rs; src/redist_cost.rs; src/fold_layout.rs; src/pair_read.rs; src/binary_io.rs; src/ffi/binary_io.rs; src/permuted_io.rs; src/symmetric_permuted_io.rs; src/sparse_permuted_io.rs	partial: dense storage, all source-supported mixed-storage coordinate permutation paths, explicit all-rank extraction, consecutive-chunk binary MPI-IO, source dense redistribution estimates, tensor::fold local packed-group metadata; remaining optimized reshuffle and full folded storage lifecycle pending
 src/tensor/untyped_tensor.h	src/tensor	pending
 src/shared/blas_symbs.cxx	src/shared	pending
 src/shared/blas_symbs.h	src/shared	pending
@@ -181,7 +181,7 @@ test/endomorphism.cxx	tests/upstream_endomorphism.rs	ported: original indexed cu
 test/gemm_4D.cxx	tests/upstream_gemm4d.rs	NS associativity port PASS WSL 1/2/4; SY/AS branches pending
 test/Makefile	Cargo/build tooling	replaced
 test/multi_tsr_sym.cxx	tests/upstream_multi_tsr_sym.rs	ported NS/SY Gram equality, original norm<1e-6; WSL 1/2/4 pass
-test/permute_multiworld.cxx	tests/upstream_permute_multiworld.rs	partial: NS blocked coordinate gather/scatter ported at n5/n1 with exact reads and abs<1e-9 writes, WSL1/2/4 world/parity; compressed branches pending
+test/permute_multiworld.cxx	tests/upstream_permute_multiworld.rs; tests/symmetric_permuted_io.rs; tests/sparse_permuted_io.rs	partial: NS original driver PASS WSL1/2/4; all mixed-storage paths have exact source-semantic fixtures PASS; original compressed expected-copy assertions remain unreconciled with pinned full-orbit duplicate accumulation
 test/readall_test.cxx	tests/upstream_readall.rs	ported bounded 2x3x2x3: source seed-zero drand48, root-only child transfer, explicit all-data read; abs<=1e-10 PASS WSL1/2/4 world/parity
 test/readwrite_test.cxx	tests/upstream_readwrite.rs	ported bounded n3: NS/SY/SH and source-literal AS=SH diagonal writes, distributed reductions and NS/SY self contractions; abs<=1e-10 PASS WSL1/2/4 world/parity
 test/reduce_bcast.cxx	tests/upstream_dense.rs; tests/upstream_reduce_bcast.rs	both identities through dense and compressed tensor APIs; original norm<=1e-6, WSL 1/2/4 pass

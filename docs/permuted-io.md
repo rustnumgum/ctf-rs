@@ -32,7 +32,26 @@ This corrects the previous Rust right-sided implementation. It is distinct from
 `algstrct::acc` used for subworld accumulation, whose right-sided coefficients
 are intentionally unchanged. Sparse pair write semantics are likewise unchanged.
 
-Only the NS branch of the original multiworld driver is migrated so far.
-Compressed gather needs the source's full-orbit reads and signed duplicate
-accumulation; compressed scatter uses canonical source entries only. Those
-coordinate-permutation paths remain pending, not approximated by dense unpack.
+## Packed and sparse combinations
+
+All source-supported storage combinations now have direct Rust methods:
+gather can read a dense, packed or sparse parent into a dense or packed child;
+scatter can read any of those three child storage types into any of the three
+parent types. Mixed variants use explicit `_dense`, `_symmetric` or `_sparse`
+method suffixes. Gather into sparse storage remains unavailable, matching the
+source's explicit assertion, rather than silently densifying a sparse target.
+
+Packed gather enumerates the full logical child domain using a cyclic request
+layout, without allocating an unpacked value tensor. The parent read handles
+source symmetry signs, and the child write canonicalizes and accumulates signed
+orbit duplicates. This is **not** a normalized slice copy: retained orbit entries
+can multiply a canonical value. Beta is still applied once per touched canonical
+key. Packed scatter sends only canonical nonzero source entries, not full orbits.
+Sparse scatter sends all stored pairs including explicit zeros; an explicit zero
+therefore touches and scales the destination, unlike an omitted dense zero.
+
+The original `permute_multiworld` driver's compressed expected-copy assertions
+remain unreconciled with this pinned full-orbit accumulation path, so that driver
+row is not declared fully passing. Dedicated exact source-semantic fixtures cover
+the compressed/mixed paths; no normalization was invented to satisfy a different
+copy contract.
