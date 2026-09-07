@@ -73,6 +73,15 @@ diagonal prescaling and distributed folded orchestration are not supplied by it.
 AS/SH fold groups use source sy_packed_size capacity, retaining diagonal holes,
 not the smaller logical packed_size domain.
 
+folded_cost::estimate_dense_folded now supplies the raw dense NS folded estimate:
+the existing replication/panel/virtual communication tree surrounds a source
+folded BLAS cost leaf, with partial-fold transpose time and all mapped tensor fold
+buffers included. Memory is redistributed-input residency plus the maximum of
+redistribution temporary storage and fold buffers plus inner workspace. Ineligible
+folds return None, not a substituted estimate. Automatic search still explicitly
+uses its unfolded estimator; selecting/executing folded distributed candidates is
+not yet connected by this cost API alone.
+
 ## Executable inner cost tree now connected
 
 GridPlan::cost_tree derives the aligned unfolded dense execution tree from the

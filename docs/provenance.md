@@ -1088,3 +1088,12 @@ extent for all link kinds. They do not use packed_size (38 onward), which shrink
 AS/SH extents. FoldLayout now retains local AS/SH diagonal holes with SY capacity;
 the kernel shares that exact recurrence. Logical compact symmetry Layout remains
 unchanged. This is a source-layout correction, not a tolerance adjustment.
+
+folded_cost.rs adapts dense detail_estimate_mem_and_time
+(contraction.cxx:2640-2810) and folded est_membw/est_fp (ctr_tsr.cxx:407-441).
+Communication construction precedes folded sequential dimension collapse. Dense
+fold residency includes all A/B/C mapped local bytes and has no extra sparse
+formatting temporary. The source leaf model multiplies residual sizes by mn/mk/nk
+and residual work by mnk but omits l; this estimator quirk is retained, while
+actual folded BLAS execution continues to process every batch. Floating-point
+work and total-time accumulation follow source order, not an integer work product.

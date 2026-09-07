@@ -1087,6 +1087,18 @@ layout/offset checks. No other passing numerical suite was rerun. All four targe
 compiled/linked on Windows GNU. Distributed partial-fold execution and native MPI
 runtime acceptance remain pending.
 
+## Raw dense folded cost estimates (2026-09-07)
+
+folded_cost passed two local exact model tests in WSL. Raw 2x2 GEMM retains its
+panel tree and inner cost/workspace (208 model units/128 bytes), adds 128 fold
+buffer bytes, and yields total 560 model units/336 memory bytes after original
+cyclic redistribution. Partial NS residual work and transpose costs are included.
+A two-batch case explicitly checks the source model's omitted l multiplier while
+retaining full 752-byte fold residency; these figures are not measured timings or
+RSS. Scalar fold ineligibility returns None. No failures, precision studies or
+old test reruns. Windows GNU compilation/linking passed; distributed folded
+execution and native MPI runtime acceptance remain pending.
+
 ## Upstream unary, endomorphism and bivariate-transform batch (2026-09-07)
 
 upstream_univar_function, upstream_endomorphism and upstream_bivar_transform each

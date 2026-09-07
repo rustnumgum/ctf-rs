@@ -497,3 +497,7 @@ path = "tests/partial_fold.rs"
 [[test]]
 name = "partial_fold_kernel"
 path = "tests/partial_fold_kernel.rs"
+
+[[test]]
+name = "folded_cost"
+path = "tests/folded_cost.rs"
