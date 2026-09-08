@@ -38,12 +38,11 @@ fn old_and_new(context: &Context<'_>, shape: Vec<usize>) -> (Distribution, Distr
     }
 }
 
-fn assert_root_only(tensor: &Tensor<'_, '_, Arithmetic<i64>>, context: &Context<'_>) {
+fn assert_replicas(tensor: &Tensor<'_, '_, Arithmetic<i64>>, context: &Context<'_>) {
     let distribution = tensor.distribution();
     for (offset, &value) in tensor.local_storage().iter().enumerate() {
         let expected = distribution
             .global_key(context.rank(), offset)
-            .filter(|&key| distribution.owner(key) == context.rank())
             .map_or(0, |key| key as i64 + 11);
         assert_eq!(value, expected, "rank {}, offset {offset}", context.rank());
     }
@@ -54,7 +53,7 @@ fn run(context: &Context<'_>) {
     let mut tensor = Tensor::new(context, old, Arithmetic::<i64>::new());
     tensor.transform(|key, value| *value = key as i64 + 11);
     tensor.redistribute(new);
-    assert_root_only(&tensor, context);
+    assert_replicas(&tensor, context);
 
     let empty = Distribution::cyclic(vec![0, 3], context.size());
     let mut empty_tensor = Tensor::new(context, empty.clone(), Arithmetic::<i64>::new());
@@ -72,10 +71,7 @@ fn run(context: &Context<'_>) {
         Topology::new(vec![context.size()]),
         vec![],
     ));
-    assert_eq!(
-        scalar.local_storage(),
-        if context.rank() == 0 { &[29] } else { &[0] }
-    );
+    assert_eq!(scalar.local_storage(), &[29]);
 
     let shape = vec![1; 13];
     let mut high_order = Tensor::new(
@@ -105,7 +101,7 @@ fn main() {
     parity.close();
     if world.rank() == 0 {
         println!(
-            "DIGIT / PASS dgtog_redistribution: exact LCM counts/ROR roots/padding/virtual/scalar/high-order legacy; world+parity"
+            "DIGIT / PASS dgtog_redistribution: exact LCM counts/replicas/padding/virtual/scalar/high-order legacy; world+parity"
         );
     }
     world.close();
