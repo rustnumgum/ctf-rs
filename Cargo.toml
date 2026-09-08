@@ -6,7 +6,7 @@ license = "BSD-2-Clause"
 description = "Rust CPU/MPI port of the cc4s Cyclops Tensor Framework"
 
 [dependencies]
-mpi-sys = "0.2"
+mpi = { version = "0.8", default-features = false }
 
 [features]
 default = ["native-linalg", "native-scalapack"]
