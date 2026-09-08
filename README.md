@@ -33,6 +33,20 @@ the currently implemented foundations. See `docs/coverage.md` and
 
 ## Running the current subset
 
+### MPI ownership
+
+The host owns an rsmpi `Universe`, initializes with at least
+`mpi::Threading::Funneled`, and checks the provided thread level. Construct
+`Context::world(&universe)` or
+`Context::from_communicator(&universe, &communicator)` on the MPI main thread;
+ctf checks both requirements and never initializes or finalizes MPI.
+Contexts borrow the universe and any host communicator. Drop tensors first,
+explicitly `close()` split contexts, then release host communicators and the
+universe. Only ctf-owned splits are freed by `close()`; dropping an unclosed
+split leaks its handle rather than performing a collective on Drop.
+The rsmpi dependency has default features disabled; custom reductions do not
+use libffi.
+
 In WSL Ubuntu-26.04, install the Rust toolchain, MPI development files,
 `libclang-dev`, BLAS/LAPACK and ScaLAPACK development libraries. Run
 `bash scripts/acceptance-wsl.sh` from this project. It uses the Linux filesystem

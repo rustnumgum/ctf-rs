@@ -1,5 +1,82 @@
 # Validation evidence
 
+## rsmpi binding
+
+R1, 2026-09-09, implementation `f072971` (series starts after `f2039d3`).
+The host owns MPI initialization/finalization; contexts borrow its rsmpi
+universe and communicator, check Funneled/main-thread support, and free only
+their own split communicators through explicit close. Thread markers remain;
+default features and libffi are disabled. MPI-IO and nonblocking ROR traffic
+retain their raw calls through `mpi::ffi`. No metric, tolerance, fixture,
+algorithm, acceptance script, or driver body changed. The 184 entry-point
+edits matched the mechanical lifecycle substitutions plus formatting.
+
+```text
+DIGIT / HANDOFF
+gate: G-CTF-R1; class: R
+Q: each WSL driver's existing metric and required invariants
+ref: pinned upstream f69cbb46; bound: each driver's unchanged upstream bound
+Delta: cyclic_reshuffle at two ranks, rank 1 local offset 0: actual 0,
+       expected -5, absolute difference 5 against exact bound 0
+checks: all 175 one-rank MPI drivers completed; at two ranks eight drivers
+        passed before the ninth, cyclic_reshuffle, failed its assertion
+runs: acceptance-wsl.sh invoked once; rank 1 once, rank 2 partial once;
+      rank 4 and subsequent local/seven-rank checks not reached
+diagnostics: one computation, plan diagnostic 1, cyclic_reshuffle at two ranks;
+             both ranks reported size 2 and Funneled and passed the main-thread
+             check; the same exact mismatch recurred before explicit close/drop
+diagnostic exit: 124 at the 60-second supervisor after the rank-local panic
+                left MPI peers blocked; original failed launcher terminated,
+                acceptance script exit 1
+scope: no numerical repair, baseline rerun, sweep, changed bound, or repeated pass
+open: what R1-scoped resolution is authorized for cyclic_reshuffle's exact
+      replica/layout mismatch (0 versus -5) with correct rank/thread setup?
+```
+
+The assertion occurs during the world-context test, before any explicit close
+or universe drop. Further diagnostics were not spent: initialization is ruled
+out, and the accepted plan requires handoff rather than numerical/driver repair.
+The diagnostic print was applied only to the Linux work copy and then removed.
+No passing numerical result was reopened.
+
+```text
+DIGIT / PASS
+Q: native Windows GNU compile/link of all tests and examples; class: R
+ref: plan.v2 native build gate; bound: successful compilation/link, exit 0
+Delta: no compile/link failure; no numerical delta applies
+runs: acceptance-native.ps1 -BuildOnly once
+```
+
+```text
+DIGIT / PASS
+Q: native D6 dense drivers' existing metrics and invariants; class: R
+ref: pinned upstream f69cbb46; bound: exact or upstream per driver, unchanged
+Delta: every invoked driver's unchanged assertion passed; numerical deltas
+       where emitted are preserved in native-d6.log, not replaced by a new metric
+checks: 50 dense drivers at each of 1/2/4 ranks and four local scaling tests passed
+runs: acceptance-native.ps1 -D6Only once, each rank configuration once; exit 0
+diagnostics: none; native numerical verification closed
+```
+
+Overall R1 remains **DIGIT / HANDOFF** because the WSL gate is incomplete.
+Native passing results do not replace the failed WSL result. Total execution:
+three acceptance-script invocations and one named diagnostic computation;
+no passing driver was repeated at the same platform/rank configuration.
+
+Commands (from `D:/projects/ctf-rs`) and logs, all outside the source tree:
+
+```powershell
+wsl -d Ubuntu-26.04 -- bash -lc 'cd /mnt/d/projects/ctf-rs && bash scripts/sync-wsl.sh && cd /home/xylxp/ctf-rs-work && bash -x scripts/acceptance-wsl.sh > /mnt/d/projects/runs/ctf-rs-r1/wsl.log 2>&1'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/acceptance-native.ps1 -BuildOnly > D:/projects/runs/ctf-rs-r1/native-build.log 2>&1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/acceptance-native.ps1 -D6Only > D:/projects/runs/ctf-rs-r1/native-d6.log 2>&1
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-r1/diagnostic-1.sh > D:/projects/runs/ctf-rs-r1/diagnostic-1.log 2>&1
+```
+
+`D:/projects/runs/ctf-rs-r1/commands.md` records the exact commands, temporary
+diagnostic line, supervisor, stale-copy cleanup, and single keepalive startup;
+`diagnostic-1.sh` records the nested diagnostic command. The unchanged acceptance
+scripts contain their own rank loops; neither was wrapped in another rank loop.
+
 ## D6 dense drivers and native runtime close (2026-09-08)
 
 The pinned dense `test_suite.cxx` subset now asserts every active dense
