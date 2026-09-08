@@ -1,36 +1,52 @@
-//! Explicit MPI lifecycle. Neither Runtime nor Context implements communicating Drop.
+//! Host-owned MPI lifecycle. Context never communicates on Drop.
 use crate::{
     algebra::{Monoid, Wire},
     ffi::mpi,
 };
 
-#[must_use = "call finalize collectively when all contexts have been closed"]
-pub struct Runtime {
-    inner: mpi::Runtime,
-}
-impl Runtime {
-    pub fn initialize() -> Self {
-        Self {
-            inner: mpi::Runtime::initialize(),
-        }
-    }
-    pub fn world(&self) -> Context<'_> {
-        Context {
-            inner: self.inner.world(),
-            _runtime: self,
-        }
-    }
-    pub fn finalize(self) {
-        self.inner.finalize();
-    }
-}
+use ::mpi::{Threading, environment::Universe, topology::Communicator};
 
 #[must_use = "call close explicitly for communicators created by collective splits"]
-pub struct Context<'runtime> {
-    pub(crate) inner: mpi::Comm,
-    _runtime: &'runtime Runtime,
+pub struct Context<'u> {
+    pub(crate) inner: mpi::Comm<'u>,
+    _universe: &'u Universe,
 }
-impl Context<'_> {
+impl<'u> Context<'u> {
+    /// Borrow the host's MPI universe without taking ownership of MPI_COMM_WORLD.
+    pub fn world(universe: &'u Universe) -> Self {
+        Self::check_thread();
+        Self {
+            inner: mpi::Comm::world(),
+            _universe: universe,
+        }
+    }
+
+    /// Borrow a host communicator; its owner remains responsible for freeing it.
+    pub fn from_communicator(universe: &'u Universe, communicator: &'u impl Communicator) -> Self {
+        Self::check_thread();
+        Self {
+            inner: mpi::Comm::from_communicator(communicator),
+            _universe: universe,
+        }
+    }
+
+    fn check_thread() {
+        let provided = ::mpi::environment::threading_support();
+        assert!(
+            provided >= Threading::Funneled,
+            "ctf requires at least MPI_THREAD_FUNNELED; provided {provided:?}"
+        );
+        let mut is_main = 0;
+        let code = unsafe { ::mpi::ffi::MPI_Is_thread_main(&mut is_main) };
+        assert_eq!(
+            code, 0,
+            "MPI_Is_thread_main error {code}; provided {provided:?}"
+        );
+        assert_ne!(
+            is_main, 0,
+            "ctf requires the MPI main thread; provided {provided:?}"
+        );
+    }
     pub fn rank(&self) -> usize {
         self.inner.rank()
     }
@@ -77,13 +93,13 @@ impl Context<'_> {
     pub fn split(&self, color: Option<i32>, key: i32) -> Option<Context<'_>> {
         self.inner.split(color, key).map(|inner| Context {
             inner,
-            _runtime: self._runtime,
+            _universe: self._universe,
         })
     }
     pub fn split_shared(&self) -> Context<'_> {
         Context {
             inner: self.inner.split_shared(),
-            _runtime: self._runtime,
+            _universe: self._universe,
         }
     }
     pub fn close(self) {
