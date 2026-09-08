@@ -1177,8 +1177,8 @@ where
         }
     }
     /// Collective distribution switch. Orders through twelve use the pinned
-    /// source's default root-only DGTOG ROR path; higher orders retain the
-    /// legacy cyclic value exchange.
+    /// source's default root-only DGTOG ROR path, then populate process replicas;
+    /// higher orders retain the legacy cyclic value exchange.
     pub fn redistribute(&mut self, distribution: Distribution) {
         assert_eq!(distribution.shape, self.distribution.shape);
         assert_eq!(distribution.topology.size(), self.context.size());
@@ -1188,6 +1188,7 @@ where
                 &self.distribution,&distribution,self.context.rank());
             self.data=plan.execute(self.context,&self.algebra,&self.data);
             self.distribution=distribution;
+            self.restore_replicas();
             return;
         }
         if self.distribution.shape.len() <= 12 {
@@ -1201,6 +1202,7 @@ where
             );
             self.distribution = distribution;
             self.data = data;
+            self.restore_replicas();
             return;
         }
         let plan = crate::cyclic_reshuffle::Plan::new(&self.distribution, &distribution, self.context.rank());
@@ -1221,6 +1223,25 @@ where
         }
         self.distribution = distribution;
         self.data = data;
+    }
+    fn restore_replicas(&mut self) {
+        let coordinates = self.distribution.topology.coordinates(self.context.rank());
+        let mut color = 0;
+        let mut physical_size = 1;
+        for mapping in &self.distribution.mappings {
+            color += mapping.physical_rank(&coordinates) * physical_size;
+            physical_size *= mapping.physical_phase();
+        }
+        if physical_size < self.context.size() {
+            // Equal physical residues identify copies of the same local block.
+            // Original-rank ordering puts its canonical owner at subgroup rank 0.
+            let replicas = self.context.split(
+                Some(color.try_into().unwrap()),
+                self.context.rank().try_into().unwrap(),
+            ).unwrap();
+            replicas.broadcast(0, &mut self.data);
+            replicas.close();
+        }
     }
     pub fn reduce(&self) -> A::Element {
         let mut value = self.algebra.zero();
