@@ -3,8 +3,8 @@
 //! The operation selection and one-based whole-matrix calls follow the pinned
 //! CTF reference at f69cbb46e23bc2f39cda5722ce096f56301dab4f
 //! (`src/interface/matrix.cxx` and `src/shared/lapack_symbs.cxx`).
-use mpi_sys as sys;
 use crate::algebra::Complex;
+use ::mpi::{ffi as sys, topology::Communicator, traits::AsRaw};
 use std::{ffi::c_char, marker::PhantomData, rc::Rc};
 
 #[cfg_attr(target_os = "windows", link(name = "scalapack"))]
@@ -292,10 +292,7 @@ macro_rules! typed_spd_family {
                 self.validate_matrix(desc_factor, factor.len());
                 self.validate_matrix(desc_b, b.len());
                 let factor_order = if from_left { m } else { n };
-                assert!(
-                    int(factor_order) <= desc_factor[2]
-                        && int(factor_order) <= desc_factor[3]
-                );
+                assert!(int(factor_order) <= desc_factor[2] && int(factor_order) <= desc_factor[3]);
                 assert!(int(m) <= desc_b[2] && int(n) <= desc_b[3]);
                 let side = if from_left { b'L' } else { b'R' } as c_char;
                 let uplo = if lower { b'L' } else { b'U' } as c_char;
@@ -498,14 +495,8 @@ macro_rules! typed_qr_family {
     };
 }
 
-typed_qr_family!(
-    f32,
-    psgeqrf_,
-    psorgqr_,
-    qr_f32,
-    0.0,
-    |value: f32| value as usize
-);
+typed_qr_family!(f32, psgeqrf_, psorgqr_, qr_f32, 0.0, |value: f32| value
+    as usize);
 typed_qr_family!(
     Complex<f32>,
     pcgeqrf_,
@@ -1134,26 +1125,14 @@ fn numroc(n: usize, block: usize, process: usize, source: usize, processes: usiz
 }
 
 impl Grid {
-    pub(crate) fn new(comm: sys::MPI_Comm, rows: usize, cols: usize) -> Self {
+    pub(crate) fn new<C: Communicator + ?Sized>(comm: &C, rows: usize, cols: usize) -> Self {
         assert!(rows > 0 && cols > 0);
         let processes = rows.checked_mul(cols).unwrap();
-        let mut size = 0;
-        let mut rank = 0;
-        unsafe {
-            assert_eq!(
-                sys::MPI_Comm_size(comm, &mut size),
-                0,
-                "MPI_Comm_size failed"
-            );
-            assert_eq!(
-                sys::MPI_Comm_rank(comm, &mut rank),
-                0,
-                "MPI_Comm_rank failed"
-            );
-        }
+        let size = comm.size();
+        let rank = comm.rank();
         assert_eq!(processes, usize::try_from(size).unwrap());
 
-        let system_context = unsafe { Csys2blacs_handle(comm) };
+        let system_context = unsafe { Csys2blacs_handle(comm.as_raw()) };
         let mut context = system_context;
         let order = b'C' as c_char;
         unsafe {

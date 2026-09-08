@@ -2,8 +2,8 @@
 // write_data_mpiio. Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Communicator-scoped MPI-IO for newline-terminated sparse text records.
 
-use super::{check, Comm};
-use mpi_sys as sys;
+use super::{Comm, check};
+use ::mpi::{collective::SystemOperation, ffi as sys, traits::CommunicatorCollectives};
 use std::{ffi::CString, path::Path};
 
 const OVERLAP: sys::MPI_Offset = 300;
@@ -12,7 +12,7 @@ fn mpi_path(path: &Path) -> CString {
     CString::new(path.to_str().unwrap()).unwrap()
 }
 
-impl Comm {
+impl Comm<'_> {
     /// Collectively reads the complete newline-terminated records assigned to
     /// this rank by the source's fixed 300-byte overlap partition.
     pub(crate) fn read_sparse_text(&self, path: &Path) -> Vec<u8> {
@@ -20,7 +20,7 @@ impl Comm {
         unsafe {
             let mut file = sys::RSMPI_FILE_NULL;
             check(sys::MPI_File_open(
-                self.raw,
+                self.raw(),
                 path.as_ptr(),
                 sys::MPI_MODE_RDONLY as i32,
                 sys::RSMPI_INFO_NULL,
@@ -57,11 +57,7 @@ impl Comm {
                 &mut status,
             ));
             let mut actual = 0;
-            check(sys::MPI_Get_count(
-                &status,
-                sys::RSMPI_UINT8_T,
-                &mut actual,
-            ));
+            check(sys::MPI_Get_count(&status, sys::RSMPI_UINT8_T, &mut actual));
             assert!(actual >= 0);
             bytes.truncate(actual as usize);
             check(sys::MPI_File_close(&mut file));
@@ -102,7 +98,7 @@ impl Comm {
         unsafe {
             let mut file = sys::RSMPI_FILE_NULL;
             check(sys::MPI_File_open(
-                self.raw,
+                self.raw(),
                 path.as_ptr(),
                 (sys::MPI_MODE_WRONLY | sys::MPI_MODE_CREATE | sys::MPI_MODE_DELETE_ON_CLOSE)
                     as i32,
@@ -111,7 +107,7 @@ impl Comm {
             ));
             check(sys::MPI_File_close(&mut file));
             check(sys::MPI_File_open(
-                self.raw,
+                self.raw(),
                 path.as_ptr(),
                 (sys::MPI_MODE_WRONLY | sys::MPI_MODE_CREATE) as i32,
                 sys::RSMPI_INFO_NULL,
@@ -120,14 +116,8 @@ impl Comm {
 
             let length: i64 = bytes.len().try_into().unwrap();
             let mut inclusive = 0i64;
-            check(sys::MPI_Scan(
-                (&length as *const i64).cast(),
-                (&mut inclusive as *mut i64).cast(),
-                1,
-                sys::RSMPI_INT64_T,
-                sys::RSMPI_SUM,
-                self.raw,
-            ));
+            self.communicator()
+                .scan_into(&length, &mut inclusive, SystemOperation::sum());
             let offset: sys::MPI_Offset = inclusive - length;
             let mut status: sys::MPI_Status = std::mem::zeroed();
             check(sys::MPI_File_write_at_all(

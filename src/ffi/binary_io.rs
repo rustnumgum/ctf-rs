@@ -1,15 +1,15 @@
 //! Communicator-scoped independent-offset binary MPI-IO. The operation order
 //! follows CTF tensor/untyped_tensor.cxx's binary read/write path.
 
-use super::{check, Comm};
-use mpi_sys as sys;
+use super::{Comm, check};
+use ::mpi::ffi as sys;
 use std::{ffi::CString, path::Path};
 
 fn mpi_path(path: &Path) -> CString {
     CString::new(path.to_str().unwrap()).unwrap()
 }
 
-impl Comm {
+impl Comm<'_> {
     /// Collectively opens `path` without truncation, independently writes this
     /// rank's byte range at `offset`, then collectively closes the file.
     pub(crate) fn write_binary_at(&self, path: &Path, offset: u64, bytes: &[u8]) {
@@ -21,7 +21,7 @@ impl Comm {
         unsafe {
             let mut file = sys::RSMPI_FILE_NULL;
             check(sys::MPI_File_open(
-                self.raw,
+                self.raw(),
                 path.as_ptr(),
                 (sys::MPI_MODE_WRONLY | sys::MPI_MODE_CREATE) as i32,
                 sys::RSMPI_INFO_NULL,
@@ -51,7 +51,7 @@ impl Comm {
         unsafe {
             let mut file = sys::RSMPI_FILE_NULL;
             check(sys::MPI_File_open(
-                self.raw,
+                self.raw(),
                 path.as_ptr(),
                 sys::MPI_MODE_RDONLY as i32,
                 sys::RSMPI_INFO_NULL,
@@ -67,11 +67,7 @@ impl Comm {
                 &mut status,
             ));
             let mut read = 0;
-            check(sys::MPI_Get_count(
-                &status,
-                sys::RSMPI_UINT8_T,
-                &mut read,
-            ));
+            check(sys::MPI_Get_count(&status, sys::RSMPI_UINT8_T, &mut read));
             actual = read;
             check(sys::MPI_File_close(&mut file));
         }

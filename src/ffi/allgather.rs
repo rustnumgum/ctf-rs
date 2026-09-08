@@ -2,24 +2,14 @@
 // Upstream provenance and retained license: docs/provenance.md and LICENSE.
 //! Variable-length byte all-gather on an existing communicator.
 
-use super::{check, Comm};
-use mpi_sys as sys;
+use super::Comm;
+use ::mpi::{datatype::PartitionMut, traits::CommunicatorCollectives};
 
-impl Comm {
+impl Comm<'_> {
     pub(crate) fn all_gather_bytes(&self, bytes: &[u8]) -> Vec<u8> {
         let count: i32 = bytes.len().try_into().unwrap();
         let mut counts = vec![0i32; self.size()];
-        unsafe {
-            check(sys::MPI_Allgather(
-                (&count as *const i32).cast(),
-                1,
-                sys::RSMPI_INT32_T,
-                counts.as_mut_ptr().cast(),
-                1,
-                sys::RSMPI_INT32_T,
-                self.raw,
-            ));
-        }
+        self.communicator().all_gather_into(&count, &mut counts[..]);
 
         let mut total = 0i32;
         let displacements: Vec<i32> = counts
@@ -39,18 +29,13 @@ impl Comm {
             send.push(0);
         }
         let mut received = vec![0u8; actual_total.max(1)];
-        unsafe {
-            check(sys::MPI_Allgatherv(
-                send.as_ptr().cast(),
-                count,
-                sys::RSMPI_UINT8_T,
-                received.as_mut_ptr().cast(),
-                counts.as_ptr(),
-                displacements.as_ptr(),
-                sys::RSMPI_UINT8_T,
-                self.raw,
-            ));
-        }
+        let mut received_partition = PartitionMut::new(
+            &mut received[..actual_total],
+            &counts[..],
+            &displacements[..],
+        );
+        self.communicator()
+            .all_gather_varcount_into(&send[..count as usize], &mut received_partition);
         received.truncate(actual_total);
         received
     }

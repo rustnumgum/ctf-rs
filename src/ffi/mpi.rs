@@ -1,23 +1,31 @@
 //! The only module allowed to use MPI's raw handles and native entry points.
 use crate::algebra::{Monoid, Wire};
-use mpi_sys as sys;
+use ::mpi::{
+    collective::{CommunicatorCollectives, Root, SystemOperation, UnsafeUserOperation},
+    datatype::{Equivalence, MutView, Partition, PartitionMut, UserDatatype, View},
+    ffi as sys,
+    point_to_point::{send_receive_into_with_tags, send_receive_replace_into_with_tags},
+    topology::{Color, Communicator, SimpleCommunicator},
+    traits::AsRaw,
+};
 #[path = "allgather.rs"]
 mod allgather;
-#[path = "gather.rs"]
-mod gather;
 #[path = "binary_io.rs"]
 mod binary_io;
-#[path = "mpi_io.rs"]
-mod mpi_io;
 #[cfg(feature = "native-linalg")]
 #[path = "factor_mpi.rs"]
 mod factor_mpi;
-use std::{marker::PhantomData, rc::Rc};
+#[path = "gather.rs"]
+mod gather;
+#[path = "mpi_io.rs"]
+mod mpi_io;
+use std::{marker::PhantomData, mem::ManuallyDrop, rc::Rc};
+
 std::thread_local! {
     static ACTIVE_ALGEBRA: std::cell::Cell<*const std::ffi::c_void> = const {std::cell::Cell::new(std::ptr::null())};
 }
 
-// MPI_Init uses SINGLE; callback state is borrowed only for the blocking call.
+// Callback state is borrowed only for the blocking collective call.
 unsafe extern "C" fn monoid_add<A: Monoid>(
     input: *mut std::ffi::c_void,
     output: *mut std::ffi::c_void,
@@ -46,12 +54,14 @@ unsafe extern "C" fn monoid_add<A: Monoid>(
     });
 }
 
-pub(crate) struct Runtime {
-    _single_thread: PhantomData<Rc<()>>,
+enum CommunicatorStorage<'a> {
+    Borrowed(&'a dyn Communicator),
+    World(SimpleCommunicator),
+    Split(ManuallyDrop<SimpleCommunicator>),
 }
-pub(crate) struct Comm {
-    raw: sys::MPI_Comm,
-    owned: bool,
+
+pub(crate) struct Comm<'a> {
+    communicator: CommunicatorStorage<'a>,
     _single_thread: PhantomData<Rc<()>>,
 }
 
@@ -66,33 +76,40 @@ fn check(code: i32) {
     assert_eq!(code, 0, "MPI error {code}");
 }
 
-impl Runtime {
-    pub(crate) fn initialize() -> Self {
-        unsafe {
-            let mut initialized = 0;
-            check(sys::MPI_Initialized(&mut initialized));
-            assert_eq!(initialized, 0, "MPI already initialized");
-            check(sys::MPI_Init(std::ptr::null_mut(), std::ptr::null_mut()));
-        }
+impl<'a> Comm<'a> {
+    fn split_communicator(communicator: SimpleCommunicator) -> Self {
         Self {
+            communicator: CommunicatorStorage::Split(ManuallyDrop::new(communicator)),
             _single_thread: PhantomData,
         }
     }
-    pub(crate) fn world(&self) -> Comm {
-        Comm {
-            raw: unsafe { sys::RSMPI_COMM_WORLD },
-            owned: false,
-            _single_thread: PhantomData,
-        }
-    }
-    pub(crate) fn finalize(self) {
-        unsafe {
-            check(sys::MPI_Finalize());
-        }
-    }
-}
 
-impl Comm {
+    pub(crate) fn world() -> Self {
+        Self {
+            communicator: CommunicatorStorage::World(SimpleCommunicator::world()),
+            _single_thread: PhantomData,
+        }
+    }
+
+    pub(crate) fn from_communicator(communicator: &'a impl Communicator) -> Self {
+        Self {
+            communicator: CommunicatorStorage::Borrowed(communicator),
+            _single_thread: PhantomData,
+        }
+    }
+
+    fn communicator(&self) -> &dyn Communicator {
+        match &self.communicator {
+            CommunicatorStorage::Borrowed(communicator) => *communicator,
+            CommunicatorStorage::World(communicator) => communicator,
+            CommunicatorStorage::Split(communicator) => &**communicator,
+        }
+    }
+
+    pub(crate) fn raw(&self) -> sys::MPI_Comm {
+        self.communicator().as_raw()
+    }
+
     /// DGTOG root-to-root exchange: post every receive, post every send, then
     /// wait for all requests. Displacements and counts are measured in bytes.
     pub(crate) fn redistribute_ror(
@@ -113,18 +130,24 @@ impl Comm {
         }
 
         let request_count = sends.iter().filter(|transfer| transfer.count != 0).count()
-            + receives.iter().filter(|transfer| transfer.count != 0).count();
+            + receives
+                .iter()
+                .filter(|transfer| transfer.count != 0)
+                .count();
         let mut requests = Vec::with_capacity(request_count);
         for transfer in receives.iter().filter(|transfer| transfer.count != 0) {
             let mut request = unsafe { sys::RSMPI_REQUEST_NULL };
             unsafe {
                 check(sys::MPI_Irecv(
-                    receive_buffer.as_mut_ptr().add(transfer.displacement).cast(),
+                    receive_buffer
+                        .as_mut_ptr()
+                        .add(transfer.displacement)
+                        .cast(),
                     transfer.count.try_into().unwrap(),
                     sys::RSMPI_UINT8_T,
                     transfer.peer as i32,
                     777,
-                    self.raw,
+                    self.raw(),
                     &mut request,
                 ));
             }
@@ -139,7 +162,7 @@ impl Comm {
                     sys::RSMPI_UINT8_T,
                     transfer.peer as i32,
                     777,
-                    self.raw,
+                    self.raw(),
                     &mut request,
                 ));
             }
@@ -169,6 +192,7 @@ impl Comm {
     {
         self.reduce_monoid(algebra, values, commutative, None);
     }
+
     pub(crate) fn reduce_monoid<A: Monoid>(
         &self,
         algebra: &A,
@@ -195,51 +219,47 @@ impl Comm {
         if input.is_empty() {
             input.push(0);
         }
+        let datatype = UserDatatype::contiguous(
+            A::Element::WIDTH.try_into().unwrap(),
+            &u8::equivalent_datatype(),
+        );
+        let input = unsafe {
+            View::with_count_and_datatype(&input[..], values.len().try_into().unwrap(), &datatype)
+        };
+        let mut output_view = unsafe {
+            MutView::with_count_and_datatype(
+                &mut output[..],
+                values.len().try_into().unwrap(),
+                &datatype,
+            )
+        };
         ACTIVE_ALGEBRA.with(|active| {
             assert!(
                 active.get().is_null(),
                 "nested MPI user reduction is not supported by MPI callbacks"
             );
             active.set((algebra as *const A).cast());
-            unsafe {
-                let mut datatype = sys::RSMPI_DATATYPE_NULL;
-                check(sys::MPI_Type_contiguous(
-                    A::Element::WIDTH.try_into().unwrap(),
-                    sys::RSMPI_UINT8_T,
-                    &mut datatype,
-                ));
-                check(sys::MPI_Type_commit(&mut datatype));
-                let mut operation = std::mem::zeroed();
-                check(sys::MPI_Op_create(
-                    Some(monoid_add::<A>),
-                    i32::from(commutative),
-                    &mut operation,
-                ));
-                if let Some(root) = root {
-                    check(sys::MPI_Reduce(
-                        input.as_ptr().cast(),
-                        output.as_mut_ptr().cast(),
-                        values.len().try_into().unwrap(),
-                        datatype,
-                        operation,
-                        root as i32,
-                        self.raw,
-                    ));
+            let operation = unsafe {
+                if commutative {
+                    UnsafeUserOperation::commutative(monoid_add::<A>)
                 } else {
-                    check(sys::MPI_Allreduce(
-                        input.as_ptr().cast(),
-                        output.as_mut_ptr().cast(),
-                        values.len().try_into().unwrap(),
-                        datatype,
-                        operation,
-                        self.raw,
-                    ));
+                    UnsafeUserOperation::associative(monoid_add::<A>)
                 }
-                check(sys::MPI_Op_free(&mut operation));
-                check(sys::MPI_Type_free(&mut datatype));
+            };
+            if let Some(root) = root {
+                let root_process = self.communicator().process_at_rank(root as i32);
+                if root == self.rank() {
+                    root_process.reduce_into_root(&input, &mut output_view, &operation);
+                } else {
+                    root_process.reduce_into(&input, &operation);
+                }
+            } else {
+                self.communicator()
+                    .all_reduce_into(&input, &mut output_view, &operation);
             }
             active.set(std::ptr::null());
         });
+        drop(output_view);
         if root.is_none() || root == Some(self.rank()) {
             for (value, bytes) in values
                 .iter_mut()
@@ -249,186 +269,133 @@ impl Comm {
             }
         }
     }
+
     pub(crate) fn rank(&self) -> usize {
-        let mut rank = 0;
-        unsafe {
-            check(sys::MPI_Comm_rank(self.raw, &mut rank));
-        }
-        rank as usize
+        self.communicator().rank() as usize
     }
+
     pub(crate) fn size(&self) -> usize {
-        let mut size = 0;
-        unsafe {
-            check(sys::MPI_Comm_size(self.raw, &mut size));
-        }
-        size as usize
+        self.communicator().size() as usize
     }
+
     pub(crate) fn split(&self, color: Option<i32>, key: i32) -> Option<Self> {
-        unsafe {
-            let mut raw = sys::RSMPI_COMM_NULL;
-            check(sys::MPI_Comm_split(
-                self.raw,
-                color.unwrap_or(sys::RSMPI_UNDEFINED),
-                key,
-                &mut raw,
-            ));
-            (raw != sys::RSMPI_COMM_NULL).then_some(Self {
-                raw,
-                owned: true,
-                _single_thread: PhantomData,
-            })
-        }
+        let color = color.map_or_else(Color::undefined, Color::with_value);
+        self.communicator()
+            .split_by_color_with_key(color, key)
+            .map(Self::split_communicator)
     }
+
     pub(crate) fn split_shared(&self) -> Self {
-        unsafe {
-            let mut raw = sys::RSMPI_COMM_NULL;
-            check(sys::MPI_Comm_split_type(
-                self.raw,
-                sys::RSMPI_COMM_TYPE_SHARED,
-                self.rank() as i32,
-                sys::RSMPI_INFO_NULL,
-                &mut raw,
-            ));
-            Self {
-                raw,
-                owned: true,
-                _single_thread: PhantomData,
-            }
-        }
+        Self::split_communicator(self.communicator().split_shared(self.rank() as i32))
     }
+
     pub(crate) fn close(mut self) {
-        if self.owned {
+        if let CommunicatorStorage::Split(communicator) = &mut self.communicator {
             unsafe {
-                check(sys::MPI_Comm_free(&mut self.raw));
+                ManuallyDrop::drop(communicator);
             }
         }
     }
+
     pub(crate) fn barrier(&self) {
-        unsafe {
-            check(sys::MPI_Barrier(self.raw));
-        }
+        self.communicator().barrier();
     }
+
     pub(crate) fn reduce_f64(&self, root: usize, values: &mut [f64]) {
         assert!(root < self.size());
         let mut input = values.to_vec();
         if input.is_empty() {
-            input.push(0.);
+            input.push(0.0);
         }
-        let mut output = vec![0.; values.len().max(1)];
-        unsafe {
-            check(sys::MPI_Reduce(
-                input.as_ptr().cast(),
-                output.as_mut_ptr().cast(),
-                values.len().try_into().unwrap(),
-                sys::RSMPI_DOUBLE,
-                sys::RSMPI_SUM,
-                root as i32,
-                self.raw,
-            ));
-        }
-        if self.rank() == root {
-            values.copy_from_slice(&output[..values.len()]);
-        }
-    }
-    pub(crate) fn sum_f64(&self, values: &mut [f64]) {
-        let input = values.to_vec();
-        if values.is_empty() {
-            // Distinct valid addresses for zero-count MPI calls.
-            let input = 0.0f64;
-            let mut output = 0.0f64;
-            unsafe {
-                check(sys::MPI_Allreduce(
-                    (&input as *const f64).cast(),
-                    (&mut output as *mut f64).cast(),
-                    0,
-                    sys::RSMPI_DOUBLE,
-                    sys::RSMPI_SUM,
-                    self.raw,
-                ));
-            }
-        } else {
-            unsafe {
-                check(sys::MPI_Allreduce(
-                    input.as_ptr().cast(),
-                    values.as_mut_ptr().cast(),
-                    values.len().try_into().unwrap(),
-                    sys::RSMPI_DOUBLE,
-                    sys::RSMPI_SUM,
-                    self.raw,
-                ));
-            }
-        }
-    }
-    pub(crate) fn all_gather_f64(&self, values: &[f64]) -> Vec<f64> {
-        let count = values.len().try_into().unwrap();
-        let mut output = vec![0.; (values.len() * self.size()).max(1)];
-        let empty = 0.0f64;
-        let input = if values.is_empty() {
-            &empty as *const f64
-        } else {
-            values.as_ptr()
+        let mut output = vec![0.0; values.len().max(1)];
+        let datatype = f64::equivalent_datatype();
+        let input = unsafe {
+            View::with_count_and_datatype(&input[..], values.len().try_into().unwrap(), &datatype)
         };
-        unsafe {
-            check(sys::MPI_Allgather(
-                input.cast(),
-                count,
-                sys::RSMPI_DOUBLE,
-                output.as_mut_ptr().cast(),
-                count,
-                sys::RSMPI_DOUBLE,
-                self.raw,
-            ));
+        let mut output_view = unsafe {
+            MutView::with_count_and_datatype(
+                &mut output[..],
+                values.len().try_into().unwrap(),
+                &datatype,
+            )
+        };
+        let root_process = self.communicator().process_at_rank(root as i32);
+        if root == self.rank() {
+            root_process.reduce_into_root(&input, &mut output_view, SystemOperation::sum());
+            drop(output_view);
+            values.copy_from_slice(&output[..values.len()]);
+        } else {
+            root_process.reduce_into(&input, SystemOperation::sum());
         }
-        output.truncate(values.len() * self.size());
+    }
+
+    pub(crate) fn sum_f64(&self, values: &mut [f64]) {
+        let mut input = values.to_vec();
+        if input.is_empty() {
+            input.push(0.0);
+        }
+        if values.is_empty() {
+            let mut output = [0.0];
+            let datatype = f64::equivalent_datatype();
+            let input = unsafe { View::with_count_and_datatype(&input[..], 0, &datatype) };
+            let mut output =
+                unsafe { MutView::with_count_and_datatype(&mut output[..], 0, &datatype) };
+            self.communicator()
+                .all_reduce_into(&input, &mut output, SystemOperation::sum());
+        } else {
+            self.communicator()
+                .all_reduce_into(&input[..], values, SystemOperation::sum());
+        }
+    }
+
+    pub(crate) fn all_gather_f64(&self, values: &[f64]) -> Vec<f64> {
+        let mut input = values.to_vec();
+        if input.is_empty() {
+            input.push(0.0);
+        }
+        let output_len = values.len() * self.size();
+        let mut output = vec![0.0; output_len.max(1)];
+        if values.is_empty() {
+            let datatype = f64::equivalent_datatype();
+            let input = unsafe { View::with_count_and_datatype(&input[..], 0, &datatype) };
+            let mut output_view =
+                unsafe { MutView::with_count_and_datatype(&mut output[..], 0, &datatype) };
+            self.communicator()
+                .all_gather_into(&input, &mut output_view);
+        } else {
+            self.communicator()
+                .all_gather_into(values, &mut output[..output_len]);
+        }
+        output.truncate(output_len);
         output
     }
+
     pub(crate) fn all_gather_i32(&self, value: i32) -> Vec<i32> {
         let mut output = vec![0; self.size()];
-        unsafe {
-            check(sys::MPI_Allgather(
-                (&value as *const i32).cast(),
-                1,
-                sys::RSMPI_INT32_T,
-                output.as_mut_ptr().cast(),
-                1,
-                sys::RSMPI_INT32_T,
-                self.raw,
-            ));
-        }
+        self.communicator().all_gather_into(&value, &mut output[..]);
         output
     }
+
     #[cfg(feature = "native-scalapack")]
     pub(crate) fn scalapack_grid(&self, rows: usize, cols: usize) -> super::scalapack::Grid {
         assert_eq!(rows * cols, self.size());
-        super::scalapack::Grid::new(self.raw, rows, cols)
+        super::scalapack::Grid::new(self.communicator(), rows, cols)
     }
+
     pub(crate) fn gather_plan_cost(&self, seconds: f64, memory: i64) -> (Vec<f64>, Vec<i64>) {
-        let mut times = vec![0.; self.size()];
+        let mut times = vec![0.0; self.size()];
         let mut bytes = vec![0i64; self.size()];
-        unsafe {
-            check(sys::MPI_Gather(
-                (&seconds as *const f64).cast(),
-                1,
-                sys::RSMPI_DOUBLE,
-                times.as_mut_ptr().cast(),
-                1,
-                sys::RSMPI_DOUBLE,
-                0,
-                self.raw,
-            ));
-            check(sys::MPI_Gather(
-                (&memory as *const i64).cast(),
-                1,
-                sys::RSMPI_INT64_T,
-                bytes.as_mut_ptr().cast(),
-                1,
-                sys::RSMPI_INT64_T,
-                0,
-                self.raw,
-            ));
+        let root = self.communicator().process_at_rank(0);
+        if self.rank() == 0 {
+            root.gather_into_root(&seconds, &mut times[..]);
+            root.gather_into_root(&memory, &mut bytes[..]);
+        } else {
+            root.gather_into(&seconds);
+            root.gather_into(&memory);
         }
         (times, bytes)
     }
+
     pub(crate) fn send_receive(
         &self,
         send: &[u8],
@@ -437,23 +404,30 @@ impl Comm {
         recv: &mut [u8],
     ) {
         assert!(destination < self.size() && source < self.size());
-        unsafe {
-            check(sys::MPI_Sendrecv(
-                send.as_ptr().cast(),
-                send.len().try_into().unwrap(),
-                sys::RSMPI_UINT8_T,
-                destination as i32,
-                9,
-                recv.as_mut_ptr().cast(),
-                recv.len().try_into().unwrap(),
-                sys::RSMPI_UINT8_T,
-                source as i32,
-                9,
-                self.raw,
-                sys::RSMPI_STATUS_IGNORE,
-            ));
-        }
+        let send_len = send.len();
+        let empty_send = [0u8];
+        let send = if send.is_empty() {
+            &empty_send[..]
+        } else {
+            send
+        };
+        let recv_len = recv.len();
+        let mut empty_recv = [0u8];
+        let recv = if recv.is_empty() {
+            &mut empty_recv[..]
+        } else {
+            recv
+        };
+        send_receive_into_with_tags(
+            &send[..send_len],
+            &self.communicator().process_at_rank(destination as i32),
+            9,
+            &mut recv[..recv_len],
+            &self.communicator().process_at_rank(source as i32),
+            9,
+        );
     }
+
     pub(crate) fn replace_wire<T: Wire>(
         &self,
         values: &mut [T],
@@ -468,99 +442,78 @@ impl Comm {
             value.encode(&mut bytes);
         }
         assert_eq!(bytes.len(), values.len() * T::WIDTH);
-        unsafe {
-            check(sys::MPI_Sendrecv_replace(
-                bytes.as_mut_ptr().cast(),
-                bytes.len().try_into().unwrap(),
-                sys::RSMPI_UINT8_T,
-                destination as i32,
-                tag,
-                source as i32,
-                tag,
-                self.raw,
-                sys::RSMPI_STATUS_IGNORE,
-            ));
+        let byte_len = bytes.len();
+        if bytes.is_empty() {
+            bytes.push(0);
         }
+        send_receive_replace_into_with_tags(
+            &mut bytes[..byte_len],
+            &self.communicator().process_at_rank(destination as i32),
+            tag,
+            &self.communicator().process_at_rank(source as i32),
+            tag,
+        );
         for (value, encoded) in values.iter_mut().zip(bytes.chunks_exact(T::WIDTH)) {
             *value = T::decode(encoded);
         }
     }
+
     pub(crate) fn broadcast(&self, root: usize, buffer: &mut [u8]) {
         assert!(root < self.size());
-        let mut empty = 0u8;
-        let pointer = if buffer.is_empty() {
-            &mut empty as *mut u8
+        let len = buffer.len();
+        let mut empty = [0u8];
+        let buffer = if buffer.is_empty() {
+            &mut empty[..]
         } else {
-            buffer.as_mut_ptr()
+            buffer
         };
-        unsafe {
-            check(sys::MPI_Bcast(
-                pointer.cast(),
-                buffer.len().try_into().unwrap(),
-                sys::RSMPI_UINT8_T,
-                root as i32,
-                self.raw,
-            ));
-        }
+        self.communicator()
+            .process_at_rank(root as i32)
+            .broadcast_into(&mut buffer[..len]);
     }
+
     /// Rank-bucket exchange: Alltoall counts, then Alltoallv payloads.
     pub(crate) fn exchange(&self, buckets: &[Vec<u8>]) -> Vec<Vec<u8>> {
         let n = self.size();
         assert_eq!(buckets.len(), n);
         let send_counts: Vec<i32> = buckets
             .iter()
-            .map(|b| b.len().try_into().unwrap())
+            .map(|bucket| bucket.len().try_into().unwrap())
             .collect();
         let mut recv_counts = vec![0i32; n];
-        unsafe {
-            check(sys::MPI_Alltoall(
-                send_counts.as_ptr().cast(),
-                1,
-                sys::RSMPI_INT32_T,
-                recv_counts.as_mut_ptr().cast(),
-                1,
-                sys::RSMPI_INT32_T,
-                self.raw,
-            ));
-        }
+        self.communicator()
+            .all_to_all_into(&send_counts[..], &mut recv_counts[..]);
+
         fn offsets(counts: &[i32]) -> (Vec<i32>, usize) {
             let mut next = 0i32;
             let offsets = counts
                 .iter()
-                .map(|&c| {
-                    let p = next;
-                    next = next.checked_add(c).unwrap();
-                    p
+                .map(|&count| {
+                    let offset = next;
+                    next = next.checked_add(count).unwrap();
+                    offset
                 })
                 .collect();
             (offsets, next as usize)
         }
-        let (send_offsets, _) = offsets(&send_counts);
-        let (recv_offsets, total) = offsets(&recv_counts);
+
+        let (send_offsets, send_total) = offsets(&send_counts);
+        let (recv_offsets, recv_total) = offsets(&recv_counts);
         let mut send: Vec<u8> = buckets.iter().flatten().copied().collect();
-        // Distinct allocations even for zero counts: empty Vecs share a dangling
-        // pointer, which MPI implementations can reject as aliased buffers.
         if send.is_empty() {
             send.push(0);
         }
-        let mut recv = vec![0u8; total.max(1)];
-        unsafe {
-            check(sys::MPI_Alltoallv(
-                send.as_ptr().cast(),
-                send_counts.as_ptr(),
-                send_offsets.as_ptr(),
-                sys::RSMPI_UINT8_T,
-                recv.as_mut_ptr().cast(),
-                recv_counts.as_ptr(),
-                recv_offsets.as_ptr(),
-                sys::RSMPI_UINT8_T,
-                self.raw,
-            ));
-        }
+        let mut recv = vec![0u8; recv_total.max(1)];
+        let send = Partition::new(&send[..send_total], &send_counts[..], &send_offsets[..]);
+        let mut recv_partition =
+            PartitionMut::new(&mut recv[..recv_total], &recv_counts[..], &recv_offsets[..]);
+        self.communicator()
+            .all_to_all_varcount_into(&send, &mut recv_partition);
+
         recv_offsets
             .iter()
             .zip(recv_counts)
-            .map(|(&p, n)| recv[p as usize..(p + n) as usize].to_vec())
+            .map(|(&offset, count)| recv[offset as usize..(offset + count) as usize].to_vec())
             .collect()
     }
 }
