@@ -1,10 +1,5 @@
 // Deterministic port of pinned CTF test/endomorphism.cxx.
-use ctf::{
-    algebra::Arithmetic,
-    context::{Context, Runtime},
-    mapping::Distribution,
-    tensor::Tensor,
-};
+use ctf::{algebra::Arithmetic, context::Context, mapping::Distribution, tensor::Tensor};
 
 const N: usize = 5;
 
@@ -28,21 +23,27 @@ fn run(context: &Context<'_>) {
     for (key, value) in values.into_iter().enumerate() {
         let old = initial(key);
         let expected = old * old * old;
-        assert!((expected - value).abs() < 1.0e-6,
-            "source endomorphism mismatch at key {key}: expected {expected}, got {value}");
+        assert!(
+            (expected - value).abs() < 1.0e-6,
+            "source endomorphism mismatch at key {key}: expected {expected}, got {value}"
+        );
     }
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
-    let parity = world.split(Some((world.rank() % 2) as i32), world.rank() as i32).unwrap();
+    let parity = world
+        .split(Some((world.rank() % 2) as i32), world.rank() as i32)
+        .unwrap();
     run(&parity);
     parity.close();
     if world.rank() == 0 {
         println!("DIGIT / PASS upstream_endomorphism: A=A^3; abs<1e-6; world+parity");
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

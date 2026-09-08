@@ -1,7 +1,9 @@
-use ctf::{context::Runtime, summation::replicated_f64};
+use ctf::summation::replicated_f64;
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let rank = world.rank();
     let np = world.size();
     let mut a = [rank as f64 + 1., rank as f64 + 2.];
@@ -78,5 +80,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

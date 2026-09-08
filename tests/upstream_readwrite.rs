@@ -7,11 +7,11 @@
 
 use ctf::{
     algebra::{Arithmetic, Monoid, Semiring},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
-    symmetry::Symmetry::{self, NS, SH, SY},
     symmetric_distribution::SymmetricDistribution,
     symmetric_tensor::SymmetricTensor,
+    symmetry::Symmetry::{self, NS, SH, SY},
     tensor::Tensor,
 };
 
@@ -34,11 +34,19 @@ fn symmetric_distribution(context: &Context<'_>, links: Vec<Symmetry>) -> Symmet
     let third = second.clone();
     let fourth = second.clone();
     let mappings = vec![first, second, third, fourth];
-    SymmetricDistribution::new(Distribution::new(vec![3, 3, 3, 3], topology, mappings), links)
+    SymmetricDistribution::new(
+        Distribution::new(vec![3, 3, 3, 3], topology, mappings),
+        links,
+    )
 }
 
 fn logical_sum(tensor: &SymmetricTensor<'_, '_, Arithmetic<f64>>) -> f64 {
-    tensor.unpack(Distribution::cyclic(tensor.distribution().distribution().shape.clone(),tensor.context().size())).reduce()
+    tensor
+        .unpack(Distribution::cyclic(
+            tensor.distribution().distribution().shape.clone(),
+            tensor.context().size(),
+        ))
+        .reduce()
 }
 
 fn run(context: &Context<'_>, n: usize) {
@@ -92,27 +100,57 @@ fn run(context: &Context<'_>, n: usize) {
         &Arithmetic::<f64>::new().zero(),
     );
 
-    a_ns = a_sy.unpack(Distribution::cyclic(shape,context.size()));
-    let mut dot = Tensor::new(context,Distribution::cyclic(vec![],context.size()),algebra);
-    dot.contract_from("",&a_ns,"ijkl",&a_ns,"ijkl",Topology::new(vec![context.size()]),1.0,0.0).unwrap();
+    a_ns = a_sy.unpack(Distribution::cyclic(shape, context.size()));
+    let mut dot = Tensor::new(
+        context,
+        Distribution::cyclic(vec![], context.size()),
+        algebra,
+    );
+    dot.contract_from(
+        "",
+        &a_ns,
+        "ijkl",
+        &a_ns,
+        "ijkl",
+        Topology::new(vec![context.size()]),
+        1.0,
+        0.0,
+    )
+    .unwrap();
     let sum = dot.read(&[0])[0];
     assert!((sum - expected).abs() <= 1e-10);
 
-    let mut dot = SymmetricTensor::new(context,SymmetricDistribution::new(Distribution::cyclic(vec![],context.size()),vec![]),algebra);
-    dot.contract_from_on("",&a_sy,"ijkl",&a_sy,"ijkl",Topology::new(vec![context.size()]),"i",1.0,0.0,true).unwrap();
+    let mut dot = SymmetricTensor::new(
+        context,
+        SymmetricDistribution::new(Distribution::cyclic(vec![], context.size()), vec![]),
+        algebra,
+    );
+    dot.contract_from_on(
+        "",
+        &a_sy,
+        "ijkl",
+        &a_sy,
+        "ijkl",
+        Topology::new(vec![context.size()]),
+        "i",
+        1.0,
+        0.0,
+        true,
+    )
+    .unwrap();
     let sum = dot.read(&[0])[0];
     assert!((sum - expected).abs() <= 1e-10);
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world, 3);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity, 3);
     parity.close();
 
@@ -123,5 +161,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

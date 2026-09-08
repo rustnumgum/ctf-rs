@@ -3,7 +3,6 @@
 
 use ctf::{
     algebra::{Arithmetic, Complex, Monoid, Semiring},
-    context::Runtime,
     flop_counter::FlopCounter,
     linalg::{Gemm, GemmKernel, Native, Syr, SyrKernel, Transpose, Uplo},
 };
@@ -125,8 +124,10 @@ fn exact_flop_aggregation(context: &ctf::context::Context<'_>) {
 
 fn main() {
     exact_syr_cases();
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     exact_flop_aggregation(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -139,5 +140,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

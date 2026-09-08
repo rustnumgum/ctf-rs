@@ -6,7 +6,7 @@
 //! oracle, so this test also covers missing sparse entries as algebraic zero.
 use ctf::{
     algebra::{Arithmetic, CustomMonoid, CustomSemiring},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     sparse::SparseTensor,
     tensor::Tensor,
@@ -130,7 +130,13 @@ fn dense_c_value(key: usize) -> i64 {
     400 - 3 * key as i64
 }
 
-fn sparse_product(m: usize, kdim: usize, n: usize, a: &[(usize, i64)], b: &[(usize, i64)]) -> Vec<i64> {
+fn sparse_product(
+    m: usize,
+    kdim: usize,
+    n: usize,
+    a: &[(usize, i64)],
+    b: &[(usize, i64)],
+) -> Vec<i64> {
     let mut result = vec![0; m * n];
     for i in 0..m {
         for j in 0..n {
@@ -171,13 +177,7 @@ fn keys(len: usize) -> Vec<usize> {
     (0..len).collect()
 }
 
-fn check_sparse_sparse(
-    context: &Context<'_>,
-    m: usize,
-    kdim: usize,
-    n: usize,
-    grid: [usize; 2],
-) {
+fn check_sparse_sparse(context: &Context<'_>, m: usize, kdim: usize, n: usize, grid: [usize; 2]) {
     let a_pairs = sparse_a_pairs(m, kdim);
     let b_pairs = sparse_b_pairs(kdim, n);
     let product = sparse_product(m, kdim, n, &a_pairs, &b_pairs);
@@ -208,13 +208,7 @@ fn check_sparse_sparse(
     assert_eq!(dense_c.read(&keys(m * n)), expected_dense);
 }
 
-fn check_sparse_dense(
-    context: &Context<'_>,
-    m: usize,
-    kdim: usize,
-    n: usize,
-    grid: [usize; 2],
-) {
+fn check_sparse_dense(context: &Context<'_>, m: usize, kdim: usize, n: usize, grid: [usize; 2]) {
     let a_pairs = sparse_a_pairs(m, kdim);
     let b_pairs = dense_b_pairs(kdim, n);
     let product = dense_right_product(m, kdim, n, &a_pairs);
@@ -292,14 +286,25 @@ fn run(context: &Context<'_>) {
 fn min_plus(context: &Context<'_>, grid: [usize; 2]) {
     const INF: i64 = 1_000_000;
     let algebra = CustomSemiring {
-        monoid: CustomMonoid { identity: INF, addition: |a: &i64, b: &i64| (*a).min(*b) },
+        monoid: CustomMonoid {
+            identity: INF,
+            addition: |a: &i64, b: &i64| (*a).min(*b),
+        },
         identity: 0,
         multiplication: |a: &i64, b: &i64| if *a == INF || *b == INF { INF } else { a + b },
     };
     let mut a = SparseTensor::new(context, cyclic(context, vec![2, 3]), algebra.clone());
     let mut b = SparseTensor::new(context, cyclic(context, vec![3, 2]), algebra.clone());
-    a.write_add(if context.rank() == 0 { &[(0, 1), (3, 2)] } else { &[] });
-    b.write_add(if context.rank() == 0 { &[(0, 4), (4, 3)] } else { &[] });
+    a.write_add(if context.rank() == 0 {
+        &[(0, 1), (3, 2)]
+    } else {
+        &[]
+    });
+    b.write_add(if context.rank() == 0 {
+        &[(0, 4), (4, 3)]
+    } else {
+        &[]
+    });
     let mut c = SparseTensor::new(context, cyclic(context, vec![2, 2]), algebra.clone());
     c.gemm_sparse(&a, &b, grid, 0, 0);
     assert_eq!(c.read(&[0, 1, 2, 3]), vec![5, INF, INF, 5]);
@@ -309,8 +314,10 @@ fn min_plus(context: &Context<'_>, grid: [usize; 2]) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let world_rank = world.rank();
     run(&world);
 
@@ -326,5 +333,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

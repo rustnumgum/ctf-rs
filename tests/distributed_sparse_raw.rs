@@ -1,6 +1,6 @@
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     normal_mapping::Problem,
     sparse::SparseTensor,
@@ -13,8 +13,10 @@ fn run_case(context: &Context<'_>, mapped: [Distribution; 3], empty: bool) {
     let dc = Distribution::cyclic(vec![5, 4], context.size());
     let mut a = SparseTensor::new(context, da.clone(), Arithmetic::<i64>::new());
     if !empty {
-        let pairs: Vec<_> = (0..15).filter(|&key| key % 4 != 0 && da.owner(key) == context.rank())
-            .map(|key| (key, key as i64 % 7 - 3)).collect();
+        let pairs: Vec<_> = (0..15)
+            .filter(|&key| key % 4 != 0 && da.owner(key) == context.rank())
+            .map(|key| (key, key as i64 % 7 - 3))
+            .collect();
         a.write_add(&pairs);
     }
     let mut b = Tensor::new(context, db, Arithmetic::<i64>::new());
@@ -24,14 +26,20 @@ fn run_case(context: &Context<'_>, mapped: [Distribution; 3], empty: bool) {
     c.contract_sparse_from_mapped("ij", &a, "ik", &b, "kj", mapped, 2, 3, true);
     assert_eq!(c.distribution(), &dc);
     let keys: Vec<_> = (0..20).collect();
-    let expected: Vec<_> = keys.iter().map(|&key| {
-        if empty { return 15; }
-        let i = key % 5;
-        let j = key / 5;
-        15 + (0..3).filter(|&k| (i + 5 * k) % 4 != 0).map(|k| {
-            2 * ((i + 5 * k) as i64 % 7 - 3) * ((k + 3 * j) as i64 - 2)
-        }).sum::<i64>()
-    }).collect();
+    let expected: Vec<_> = keys
+        .iter()
+        .map(|&key| {
+            if empty {
+                return 15;
+            }
+            let i = key % 5;
+            let j = key / 5;
+            15 + (0..3)
+                .filter(|&k| (i + 5 * k) % 4 != 0)
+                .map(|k| 2 * ((i + 5 * k) as i64 % 7 - 3) * ((k + 3 * j) as i64 - 2))
+                .sum::<i64>()
+        })
+        .collect();
     assert_eq!(c.read(&keys), expected);
 }
 
@@ -42,35 +50,62 @@ fn run(context: &Context<'_>) {
     } else {
         Topology::new(vec![context.size(), 1])
     };
-    let mismatched = Problem::new(shapes, ["ik", "kj", "ij"]).unwrap()
-        .map_to_topology(&topology, 0, [None; 3]).unwrap();
+    let mismatched = Problem::new(shapes, ["ik", "kj", "ij"])
+        .unwrap()
+        .map_to_topology(&topology, 0, [None; 3])
+        .unwrap();
     run_case(context, mismatched, false);
-    run_case(context, Problem::new(shapes, ["ik", "kj", "ij"]).unwrap()
-        .map_to_topology(&topology, 0, [None; 3]).unwrap(), true);
+    run_case(
+        context,
+        Problem::new(shapes, ["ik", "kj", "ij"])
+            .unwrap()
+            .map_to_topology(&topology, 0, [None; 3])
+            .unwrap(),
+        true,
+    );
 
     let topology = Topology::new(vec![context.size()]);
-    let physical = || Mapping::Physical { axis: 0, processes: context.size(),
-        child: Box::new(Mapping::Unmapped) };
-    let virtual_two = || Mapping::Virtual { copies: 2,
-        child: Box::new(Mapping::Unmapped) };
+    let physical = || Mapping::Physical {
+        axis: 0,
+        processes: context.size(),
+        child: Box::new(Mapping::Unmapped),
+    };
+    let virtual_two = || Mapping::Virtual {
+        copies: 2,
+        child: Box::new(Mapping::Unmapped),
+    };
     let virtual_mapped = [
-        Distribution::new(vec![5, 3], topology.clone(), vec![physical(), virtual_two()]),
-        Distribution::new(vec![3, 4], topology.clone(), vec![virtual_two(), Mapping::Unmapped]),
+        Distribution::new(
+            vec![5, 3],
+            topology.clone(),
+            vec![physical(), virtual_two()],
+        ),
+        Distribution::new(
+            vec![3, 4],
+            topology.clone(),
+            vec![virtual_two(), Mapping::Unmapped],
+        ),
         Distribution::new(vec![5, 4], topology, vec![physical(), Mapping::Unmapped]),
     ];
     run_case(context, virtual_mapped, false);
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
-    let parity = world.split(Some((world.rank() % 2) as i32), world.rank() as i32).unwrap();
+    let parity = world
+        .split(Some((world.rank() % 2) as i32), world.rank() as i32)
+        .unwrap();
     run(&parity);
     parity.close();
     if world.rank() == 0 {
-        println!("DIGIT / PASS distributed_sparse_raw: source raw mapped panels, beta, uneven shapes, empty shards, virtual factors; exact i64; world+parity");
+        println!(
+            "DIGIT / PASS distributed_sparse_raw: source raw mapped panels, beta, uneven shapes, empty shards, virtual factors; exact i64; world+parity"
+        );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

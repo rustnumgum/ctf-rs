@@ -7,7 +7,7 @@
 
 use ctf::{
     algebra::{Arithmetic, Monoid, Semiring},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     random::Generator,
     sparse::SparseTensor,
@@ -166,14 +166,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -183,5 +183,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

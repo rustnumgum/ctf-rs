@@ -1,6 +1,6 @@
 use ctf::{
     algebra::{Arithmetic, Complex, Monoid, Semiring, Wire},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -34,7 +34,9 @@ fn child_distribution(shape: &[usize], processes: usize, mode: ChildMode) -> Dis
             first.augment_physical(&topology, 0);
             first.augment_virtual(processes * 2);
             let mut mappings = vec![Mapping::Unmapped; shape.len()];
-            if !shape.is_empty() { mappings[0] = first; }
+            if !shape.is_empty() {
+                mappings[0] = first;
+            }
             Distribution::new(shape.to_vec(), topology, mappings)
         }
     }
@@ -74,11 +76,10 @@ fn exercise_group<A, F, G, C>(
     let world_size = context.size();
     let rank = context.rank();
     let active = rank % 2 == group;
-    let child_size = (0..world_size).filter(|candidate| candidate % 2 == group).count();
-    let child = context.split(
-        active.then_some(0),
-        (world_size - 1 - rank) as i32,
-    );
+    let child_size = (0..world_size)
+        .filter(|candidate| candidate % 2 == group)
+        .count();
+    let child = context.split(active.then_some(0), (world_size - 1 - rank) as i32);
     if active {
         let child = child.as_ref().unwrap();
         assert_eq!(child.size(), child_size);
@@ -95,11 +96,7 @@ fn exercise_group<A, F, G, C>(
             Distribution::cyclic(shape.clone(), world_size)
         };
         let target_distribution = child_distribution(&shape, child_size, child_mode);
-        let mut source = Tensor::new(
-            context,
-            parent_distribution.clone(),
-            algebra.clone(),
-        );
+        let mut source = Tensor::new(context, parent_distribution.clone(), algebra.clone());
         source.transform(|key, value| *value = source_value(key));
         let source_before = source.local_pairs();
         let source_distribution_before = source.distribution().clone();
@@ -120,13 +117,7 @@ fn exercise_group<A, F, G, C>(
         if let Some(destination) = destination.as_ref() {
             assert_eq!(destination.distribution(), &target_distribution);
             for (key, actual) in destination.local_pairs() {
-                let expected = affine(
-                    &algebra,
-                    &source_value(key),
-                    &old_value(key),
-                    &alpha,
-                    &beta,
-                );
+                let expected = affine(&algebra, &source_value(key), &old_value(key), &alpha, &beta);
                 assert!(close(&actual, &expected), "add_to_subworld key {key}");
             }
             if shape.as_slice() == [1] && child_mode == ChildMode::Cyclic && child_size > 1 {
@@ -145,11 +136,8 @@ fn exercise_group<A, F, G, C>(
             tensor
         });
         let child_source_before = child_source.as_ref().map(|tensor| tensor.local_pairs());
-        let mut parent_destination = Tensor::new(
-            context,
-            parent_distribution.clone(),
-            algebra.clone(),
-        );
+        let mut parent_destination =
+            Tensor::new(context, parent_distribution.clone(), algebra.clone());
         parent_destination.transform(|key, value| *value = old_value(key));
         let parent_distribution_before = parent_destination.distribution().clone();
         parent_destination.add_from_subworld(
@@ -158,23 +146,22 @@ fn exercise_group<A, F, G, C>(
             alpha.clone(),
             beta.clone(),
         );
-        assert_eq!(parent_destination.distribution(), &parent_distribution_before);
+        assert_eq!(
+            parent_destination.distribution(),
+            &parent_distribution_before
+        );
         if let (Some(child_source), Some(before)) = (child_source.as_ref(), child_source_before) {
             assert_eq!(child_source.local_pairs(), before);
             assert_eq!(child_source.distribution(), &target_distribution);
         }
         for (key, actual) in parent_destination.local_pairs() {
-            let expected = affine(
-                &algebra,
-                &source_value(key),
-                &old_value(key),
-                &alpha,
-                &beta,
-            );
+            let expected = affine(&algebra, &source_value(key), &old_value(key), &alpha, &beta);
             assert!(close(&actual, &expected), "add_from_subworld key {key}");
         }
     }
-    if let Some(child) = child { child.close(); }
+    if let Some(child) = child {
+        child.close();
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -188,7 +175,9 @@ impl Wire for Matrix {
         }
     }
     fn decode(input: &[u8]) -> Self {
-        Self(std::array::from_fn(|i| i64::decode(&input[8 * i..8 * (i + 1)])))
+        Self(std::array::from_fn(|i| {
+            i64::decode(&input[8 * i..8 * (i + 1)])
+        }))
     }
 }
 
@@ -197,14 +186,18 @@ struct MatrixAlgebra;
 
 impl Monoid for MatrixAlgebra {
     type Element = Matrix;
-    fn zero(&self) -> Matrix { Matrix([0; 4]) }
+    fn zero(&self) -> Matrix {
+        Matrix([0; 4])
+    }
     fn add(&self, a: &Matrix, b: &Matrix) -> Matrix {
         Matrix(std::array::from_fn(|i| a.0[i] + b.0[i]))
     }
 }
 
 impl Semiring for MatrixAlgebra {
-    fn one(&self) -> Matrix { Matrix([1, 0, 0, 1]) }
+    fn one(&self) -> Matrix {
+        Matrix([1, 0, 0, 1])
+    }
     fn multiply(&self, a: &Matrix, b: &Matrix) -> Matrix {
         Matrix([
             a.0[0] * b.0[0] + a.0[1] * b.0[2],
@@ -256,7 +249,10 @@ fn run(context: &Context<'_>) {
 
     let alpha = Matrix([1, 2, 3, 4]);
     let beta = Matrix([2, -1, 1, 3]);
-    assert_ne!(MatrixAlgebra.multiply(&alpha, &beta), MatrixAlgebra.multiply(&beta, &alpha));
+    assert_ne!(
+        MatrixAlgebra.multiply(&alpha, &beta),
+        MatrixAlgebra.multiply(&beta, &alpha)
+    );
     for group in 0..2 {
         if group < context.size() {
             exercise_group(
@@ -276,13 +272,13 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let rank = world.rank();
     run(&world);
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
     world.barrier();
@@ -292,5 +288,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

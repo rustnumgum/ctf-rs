@@ -1,12 +1,13 @@
 use ctf::{
     algebra::Arithmetic,
-    context::Runtime,
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let np = world.size();
     let topology = Topology::new(vec![np]);
     let mut kmap = Mapping::Unmapped;
@@ -51,5 +52,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

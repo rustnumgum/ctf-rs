@@ -1,9 +1,9 @@
-use ctf::{
-    algebra::Arithmetic, context::Runtime, linalg::Native, mapping::Distribution, tensor::Tensor,
-};
+use ctf::{algebra::Arithmetic, linalg::Native, mapping::Distribution, tensor::Tensor};
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let np = world.size();
     let grid = if np == 4 { [2, 2] } else { [np, 1] };
     let (m, k, n) = (5, 7, 3);
@@ -62,5 +62,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

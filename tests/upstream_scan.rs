@@ -9,12 +9,12 @@
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     random::Generator,
-    symmetry::Symmetry::{self, AS, NS, SH},
     symmetric_distribution::SymmetricDistribution,
     symmetric_tensor::SymmetricTensor,
+    symmetry::Symmetry::{self, AS, NS, SH},
     tensor::Tensor as DenseTensor,
 };
 
@@ -40,9 +40,7 @@ fn distribution(
 }
 
 fn labels(order: usize) -> String {
-    (0..order)
-        .map(|axis| (b'a' + axis as u8) as char)
-        .collect()
+    (0..order).map(|axis| (b'a' + axis as u8) as char).collect()
 }
 
 fn shift_matrix<'c, 'r>(context: &'c Context<'r>) -> Tensor<'c, 'r> {
@@ -69,18 +67,7 @@ fn rec_scan<'c, 'r>(tensor: &mut Tensor<'c, 'r>) {
     if order == 1 {
         let old = clone_tensor(tensor);
         tensor
-            .contract_from_on(
-                "a",
-                &w,
-                "ba",
-                &old,
-                "b",
-                topology,
-                "a",
-                1.0,
-                0.0,
-                true,
-            )
+            .contract_from_on("a", &w, "ba", &old, "b", topology, "a", 1.0, 0.0, true)
             .unwrap();
         return;
     }
@@ -89,11 +76,7 @@ fn rec_scan<'c, 'r>(tensor: &mut Tensor<'c, 'r>) {
     let reduced_indices = &output_indices[1..];
     let mut reduced = Tensor::new(
         tensor.context(),
-        distribution(
-            tensor.context(),
-            vec![2; order - 1],
-            vec![NS; order - 1],
-        ),
+        distribution(tensor.context(), vec![2; order - 1], vec![NS; order - 1]),
         Algebra::new(),
     );
     reduced.sum_from(reduced_indices, tensor, &output_indices, 1.0, 0.0);
@@ -161,14 +144,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -178,5 +161,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

@@ -1,5 +1,5 @@
 use ctf::{
-    context::{Context, Runtime},
+    context::Context,
     int_timer::{FunctionTimer, Timer, TimerRegistry},
     symmetry::Symmetry::{AS, NS, SY},
     util,
@@ -119,8 +119,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -133,5 +135,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

@@ -1,7 +1,4 @@
-use ctf::{
-    algebra::{CustomMonoid, Wire},
-    context::Runtime,
-};
+use ctf::algebra::{CustomMonoid, Wire};
 #[derive(Clone, Debug, PartialEq)]
 struct Affine(i64, i64);
 impl Wire for Affine {
@@ -15,8 +12,10 @@ impl Wire for Affine {
     }
 }
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let compose = CustomMonoid {
         identity: Affine(1, 0),
         addition: |a: &Affine, b: &Affine| Affine(a.0 * b.0, a.0 * b.1 + a.1),
@@ -47,5 +46,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

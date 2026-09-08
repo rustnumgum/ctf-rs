@@ -1,6 +1,6 @@
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -44,10 +44,7 @@ fn factor_value(coordinate: usize, auxiliary: usize) -> f64 {
 }
 
 fn exact_x(output_mode: usize, output_coordinate: usize, auxiliary: usize) -> f64 {
-    0.35
-        + 0.07 * output_mode as f64
-        + 0.11 * output_coordinate as f64
-        + 0.19 * auxiliary as f64
+    0.35 + 0.07 * output_mode as f64 + 0.11 * output_coordinate as f64 + 0.19 * auxiliary as f64
 }
 
 fn source_distribution(
@@ -138,10 +135,7 @@ fn make_rhs<'c, 'r>(
     shape: &[usize],
     output_mode: usize,
 ) -> (Dense<'c, 'r>, Dense<'c, 'r>) {
-    let distribution = Distribution::cyclic(
-        vec![AUXILIARY, shape[output_mode]],
-        context.size(),
-    );
+    let distribution = Distribution::cyclic(vec![AUXILIARY, shape[output_mode]], context.size());
     let mut rhs = Dense::new(context, distribution.clone(), Arithmetic::new());
     let mut expected = Dense::new(context, distribution.clone(), Arithmetic::new());
     rhs.transform(|key, value| {
@@ -149,8 +143,9 @@ fn make_rhs<'c, 'r>(
         let output_coordinate = coordinates[1];
         let normal = normal_matrix(shape, output_mode, output_coordinate);
         *value = (0..AUXILIARY)
-            .map(|column| normal[coordinates[0]][column]
-                * exact_x(output_mode, output_coordinate, column))
+            .map(|column| {
+                normal[coordinates[0]][column] * exact_x(output_mode, output_coordinate, column)
+            })
             .sum();
     });
     expected.transform(|key, value| {
@@ -169,7 +164,10 @@ fn assert_allclose(reference: &Dense<'_, '_>, actual: &Dense<'_, '_>) {
     {
         assert_eq!(key, other);
         assert!(expected.is_finite(), "non-finite reference at key={key}");
-        assert!(value.is_finite(), "non-finite solve_factor value at key={key}");
+        assert!(
+            value.is_finite(),
+            "non-finite solve_factor value at key={key}"
+        );
         let difference = (value - expected).abs();
         let bound = 1e-8 + 1e-5 * expected.abs();
         assert!(
@@ -223,8 +221,10 @@ fn exercise_singular(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     exercise(&world);
     exercise_singular(&world);
     let child = world
@@ -240,5 +240,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

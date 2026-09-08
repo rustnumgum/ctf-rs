@@ -5,8 +5,10 @@
 //! CSR and CCSR values, while MPI reductions consume the same Monoid contract.
 
 use ctf::{
-    algebra::{Arithmetic, CustomMonoid, CustomRing, CustomSemiring, Group, Monoid, Ring, Semiring, Wire},
-    context::{Context, Runtime},
+    algebra::{
+        Arithmetic, CustomMonoid, CustomRing, CustomSemiring, Group, Monoid, Ring, Semiring, Wire,
+    },
+    context::Context,
     sparse_formats::Coo,
 };
 
@@ -105,7 +107,10 @@ fn check_set_conversions() {
     assert_eq!(ccsr.columns(), csr.columns());
     assert_eq!(ccsr.values(), csr.values());
     assert_eq!(ccsr.to_coo(), csr.to_coo());
-    assert_eq!(csr.to_coo().entries(), &[(1, 1, 3), (1, 2, 2), (1, 2, 0), (3, 1, 6), (4, 3, 9)]);
+    assert_eq!(
+        csr.to_coo().entries(),
+        &[(1, 1, 3), (1, 2, 2), (1, 2, 0), (3, 1, 6), (4, 3, 9)]
+    );
 }
 
 fn check_monoid_production(context: &Context<'_>) {
@@ -124,7 +129,10 @@ fn check_monoid_production(context: &Context<'_>) {
 
     let a = Coo::new(1, 1, vec![(1, 1, Affine(2, 3))]).to_csr();
     let b = Coo::new(1, 1, vec![(1, 1, Affine(5, 7))]).to_csr();
-    assert_eq!(a.add(&b, &algebra).to_coo().entries(), &[(1, 1, Affine(10, 17))]);
+    assert_eq!(
+        a.add(&b, &algebra).to_coo().entries(),
+        &[(1, 1, Affine(10, 17))]
+    );
 }
 
 fn run(context: &Context<'_>) {
@@ -135,8 +143,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let parity = world
@@ -151,5 +161,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

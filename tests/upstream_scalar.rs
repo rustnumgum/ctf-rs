@@ -7,11 +7,11 @@
 
 use ctf::{
     algebra::{Arithmetic, Monoid, Semiring},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
-    symmetry::Symmetry::{self, NS, SY},
     symmetric_distribution::SymmetricDistribution,
     symmetric_tensor::SymmetricTensor,
+    symmetry::Symmetry::{self, NS, SY},
     tensor::Tensor,
 };
 
@@ -76,16 +76,7 @@ fn run(context: &Context<'_>) {
 
     let e_operand = e.redistribute(e.distribution().clone());
     e.contract_from_on(
-        "ij",
-        &d,
-        "klij",
-        &e_operand,
-        "ki",
-        topology,
-        "k",
-        1.0,
-        0.0,
-        true,
+        "ij", &d, "klij", &e_operand, "ki", topology, "k", 1.0, 0.0, true,
     )
     .unwrap();
     assert!(e.norm1().abs() < 1e-10);
@@ -112,14 +103,14 @@ fn symmetric_tensor<'c, 'r>(
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -130,5 +121,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

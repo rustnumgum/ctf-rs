@@ -1,18 +1,15 @@
 //! One bounded local nonsymmetric transpose measurement with an exact probe.
-use ctf::{
-    algebra::Arithmetic,
-    context::Runtime,
-    mapping::Distribution,
-    tensor::Tensor,
-};
+use ctf::{algebra::Arithmetic, mapping::Distribution, tensor::Tensor};
 
 fn value(key: usize) -> f64 {
     key as f64 + 0.25
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let processes = world.size();
 
     let probe_shape = [3, 4];
@@ -68,5 +65,5 @@ fn main() {
     drop(transposed_probe);
     drop(probe);
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

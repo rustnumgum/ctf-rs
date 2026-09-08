@@ -1,7 +1,7 @@
 //! Exact foundation acceptance. These cases do not stand in for the full upstream suite.
 use ctf::{
     algebra::{Arithmetic, CustomMonoid, CustomSemiring, Monoid, Semiring},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -159,8 +159,10 @@ fn distributed(world: &Context<'_>) {
 
 fn main() {
     layouts();
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     distributed(&world);
     if world.rank() == 0 {
         println!(
@@ -169,5 +171,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

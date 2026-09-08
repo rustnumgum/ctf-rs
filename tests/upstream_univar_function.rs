@@ -1,7 +1,7 @@
 // Deterministic port of pinned CTF test/univar_function.cxx.
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     tensor::Tensor,
 };
@@ -30,28 +30,35 @@ fn run(context: &Context<'_>) {
         1.0,
         0.25,
         |value| value * value * value * value,
-    ).unwrap();
+    )
+    .unwrap();
 
     let keys: Vec<_> = (0..length).collect();
     let values = a.read(&keys);
     for (key, value) in values.into_iter().enumerate() {
         let old = initial(key);
         let expected = 0.25 * old + old * old * old * old;
-        assert!((expected - value).abs() < 1.0e-6,
-            "source univar_function mismatch at key {key}: expected {expected}, got {value}");
+        assert!(
+            (expected - value).abs() < 1.0e-6,
+            "source univar_function mismatch at key {key}: expected {expected}, got {value}"
+        );
     }
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
-    let parity = world.split(Some((world.rank() % 2) as i32), world.rank() as i32).unwrap();
+    let parity = world
+        .split(Some((world.rank() % 2) as i32), world.rank() as i32)
+        .unwrap();
     run(&parity);
     parity.close();
     if world.rank() == 0 {
         println!("DIGIT / PASS upstream_univar_function: A=0.25*A+A^4; abs<1e-6; world+parity");
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

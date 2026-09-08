@@ -2,7 +2,6 @@
 // Adapted test/diag_ctr.cxx and test/reduce_bcast.cxx at the pinned commit.
 use ctf::{
     algebra::Arithmetic,
-    context::Runtime,
     mapping::{Distribution, Topology},
     tensor::Tensor,
 };
@@ -17,8 +16,10 @@ impl Drand48 {
     }
 }
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let np = world.size();
     let topo = Topology::new(if np == 4 { vec![2, 2] } else { vec![np] });
     let make = |shape: Vec<usize>| {
@@ -80,5 +81,5 @@ fn main() {
         println!("upstream_dense complete: ranks={np}");
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

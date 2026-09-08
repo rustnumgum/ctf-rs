@@ -1,7 +1,7 @@
 // Deterministic port of pinned CTF test/endomorphism_cust.cxx.
 use ctf::{
     algebra::{CustomMonoid, Wire},
-    context::{Context, Runtime},
+    context::Context,
     mapping::Distribution,
     tensor::Tensor,
 };
@@ -15,7 +15,12 @@ struct Name {
 }
 
 impl Name {
-    fn empty() -> Self { Self { bytes: [0; 256], len_name: 0 } }
+    fn empty() -> Self {
+        Self {
+            bytes: [0; 256],
+            len_name: 0,
+        }
+    }
     fn with_length(length: usize) -> Self {
         let mut value = Self::empty();
         value.bytes[..length].fill(b'a');
@@ -42,11 +47,20 @@ impl Wire for Name {
 }
 
 fn longest(a: &Name, b: &Name) -> Name {
-    if a.length() >= b.length() { a.clone() } else { b.clone() }
+    if a.length() >= b.length() {
+        a.clone()
+    } else {
+        b.clone()
+    }
 }
 
 type Names = CustomMonoid<Name, fn(&Name, &Name) -> Name>;
-fn algebra() -> Names { CustomMonoid { identity: Name::empty(), addition: longest } }
+fn algebra() -> Names {
+    CustomMonoid {
+        identity: Name::empty(),
+        addition: longest,
+    }
+}
 
 fn run(context: &Context<'_>) {
     let shape = vec![N + 1, N, N + 2, N + 3];
@@ -62,21 +76,30 @@ fn run(context: &Context<'_>) {
 
     let keys: Vec<_> = (0..length).collect();
     for (key, value) in a.read(&keys).into_iter().enumerate() {
-        assert_eq!(value.length(), value.len_name as usize,
-            "source custom endomorphism length mismatch at key {key}");
+        assert_eq!(
+            value.length(),
+            value.len_name as usize,
+            "source custom endomorphism length mismatch at key {key}"
+        );
     }
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
-    let parity = world.split(Some((world.rank() % 2) as i32), world.rank() as i32).unwrap();
+    let parity = world
+        .split(Some((world.rank() % 2) as i32), world.rank() as i32)
+        .unwrap();
     run(&parity);
     parity.close();
     if world.rank() == 0 {
-        println!("DIGIT / PASS upstream_endomorphism_cust: cached string lengths; exact; world+parity");
+        println!(
+            "DIGIT / PASS upstream_endomorphism_cust: cached string lengths; exact; world+parity"
+        );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

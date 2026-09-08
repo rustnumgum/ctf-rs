@@ -2,7 +2,7 @@
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     symmetric_distribution::SymmetricDistribution,
     symmetric_tensor::SymmetricTensor,
@@ -21,11 +21,7 @@ impl Drand48 {
     }
 
     fn next(&mut self) -> f64 {
-        self.0 = (self
-            .0
-            .wrapping_mul(0x5deece66d)
-            .wrapping_add(0xb))
-            & ((1 << 48) - 1);
+        self.0 = (self.0.wrapping_mul(0x5deece66d).wrapping_add(0xb)) & ((1 << 48) - 1);
         self.0 as f64 / (1u64 << 48) as f64
     }
 }
@@ -42,10 +38,7 @@ fn tensor<'c, 'r>(
     }
     SymmetricTensor::new(
         context,
-        SymmetricDistribution::new(
-            Distribution::new(vec![N; 4], topology, mappings),
-            links,
-        ),
+        SymmetricDistribution::new(Distribution::new(vec![N; 4], topology, mappings), links),
         Arithmetic::new(),
     )
 }
@@ -98,14 +91,15 @@ fn run_case(context: &Context<'_>, kind: Symmetry) {
     let keys: Vec<_> = original_a.iter().map(|&(key, _)| key).collect();
     let values = c.read(&keys);
     for ((key, expected), actual) in original_a.into_iter().zip(values) {
-        assert!(expected.is_finite() && actual.is_finite(), "non-finite key {key}");
+        assert!(
+            expected.is_finite() && actual.is_finite(),
+            "non-finite key {key}"
+        );
         // Preserve the source criterion's signed denominator expression.
         if expected.abs() > NONZERO_CUTOFF
             && (actual - expected).abs() / expected > RELATIVE_TOLERANCE
         {
-            panic!(
-                "weigh_4D {kind:?} key {key}: expected {expected}, actual {actual}"
-            );
+            panic!("weigh_4D {kind:?} key {key}: expected {expected}, actual {actual}");
         }
     }
 }
@@ -117,14 +111,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -134,5 +128,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

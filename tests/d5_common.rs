@@ -1,7 +1,4 @@
-use ctf::{
-    common,
-    context::{Context, Runtime},
-};
+use ctf::{common, context::Context};
 
 fn labels_and_column_major_indices_are_exact() {
     assert_eq!(common::default_indices(0, 0), b"");
@@ -42,8 +39,10 @@ fn run(_context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -56,5 +55,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

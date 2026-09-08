@@ -5,7 +5,7 @@
 //! affine update can be checked exactly.
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     sparse::SparseTensor,
     tensor::Tensor,
@@ -107,8 +107,18 @@ fn fixture(context: &Context<'_>) {
     let distribution = cyclic(context, vec![3, 3, 3, 3]);
     let a_entries = [(1, 3), (2, 42), (4, 1), (8, -1)];
     let b_entries = [(2, 24), (3, 7)];
-    let a = sparse_from_rank(context, distribution.clone(), &a_entries, context.size() / 2);
-    let mut b = sparse_from_rank(context, distribution.clone(), &b_entries, context.size() / 2);
+    let a = sparse_from_rank(
+        context,
+        distribution.clone(),
+        &a_entries,
+        context.size() / 2,
+    );
+    let mut b = sparse_from_rank(
+        context,
+        distribution.clone(),
+        &b_entries,
+        context.size() / 2,
+    );
     b.sum_from("abij", &a, "abij", 1, 1);
     let keys = [1, 2, 3, 4, 8];
     assert_eq!(b.read(&keys), vec![3, 66, 7, 1, -1]);
@@ -279,11 +289,7 @@ fn dense_to_sparse_permutation(context: &Context<'_>) {
         &[(0, 2), (1, 3), (2, 5), (3, 7), (4, 11), (5, 13)],
     );
     let base = 70;
-    let mut output = sparse(
-        context,
-        virtual2(context, vec![3, 2]),
-        &full_pairs(6, base),
-    );
+    let mut output = sparse(context, virtual2(context, vec![3, 2]), &full_pairs(6, base));
     output.sum_from_dense("ji", &source, "ij", 2, 3);
     let mut expected = vec![0; 6];
     for i in 0..2 {
@@ -309,15 +315,20 @@ fn run(context: &Context<'_>) {
     let mut b = sparse(context, cyclic(context, vec![2, 3]), &[(5, 9)]);
     b.sum_from_dense("ij", &a, "ij", 0, 0);
     assert_eq!(b.read(&(0..6).collect::<Vec<_>>()), vec![0; 6]);
-    for (key, value) in b.local_pairs() { assert!(key < 6); assert_eq!(value, 0); }
+    for (key, value) in b.local_pairs() {
+        assert!(key < 6);
+        assert_eq!(value, 0);
+    }
     let mut count = [b.local_nnz() as f64];
     context.sum_f64(&mut count);
     assert_eq!(count[0], 6.);
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let world_rank = world.rank();
     run(&world);
 
@@ -333,5 +344,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

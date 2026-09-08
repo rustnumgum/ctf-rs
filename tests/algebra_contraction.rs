@@ -1,11 +1,12 @@
 use ctf::{
     algebra::{Arithmetic, CustomMonoid, CustomSemiring},
-    context::Runtime,
     contraction::replicated,
 };
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let np = world.size();
     let mut a = [world.rank() as i64 + 1];
     let mut b = [2];
@@ -78,5 +79,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

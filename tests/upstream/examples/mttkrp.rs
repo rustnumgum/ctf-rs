@@ -8,7 +8,7 @@
 
 use ctf::{
     algebra::{Arithmetic, Complex, Monoid, Ring, Semiring, Wire},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     sparse::SparseTensor,
     tensor::Tensor,
@@ -247,8 +247,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -261,5 +263,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

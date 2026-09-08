@@ -7,11 +7,11 @@
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
-    symmetry::Symmetry::{self, *},
     symmetric_distribution::SymmetricDistribution,
     symmetric_tensor::SymmetricTensor,
+    symmetry::Symmetry::{self, *},
 };
 
 const N: usize = 3;
@@ -56,16 +56,7 @@ fn symmetric_square_norm<'c, 'r>(
     let mut scalar = symmetric_tensor(context, vec![], vec![]);
     scalar
         .contract_from_on(
-            "",
-            tensor,
-            "ijkl",
-            tensor,
-            "ijkl",
-            topology,
-            "i",
-            1.0,
-            0.0,
-            true,
+            "", tensor, "ijkl", tensor, "ijkl", topology, "i", 1.0, 0.0, true,
         )
         .unwrap();
     scalar.read(&[0])[0].sqrt()
@@ -73,11 +64,7 @@ fn symmetric_square_norm<'c, 'r>(
 
 fn run(context: &Context<'_>) {
     let as_a = {
-        let mut tensor = symmetric_tensor(
-            context,
-            vec![N, N, N, M],
-            vec![AS, NS, NS, NS],
-        );
+        let mut tensor = symmetric_tensor(context, vec![N, N, N, M], vec![AS, NS, NS, NS]);
         tensor.transform(|key, value| *value = fixture(key, 13));
         tensor
     };
@@ -91,22 +78,14 @@ fn run(context: &Context<'_>) {
         tensor
     };
     let mut as_c = {
-        let mut tensor = symmetric_tensor(
-            context,
-            vec![M, M, N, N],
-            vec![AS, NS, AS, NS],
-        );
+        let mut tensor = symmetric_tensor(context, vec![M, M, N, N], vec![AS, NS, AS, NS]);
         tensor.transform(|key, value| *value = fixture(key, 47));
         tensor
     };
 
     // Preserve the source's partial-AS reference storage.  NS_A is fully
     // nonsymmetric, while NS_B and NS_C retain only the first AS pair.
-    let mut ns_a = symmetric_tensor(
-        context,
-        vec![N, N, N, M],
-        vec![NS, NS, NS, NS],
-    );
+    let mut ns_a = symmetric_tensor(context, vec![N, N, N, M], vec![NS, NS, NS, NS]);
     ns_a.sum_from("mnje", &as_a, "mnje", 1.0, 0.0);
     let mut ns_b = symmetric_tensor(
         context,
@@ -114,57 +93,50 @@ fn run(context: &Context<'_>) {
         vec![AS, NS, NS, NS, NS, NS],
     );
     ns_b.sum_from("abeimn", &as_b, "abeimn", 1.0, 0.0);
-    let mut ns_c = symmetric_tensor(
-        context,
-        vec![M, M, N, N],
-        vec![AS, NS, NS, NS],
-    );
+    let mut ns_c = symmetric_tensor(context, vec![M, M, N, N], vec![AS, NS, NS, NS]);
     ns_c.sum_from("abij", &as_c, "abij", 1.0, 0.0);
 
     let topology = Topology::new(vec![context.size()]);
-    as_c
-        .contract_from_on(
-            "abij",
-            &as_a,
-            "mnje",
-            &as_b,
-            "abeimn",
-            topology.clone(),
-            "a",
-            0.5,
-            1.0,
-            true,
-        )
-        .unwrap();
+    as_c.contract_from_on(
+        "abij",
+        &as_a,
+        "mnje",
+        &as_b,
+        "abeimn",
+        topology.clone(),
+        "a",
+        0.5,
+        1.0,
+        true,
+    )
+    .unwrap();
 
-    ns_c
-        .contract_from_on(
-            "abij",
-            &ns_a,
-            "mnje",
-            &ns_b,
-            "abeimn",
-            topology.clone(),
-            "a",
-            0.5,
-            1.0,
-            true,
-        )
-        .unwrap();
-    ns_c
-        .contract_from_on(
-            "abji",
-            &ns_a,
-            "mnje",
-            &ns_b,
-            "abeimn",
-            topology.clone(),
-            "a",
-            -0.5,
-            1.0,
-            true,
-        )
-        .unwrap();
+    ns_c.contract_from_on(
+        "abij",
+        &ns_a,
+        "mnje",
+        &ns_b,
+        "abeimn",
+        topology.clone(),
+        "a",
+        0.5,
+        1.0,
+        true,
+    )
+    .unwrap();
+    ns_c.contract_from_on(
+        "abji",
+        &ns_a,
+        "mnje",
+        &ns_b,
+        "abeimn",
+        topology.clone(),
+        "a",
+        -0.5,
+        1.0,
+        true,
+    )
+    .unwrap();
 
     let nrm_as = symmetric_square_norm(context, &as_c, topology.clone());
     let nrm_ns = symmetric_square_norm(context, &ns_c, topology.clone());
@@ -178,14 +150,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -195,5 +167,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

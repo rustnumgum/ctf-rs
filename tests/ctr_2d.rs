@@ -1,10 +1,9 @@
-use ctf::{
-    context::Runtime,
-    ctr_2d::{Layers, Panel, execute},
-};
+use ctf::ctr_2d::{Layers, Panel, execute};
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let np = world.size();
     let rank = world.rank();
     let edge = 2 * np;
@@ -84,5 +83,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

@@ -1,7 +1,7 @@
 //! Port of pinned CTF test/multi_tsr_sym.cxx.
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     symmetric_distribution::SymmetricDistribution,
     symmetric_tensor::SymmetricTensor,
@@ -54,34 +54,32 @@ fn run(context: &Context<'_>) -> f64 {
 
     a.transform(|key, value| *value = fixture(key, 13));
     let (topology, physical_labels) = contraction_grid(context);
-    c_ns
-        .contract_from_on(
-            "ij",
-            &a,
-            "ik",
-            &a,
-            "jk",
-            topology.clone(),
-            physical_labels,
-            1.0,
-            0.0,
-            true,
-        )
-        .unwrap();
-    c_sy
-        .contract_from_on(
-            "ij",
-            &a,
-            "ik",
-            &a,
-            "jk",
-            topology,
-            physical_labels,
-            1.0,
-            0.0,
-            true,
-        )
-        .unwrap();
+    c_ns.contract_from_on(
+        "ij",
+        &a,
+        "ik",
+        &a,
+        "jk",
+        topology.clone(),
+        physical_labels,
+        1.0,
+        0.0,
+        true,
+    )
+    .unwrap();
+    c_sy.contract_from_on(
+        "ij",
+        &a,
+        "ik",
+        &a,
+        "jk",
+        topology,
+        physical_labels,
+        1.0,
+        0.0,
+        true,
+    )
+    .unwrap();
 
     difference.sum_from("ij", &c_sy, "ij", 1.0, 0.0);
     difference.sum_from("ij", &c_ns, "ij", -1.0, 1.0);
@@ -100,8 +98,10 @@ fn run(context: &Context<'_>) -> f64 {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let world_error = run(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -114,5 +114,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

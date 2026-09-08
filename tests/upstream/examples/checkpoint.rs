@@ -2,7 +2,7 @@
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     random::Generator,
     tensor::Tensor,
@@ -84,8 +84,10 @@ fn run(context: &Context<'_>, token: u64, scope: usize) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let mut token = [std::process::id() as u64];
     world.broadcast(0, &mut token);
     run(&world, token[0], 0);
@@ -101,5 +103,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

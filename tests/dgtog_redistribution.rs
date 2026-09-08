@@ -1,6 +1,6 @@
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -32,11 +32,7 @@ fn old_and_new(context: &Context<'_>, shape: Vec<usize>) -> (Distribution, Distr
         new_map.augment_physical(&topology, 0);
         new_map.augment_virtual(2 * np);
         (
-            Distribution::new(
-                shape.clone(),
-                topology.clone(),
-                vec![Mapping::Unmapped; 2],
-            ),
+            Distribution::new(shape.clone(), topology.clone(), vec![Mapping::Unmapped; 2]),
             Distribution::new(shape, topology, vec![new_map, Mapping::Unmapped]),
         )
     }
@@ -76,7 +72,10 @@ fn run(context: &Context<'_>) {
         Topology::new(vec![context.size()]),
         vec![],
     ));
-    assert_eq!(scalar.local_storage(), if context.rank() == 0 { &[29] } else { &[0] });
+    assert_eq!(
+        scalar.local_storage(),
+        if context.rank() == 0 { &[29] } else { &[0] }
+    );
 
     let shape = vec![1; 13];
     let mut high_order = Tensor::new(
@@ -94,8 +93,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -103,8 +104,10 @@ fn main() {
     run(&parity);
     parity.close();
     if world.rank() == 0 {
-        println!("DIGIT / PASS dgtog_redistribution: exact LCM counts/ROR roots/padding/virtual/scalar/high-order legacy; world+parity");
+        println!(
+            "DIGIT / PASS dgtog_redistribution: exact LCM counts/ROR roots/padding/virtual/scalar/high-order legacy; world+parity"
+        );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

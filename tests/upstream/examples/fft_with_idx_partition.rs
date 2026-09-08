@@ -2,7 +2,7 @@
 
 use ctf::{
     algebra::{Arithmetic, Complex},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     partition::Partition,
     random::Generator,
@@ -85,8 +85,7 @@ fn run(context: &Context<'_>) {
         vec![SY, NS],
     );
     dft.transform(|key, value| {
-        let angle = -2.0 * (key / m) as f64 * (key % m) as f64
-            * (std::f64::consts::PI / m as f64);
+        let angle = -2.0 * (key / m) as f64 * (key % m) as f64 * (std::f64::consts::PI / m as f64);
         *value = cis(angle);
     });
 
@@ -108,11 +107,7 @@ fn run(context: &Context<'_>) {
     );
 
     let mut generator = Generator::new(context.rank() as u64);
-    a.fill_random(
-        Scalar::new(0.0, 0.0),
-        Scalar::new(1.0, 1.0),
-        &mut generator,
-    );
+    a.fill_random(Scalar::new(0.0, 0.0), Scalar::new(1.0, 1.0), &mut generator);
     c.contract_from(
         "ijk",
         &dft,
@@ -146,12 +141,17 @@ fn run(context: &Context<'_>) {
         Scalar::new(1.0, 0.0),
     );
     let error = c.norm2();
-    assert!(error <= (n * n * m) as f64 * 1e-6, "FFT partition error {error}");
+    assert!(
+        error <= (n * n * m) as f64 * 1e-6,
+        "FFT partition error {error}"
+    );
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -159,8 +159,10 @@ fn main() {
     run(&parity);
     parity.close();
     if world.rank() == 0 {
-        println!("DIGIT / PASS fft_with_idx_partition: recursive fiber FFT equals SY DFT contraction; n=6 logm=8; error<=n*n*m*1e-6; world+parity");
+        println!(
+            "DIGIT / PASS fft_with_idx_partition: recursive fiber FFT equals SY DFT contraction; n=6 logm=8; error<=n*n*m*1e-6; world+parity"
+        );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

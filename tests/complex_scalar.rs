@@ -1,6 +1,5 @@
 use ctf::{
     algebra::{Arithmetic, Complex, Group, Semiring},
-    context::Runtime,
     contraction::sequential,
     mapping::Distribution,
     tensor::Tensor,
@@ -33,8 +32,10 @@ fn main() {
         &Complex::new(0., 0.),
     );
     assert_eq!(product, [Complex::new(-10., 24.)]);
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let np = world.size();
     let mut value = [Complex::new(world.rank() as f64 + 1., 1.)];
     world.all_reduce_monoid(&a, &mut value, true);
@@ -52,5 +53,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

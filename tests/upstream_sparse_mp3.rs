@@ -6,7 +6,7 @@
 // tensors while retaining the source's Ea/Ei and integral value intervals.
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     sparse::SparseTensor,
     tensor::Tensor,
@@ -19,8 +19,7 @@ const NO: usize = 2;
 const SPARSITY: f64 = 0.8;
 
 fn fixture_unit(key: usize, stream: u64) -> f64 {
-    let mut state = (key as u64)
-        .wrapping_add(0x9e37_79b9_7f4a_7c15u64.wrapping_mul(stream + 1));
+    let mut state = (key as u64).wrapping_add(0x9e37_79b9_7f4a_7c15u64.wrapping_mul(stream + 1));
     state ^= state >> 30;
     state = state.wrapping_mul(0xbf58_476d_1ce4_e5b9);
     state ^= state >> 27;
@@ -135,15 +134,46 @@ fn mp3_dense<'c, 'r>(
         .unwrap();
     z.contract_from("abij", fij, "ni", &t, "abnj", topology.clone(), -1.0, 1.0)
         .unwrap();
-    z.contract_from("abij", vabcd, "abef", &t, "efij", topology.clone(), 0.5, 1.0)
-        .unwrap();
-    z.contract_from("abij", vijkl, "mnij", &t, "abmn", topology.clone(), 0.5, 1.0)
-        .unwrap();
-    z.contract_from("abij", vaibj, "amei", &t, "ebmj", topology.clone(), 1.0, 1.0)
-        .unwrap();
+    z.contract_from(
+        "abij",
+        vabcd,
+        "abef",
+        &t,
+        "efij",
+        topology.clone(),
+        0.5,
+        1.0,
+    )
+    .unwrap();
+    z.contract_from(
+        "abij",
+        vijkl,
+        "mnij",
+        &t,
+        "abmn",
+        topology.clone(),
+        0.5,
+        1.0,
+    )
+    .unwrap();
+    z.contract_from(
+        "abij",
+        vaibj,
+        "amei",
+        &t,
+        "ebmj",
+        topology.clone(),
+        1.0,
+        1.0,
+    )
+    .unwrap();
     divide_ea_ei(ea, ei, &mut z, topology);
 
-    let mut energy = Tensor::new(ea.context(), Distribution::cyclic(vec![], ea.context().size()), F64::new());
+    let mut energy = Tensor::new(
+        ea.context(),
+        Distribution::cyclic(vec![], ea.context().size()),
+        F64::new(),
+    );
     energy
         .contract_from("", vabij, "abij", &z, "abij", topology.clone(), 1.0, 0.0)
         .unwrap();
@@ -165,11 +195,19 @@ fn mp3_sparse_dense<'c, 'r>(
     grid: [usize; 2],
     topology: &Topology,
 ) -> f64 {
-    let mut t = Tensor::new(ea.context(), Distribution::cyclic(vec![NV, NV, NO, NO], ea.context().size()), F64::new());
+    let mut t = Tensor::new(
+        ea.context(),
+        Distribution::cyclic(vec![NV, NV, NO, NO], ea.context().size()),
+        F64::new(),
+    );
     t.sum_from_sparse("abij", vabij, "abij", 1.0, 0.0);
     divide_ea_ei(ea, ei, &mut t, topology);
 
-    let mut z = Tensor::new(ea.context(), Distribution::cyclic(vec![NV, NV, NO, NO], ea.context().size()), F64::new());
+    let mut z = Tensor::new(
+        ea.context(),
+        Distribution::cyclic(vec![NV, NV, NO, NO], ea.context().size()),
+        F64::new(),
+    );
     z.sum_from_sparse("abij", vijab, "ijab", 1.0, 0.0);
     z.contract_from("abij", fab, "af", &t, "fbij", topology.clone(), 1.0, 1.0)
         .unwrap();
@@ -183,7 +221,11 @@ fn mp3_sparse_dense<'c, 'r>(
         .unwrap();
     divide_ea_ei(ea, ei, &mut z, topology);
 
-    let mut energy = Tensor::new(ea.context(), Distribution::cyclic(vec![], ea.context().size()), F64::new());
+    let mut energy = Tensor::new(
+        ea.context(),
+        Distribution::cyclic(vec![], ea.context().size()),
+        F64::new(),
+    );
     energy
         .contract_from_sparse_dense("", vabij, "abij", &z, "abij", grid, 1.0, 0.0)
         .unwrap();
@@ -252,8 +294,10 @@ fn run(context: &Context<'_>) -> (f64, f64, f64) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let world_rank = world.rank();
     let world_result = run(&world);
 
@@ -267,7 +311,10 @@ fn main() {
     if world_rank == 0 {
         println!(
             "DIGIT / PASS upstream sparse_mp3 dense-T sparse*dense: world_ranks={} dense_energy={:e} sparse_energy={:e} relative={:e}",
-            world.size(), world_result.0, world_result.1, world_result.2
+            world.size(),
+            world_result.0,
+            world_result.1,
+            world_result.2
         );
         println!(
             "DIGIT / PASS upstream sparse_mp3 dense-T sparse*dense: parity_ranks={} dense_energy={:e} sparse_energy={:e} relative={:e}",
@@ -275,5 +322,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

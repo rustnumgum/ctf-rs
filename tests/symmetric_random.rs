@@ -2,7 +2,7 @@
 
 use ctf::{
     algebra::{Arithmetic, Complex},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     random::Generator,
     symmetric_distribution::SymmetricDistribution,
@@ -36,10 +36,7 @@ where
 
 fn valid_offsets<A: ctf::algebra::Group>(tensor: &SymmetricTensor<'_, '_, A>) -> Vec<bool> {
     let mut valid = vec![false; tensor.local_storage().len()];
-    for (offset, _) in tensor
-        .distribution()
-        .local_pairs(tensor.context().rank())
-    {
+    for (offset, _) in tensor.distribution().local_pairs(tensor.context().rank()) {
         valid[offset] = true;
     }
     valid
@@ -55,15 +52,31 @@ macro_rules! check_case {
             actual.fill_random($minimum, $maximum, &mut generator);
             for (offset, &value) in actual.local_storage().iter().enumerate() {
                 let draw = reference.unit_interval();
-                let expected = if valid[offset] { ($expected)(draw) } else { $zero };
-                assert_eq!(value, expected, "{} packed offset {offset}", stringify!($scalar));
+                let expected = if valid[offset] {
+                    ($expected)(draw)
+                } else {
+                    $zero
+                };
+                assert_eq!(
+                    value,
+                    expected,
+                    "{} packed offset {offset}",
+                    stringify!($scalar)
+                );
             }
             assert_eq!(generator.next_u64(), reference.next_u64());
         }
     };
 }
 
-check_case!(check_f32, f32, -1f32, 1f32, |x: f64| (x as f32) * 2f32 - 1f32, 0f32);
+check_case!(
+    check_f32,
+    f32,
+    -1f32,
+    1f32,
+    |x: f64| (x as f32) * 2f32 - 1f32,
+    0f32
+);
 check_case!(check_f64, f64, -1f64, 1f64, |x: f64| x * 2. - 1., 0f64);
 check_case!(
     check_complex32,
@@ -91,12 +104,7 @@ fn check_scalar_and_zero_extent(context: &Context<'_>) {
     assert_eq!(scalar.local_storage(), &[(draw * 5.0 - 2.0)]);
     assert_eq!(scalar_generator.next_u64(), scalar_reference.next_u64());
 
-    let mut empty = tensor(
-        context,
-        vec![0, 0],
-        vec![SY, NS],
-        Arithmetic::<f64>::new(),
-    );
+    let mut empty = tensor(context, vec![0, 0], vec![SY, NS], Arithmetic::<f64>::new());
     let mut empty_generator = Generator::new(context.rank() as u64);
     let mut empty_reference = Generator::new(context.rank() as u64);
     empty.fill_random(-1.0, 1.0, &mut empty_generator);
@@ -115,13 +123,13 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
     if rank == 0 {
@@ -130,5 +138,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

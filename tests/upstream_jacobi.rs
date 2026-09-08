@@ -8,7 +8,7 @@
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     random::Generator,
     sparse::SparseTensor,
@@ -36,31 +36,12 @@ fn jacobi_dense<'c, 'r>(
     topology: &Topology,
 ) {
     let old = x.clone();
-    x.contract_from(
-        "i",
-        remainder,
-        "ij",
-        &old,
-        "j",
-        topology.clone(),
-        -1.0,
-        0.0,
-    )
-    .unwrap();
-    x.sum_from("i", b, "i", topology.clone(), 1.0, 1.0)
+    x.contract_from("i", remainder, "ij", &old, "j", topology.clone(), -1.0, 0.0)
         .unwrap();
+    x.sum_from("i", b, "i", topology.clone(), 1.0, 1.0).unwrap();
     let old = x.clone();
-    x.contract_from(
-        "i",
-        d,
-        "i",
-        &old,
-        "i",
-        topology.clone(),
-        1.0,
-        0.0,
-    )
-    .unwrap();
+    x.contract_from("i", d, "i", &old, "i", topology.clone(), 1.0, 0.0)
+        .unwrap();
 }
 
 fn jacobi_sparse<'c, 'r>(
@@ -74,20 +55,10 @@ fn jacobi_sparse<'c, 'r>(
     let old = x.clone();
     x.contract_from_sparse_dense("i", remainder, "ij", &old, "j", grid, -1.0, 0.0)
         .unwrap();
-    x.sum_from("i", b, "i", topology.clone(), 1.0, 1.0)
-        .unwrap();
+    x.sum_from("i", b, "i", topology.clone(), 1.0, 1.0).unwrap();
     let old = x.clone();
-    x.contract_from(
-        "i",
-        d,
-        "i",
-        &old,
-        "i",
-        topology.clone(),
-        1.0,
-        0.0,
-    )
-    .unwrap();
+    x.contract_from("i", d, "i", &old, "i", topology.clone(), 1.0, 0.0)
+        .unwrap();
 }
 
 fn dense_residual<'c, 'r>(
@@ -196,14 +167,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -213,5 +184,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

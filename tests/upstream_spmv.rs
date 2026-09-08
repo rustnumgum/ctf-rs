@@ -5,7 +5,7 @@
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     random::Generator,
     sparse::SparseTensor,
@@ -84,8 +84,7 @@ fn check_dense_output(
 
     let initial_norm = c2.norm2();
     assert!(initial_norm.is_finite() && initial_norm >= INITIAL_CUTOFF);
-    c2.sum_from("i", &c1, "i", topology, -1.0, 1.0)
-        .unwrap();
+    c2.sum_from("i", &c1, "i", topology, -1.0, 1.0).unwrap();
     let residual = c2.norm2();
     assert!(residual.is_finite() && residual <= RESIDUAL_TOLERANCE);
 }
@@ -135,14 +134,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -152,5 +151,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

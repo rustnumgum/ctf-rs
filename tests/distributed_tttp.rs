@@ -1,6 +1,6 @@
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -31,11 +31,7 @@ fn tensor_distribution(context: &Context<'_>, shape: &[usize], mode_two: bool) -
     Distribution::new(shape.to_vec(), topology, mappings)
 }
 
-fn make_tensor<'c, 'r>(
-    context: &'c Context<'r>,
-    shape: &[usize],
-    mode_two: bool,
-) -> Dense<'c, 'r> {
+fn make_tensor<'c, 'r>(context: &'c Context<'r>, shape: &[usize], mode_two: bool) -> Dense<'c, 'r> {
     let mut tensor = Tensor::new(
         context,
         tensor_distribution(context, shape, mode_two),
@@ -104,12 +100,7 @@ fn vector_expected(key: usize, shape: &[usize], modes: &[usize]) -> f64 {
     })
 }
 
-fn matrix_expected(
-    key: usize,
-    shape: &[usize],
-    modes: &[usize],
-    k: usize,
-) -> f64 {
+fn matrix_expected(key: usize, shape: &[usize], modes: &[usize], k: usize) -> f64 {
     let coordinates = Distribution::cyclic(shape.to_vec(), 1).decode_key(key);
     let multiplier = (0..k)
         .map(|auxiliary| {
@@ -172,7 +163,11 @@ fn exercise_matrices(
         .iter()
         .map(|&(mode, ref factor)| (mode, factor))
         .collect();
-    tensor.tttp_matrices(&references, aux_mode_first, ctf::multilinear::TttpBlocking::Divisions(divisions));
+    tensor.tttp_matrices(
+        &references,
+        aux_mode_first,
+        ctf::multilinear::TttpBlocking::Divisions(divisions),
+    );
     assert_matrices(&tensor, &shape, modes, k);
 }
 
@@ -195,7 +190,11 @@ fn exercise_empty_shards(context: &Context<'_>) {
             .iter()
             .map(|&(mode, ref factor)| (mode, factor))
             .collect();
-        tensor.tttp_matrices(&references, aux_mode_first, ctf::multilinear::TttpBlocking::Divisions(3));
+        tensor.tttp_matrices(
+            &references,
+            aux_mode_first,
+            ctf::multilinear::TttpBlocking::Divisions(3),
+        );
         assert_matrices(&tensor, &shape, &modes, 5);
     }
 }
@@ -215,8 +214,10 @@ fn exercise(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     exercise(&world);
     let child = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -230,5 +231,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

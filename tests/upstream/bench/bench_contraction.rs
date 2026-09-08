@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     tensor::Tensor,
 };
@@ -55,8 +55,10 @@ fn run(context: &Context<'_>) -> f64 {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let world_seconds = run(&world);
     if world.rank() == 0 {
         println!(
@@ -64,5 +66,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

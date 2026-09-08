@@ -7,7 +7,7 @@
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     random::Generator,
     tensor::Tensor,
@@ -46,107 +46,72 @@ fn run(context: &Context<'_>) {
                 .collect()
         })
         .collect();
-    let mut w: Vec<_> = (0..3)
-        .map(|_| dense(context, vec![N, N, N]))
-        .collect();
-    let mut z: Vec<_> = (0..3)
-        .map(|_| dense(context, vec![N, N, N]))
-        .collect();
+    let mut w: Vec<_> = (0..3).map(|_| dense(context, vec![N, N, N])).collect();
+    let mut z: Vec<_> = (0..3).map(|_| dense(context, vec![N, N, N])).collect();
 
     // Preserve the source's initial u for all three first-stage products;
     // source assignment overwrites u only after z has been formed.
     let initial_u = u.clone();
-    w[0]
-        .contract_from(
-            "ijk",
-            &d,
-            "kl",
-            &initial_u,
-            "ijl",
-            topology.clone(),
-            1.0,
-            0.0,
-        )
-        .unwrap();
-    w[1]
-        .contract_from(
-            "ijk",
-            &d,
-            "jl",
-            &initial_u,
-            "ilk",
-            topology.clone(),
-            1.0,
-            0.0,
-        )
-        .unwrap();
-    w[2]
-        .contract_from(
-            "ijk",
-            &d,
-            "il",
-            &initial_u,
-            "ljk",
-            topology.clone(),
-            1.0,
-            0.0,
-        )
-        .unwrap();
-
-    for a in 0..3 {
-        for b in 0..3 {
-            // All labels occur in all three tensors, so this is the source's
-            // elementwise product rather than a reduction over an index.
-            z[a]
-                .contract_from(
-                    "ijk",
-                    &g[a][b],
-                    "ijk",
-                    &w[b],
-                    "ijk",
-                    topology.clone(),
-                    1.0,
-                    1.0,
-                )
-                .unwrap();
-        }
-    }
-
-    // Source `u[ijk] = ...` applies beta=0 on the first term and beta=1 on
-    // the two subsequent terms.
-    u.contract_from(
+    w[0].contract_from(
         "ijk",
         &d,
-        "lk",
-        &z[0],
+        "kl",
+        &initial_u,
         "ijl",
         topology.clone(),
         1.0,
         0.0,
     )
     .unwrap();
-    u.contract_from(
+    w[1].contract_from(
         "ijk",
         &d,
-        "lj",
-        &z[1],
+        "jl",
+        &initial_u,
         "ilk",
         topology.clone(),
         1.0,
-        1.0,
+        0.0,
     )
     .unwrap();
-    u.contract_from(
+    w[2].contract_from(
         "ijk",
         &d,
-        "li",
-        &z[2],
+        "il",
+        &initial_u,
         "ljk",
-        topology,
+        topology.clone(),
         1.0,
-        1.0,
+        0.0,
     )
     .unwrap();
+
+    for a in 0..3 {
+        for b in 0..3 {
+            // All labels occur in all three tensors, so this is the source's
+            // elementwise product rather than a reduction over an index.
+            z[a].contract_from(
+                "ijk",
+                &g[a][b],
+                "ijk",
+                &w[b],
+                "ijk",
+                topology.clone(),
+                1.0,
+                1.0,
+            )
+            .unwrap();
+        }
+    }
+
+    // Source `u[ijk] = ...` applies beta=0 on the first term and beta=1 on
+    // the two subsequent terms.
+    u.contract_from("ijk", &d, "lk", &z[0], "ijl", topology.clone(), 1.0, 0.0)
+        .unwrap();
+    u.contract_from("ijk", &d, "lj", &z[1], "ilk", topology.clone(), 1.0, 1.0)
+        .unwrap();
+    u.contract_from("ijk", &d, "li", &z[2], "ljk", topology, 1.0, 1.0)
+        .unwrap();
 
     // Preserve the source-only acceptance quantity and bound.
     let norm = u.norm2();
@@ -154,14 +119,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -171,5 +136,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

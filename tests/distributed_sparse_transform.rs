@@ -5,7 +5,7 @@
 //! implicit.
 use ctf::{
     algebra::{Arithmetic, CustomMonoid, Wire},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     sparse::SparseTensor,
     tensor::Tensor,
@@ -99,10 +99,7 @@ fn sparse_pair<'c, 'r>(
     tensor
 }
 
-fn dense_i64<'c, 'r>(
-    context: &'c Context<'r>,
-    values: &[i64],
-) -> Tensor<'c, 'r, Arithmetic<i64>> {
+fn dense_i64<'c, 'r>(context: &'c Context<'r>, values: &[i64]) -> Tensor<'c, 'r, Arithmetic<i64>> {
     let distribution = Distribution::cyclic(vec![values.len()], context.size());
     let entries: Vec<_> = values.iter().copied().enumerate().collect();
     let owned: Vec<_> = entries
@@ -135,13 +132,11 @@ fn map_and_accumulate(context: &Context<'_>) {
     let source = sparse_i64(context, distribution.clone(), &source_entries);
     let keys = all_keys(distribution.global_len());
 
-    let mut explicit_zero_copies = [
-        source
-            .local_pairs()
-            .iter()
-            .filter(|(key, value)| *key == 4 && *value == 0)
-            .count() as f64,
-    ];
+    let mut explicit_zero_copies = [source
+        .local_pairs()
+        .iter()
+        .filter(|(key, value)| *key == 4 && *value == 0)
+        .count() as f64];
     context.sum_f64(&mut explicit_zero_copies);
     assert!(explicit_zero_copies[0] > 0.);
 
@@ -175,15 +170,18 @@ fn map_and_accumulate(context: &Context<'_>) {
     assert_eq!(mapped.read(&keys), expected_mapped);
 
     let mapped_back = mapped.map_stored(Arithmetic::<i64>::new(), |value| value.a + value.b);
-    assert_eq!(mapped_back.read(&keys), keys.iter().map(|&key| 3 * source_value(key)).collect::<Vec<_>>());
+    assert_eq!(
+        mapped_back.read(&keys),
+        keys.iter()
+            .map(|&key| 3 * source_value(key))
+            .collect::<Vec<_>>()
+    );
     assert_eq!(mapped_back.local_nnz(), source.local_nnz());
-    let mut mapped_zero_copies = [
-        mapped_back
-            .local_pairs()
-            .iter()
-            .filter(|(key, value)| *key == 4 && *value == 0)
-            .count() as f64,
-    ];
+    let mut mapped_zero_copies = [mapped_back
+        .local_pairs()
+        .iter()
+        .filter(|(key, value)| *key == 4 && *value == 0)
+        .count() as f64];
     context.sum_f64(&mut mapped_zero_copies);
     assert!(mapped_zero_copies[0] > 0.);
 
@@ -245,15 +243,16 @@ fn repeated_output(context: &Context<'_>) {
         .enumerate()
         .map(|(key, mut pair)| {
             let coordinates = distribution.decode_key(key);
-            if entries.iter().any(|(entry, _)| *entry == key)
-                && coordinates[0] == coordinates[1]
-            {
+            if entries.iter().any(|(entry, _)| *entry == key) && coordinates[0] == coordinates[1] {
                 pair.b += [7, 11, 13][coordinates[0]];
             }
             pair
         })
         .collect();
-    assert_eq!(output.read(&(0..distribution.global_len()).collect::<Vec<_>>()), expected);
+    assert_eq!(
+        output.read(&(0..distribution.global_len()).collect::<Vec<_>>()),
+        expected
+    );
 }
 
 fn input_zero_semantics(context: &Context<'_>) {
@@ -271,12 +270,19 @@ fn input_zero_semantics(context: &Context<'_>) {
     // The source sparsifies dense A before its sparse accumulator kernel.
     assert_eq!(calls, 0);
     assert_eq!(output.local_nnz(), stored);
-    assert_eq!(output.read(&[0, 4, 1]), vec![
-        Pair { a: 9, b: 2 },
-        Pair { a: 0, b: 0 },
-        Pair { a: 0, b: 0 },
-    ]);
-    let input = sparse_i64(context, Distribution::cyclic(vec![3], context.size()), &[(0, 0), (2, 7)]);
+    assert_eq!(
+        output.read(&[0, 4, 1]),
+        vec![
+            Pair { a: 9, b: 2 },
+            Pair { a: 0, b: 0 },
+            Pair { a: 0, b: 0 },
+        ]
+    );
+    let input = sparse_i64(
+        context,
+        Distribution::cyclic(vec![3], context.size()),
+        &[(0, 0), (2, 7)],
+    );
     output.accumulate_from_sparse("ijk", &input, "i", |value, pair| {
         calls += 1;
         pair.b += *value + 1;
@@ -285,9 +291,14 @@ fn input_zero_semantics(context: &Context<'_>) {
     context.sum_f64(&mut count);
     assert_eq!(count[0], 1.);
     assert_eq!(output.local_nnz(), stored);
-    assert_eq!(output.read(&[0, 4, 2]), vec![
-        Pair { a: 9, b: 3 }, Pair { a: 0, b: 0 }, Pair { a: 0, b: 0 },
-    ]);
+    assert_eq!(
+        output.read(&[0, 4, 2]),
+        vec![
+            Pair { a: 9, b: 3 },
+            Pair { a: 0, b: 0 },
+            Pair { a: 0, b: 0 },
+        ]
+    );
 }
 
 fn run(context: &Context<'_>) {
@@ -297,8 +308,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let world_rank = world.rank();
     run(&world);
 
@@ -314,5 +327,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

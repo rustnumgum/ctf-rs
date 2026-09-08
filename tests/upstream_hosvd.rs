@@ -11,7 +11,7 @@
 
 use ctf::{
     algebra::{Arithmetic, Complex, Group, Monoid, Semiring},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     multilinear::tensor_svd::TensorSvd,
     random::Generator,
@@ -248,12 +248,7 @@ macro_rules! scalar_case {
                         // This is the Rust adaptation of source fill_sp_random:
                         // sparse storage is generated first, then only present
                         // values receive the typed random sample.
-                        tensor.fill_random_sparse(
-                            minimum,
-                            maximum,
-                            fraction,
-                            &mut generator,
-                        );
+                        tensor.fill_random_sparse(minimum, maximum, fraction, &mut generator);
                         let tnorm = tensor.norm2();
                         let reconstructed = hosvd_sequence!(
                             context,
@@ -276,13 +271,7 @@ macro_rules! scalar_case {
                         );
                         let one = algebra.one();
                         let minus_one = algebra.negate(&one);
-                        tensor.sum_from_dense(
-                            "ijkl",
-                            &reconstructed,
-                            "ijkl",
-                            minus_one,
-                            one,
-                        );
+                        tensor.sum_from_dense("ijkl", &reconstructed, "ijkl", minus_one, one);
                         assert_source_bound(tnorm, tensor.norm2(), rank);
                     } else {
                         let mut tensor = Tensor::new(
@@ -292,12 +281,7 @@ macro_rules! scalar_case {
                         );
                         // fraction=1 keeps the dense allocation while using
                         // the same source-compatible candidate/sample order.
-                        tensor.fill_random_sparse(
-                            minimum,
-                            maximum,
-                            fraction,
-                            &mut generator,
-                        );
+                        tensor.fill_random_sparse(minimum, maximum, fraction, &mut generator);
                         let tnorm = tensor.norm2();
                         let reconstructed = hosvd_sequence!(
                             context,
@@ -342,8 +326,18 @@ macro_rules! scalar_case {
 
 scalar_case!(real32, f32, -1.0f32, 1.0f32);
 scalar_case!(real64, f64, -1.0f64, 1.0f64);
-scalar_case!(complex32, Complex<f32>, Complex::new(-1.0f32, 0.0f32), Complex::new(1.0f32, 0.0f32));
-scalar_case!(complex64, Complex<f64>, Complex::new(-1.0f64, 0.0f64), Complex::new(1.0f64, 0.0f64));
+scalar_case!(
+    complex32,
+    Complex<f32>,
+    Complex::new(-1.0f32, 0.0f32),
+    Complex::new(1.0f32, 0.0f32)
+);
+scalar_case!(
+    complex64,
+    Complex<f64>,
+    Complex::new(-1.0f64, 0.0f64),
+    Complex::new(1.0f64, 0.0f64)
+);
 
 fn run(context: &Context<'_>) {
     real32(context);
@@ -353,14 +347,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -370,5 +364,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

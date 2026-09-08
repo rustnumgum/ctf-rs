@@ -1,6 +1,5 @@
 use ctf::{
     algebra::Arithmetic,
-    context::Runtime,
     contraction::{replicated_f64, virtualized},
 };
 fn main() {
@@ -23,8 +22,10 @@ fn main() {
         &3,
     );
     assert_eq!(c, [94]);
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let mut a = [world.rank() as f64 + 1.];
     let mut b = [2.];
     let mut c = [10.];
@@ -92,5 +93,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

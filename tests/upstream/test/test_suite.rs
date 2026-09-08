@@ -5,7 +5,7 @@
 //! and invokes native Rust ports whose individual source criteria assert at
 //! the point of evaluation. Sparse and density-parameter cases are excluded.
 
-use ctf::context::{Context, Runtime};
+use ctf::context::Context;
 
 const N: usize = 6;
 const N_SQUARED: usize = N * N;
@@ -1499,8 +1499,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -1513,5 +1515,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

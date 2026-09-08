@@ -1,7 +1,6 @@
 //! One bounded dense redistribution measurement with an exact key probe.
 use ctf::{
     algebra::Arithmetic,
-    context::Runtime,
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -18,18 +17,16 @@ fn value(key: usize) -> i64 {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let processes = world.size();
     let shape = vec![48, 40];
     let source_distribution = axis_distribution(&shape, 0, processes);
     let destination_distribution = axis_distribution(&shape, 1, processes);
 
-    let mut source = Tensor::new(
-        &world,
-        source_distribution,
-        Arithmetic::<i64>::new(),
-    );
+    let mut source = Tensor::new(&world, source_distribution, Arithmetic::<i64>::new());
     source.transform(|key, entry| *entry = value(key));
 
     let probe_keys = [0, 1, shape[0] + 2, shape.iter().product::<usize>() - 1];
@@ -54,5 +51,5 @@ fn main() {
     drop(source);
     drop(checked);
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

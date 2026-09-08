@@ -1,10 +1,6 @@
 // Residual/orthogonality criteria adapted from pinned scalapack_tests/{qr,svd}.cxx.
 use ctf::{
-    algebra::Arithmetic,
-    context::{Context, Runtime},
-    linalg::Native,
-    mapping::Distribution,
-    tensor::Tensor,
+    algebra::Arithmetic, context::Context, linalg::Native, mapping::Distribution, tensor::Tensor,
 };
 type Matrix<'c, 'r> = Tensor<'c, 'r, Arithmetic<f64>>;
 fn residual(reference: &Matrix<'_, '_>, actual: &mut Matrix<'_, '_>, bound: f64) -> f64 {
@@ -83,8 +79,10 @@ fn exercise(context: &Context<'_>) {
     }
 }
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     exercise(&world);
     let child = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -98,5 +96,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

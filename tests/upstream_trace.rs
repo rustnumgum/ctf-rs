@@ -7,7 +7,7 @@
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Topology},
     tensor::Tensor,
 };
@@ -18,9 +18,9 @@ type Dense<'c, 'r> = Tensor<'c, 'r, Algebra>;
 
 struct Drand48(u64);
 impl Drand48 {
-    fn next(&mut self)->f64 {
-        self.0=(self.0.wrapping_mul(0x5deece66d).wrapping_add(11))&((1u64<<48)-1);
-        self.0 as f64/(1u64<<48)as f64
+    fn next(&mut self) -> f64 {
+        self.0 = (self.0.wrapping_mul(0x5deece66d).wrapping_add(11)) & ((1u64 << 48) - 1);
+        self.0 as f64 / (1u64 << 48) as f64
     }
 }
 
@@ -32,12 +32,9 @@ fn matrix<'c, 'r>(context: &'c Context<'r>) -> Dense<'c, 'r> {
     )
 }
 
-fn random_matrix<'c, 'r>(
-    context: &'c Context<'r>,
-    generator: &mut Drand48,
-) -> Dense<'c, 'r> {
+fn random_matrix<'c, 'r>(context: &'c Context<'r>, generator: &mut Drand48) -> Dense<'c, 'r> {
     let mut result = matrix(context);
-    result.transform(|_,value|*value=generator.next());
+    result.transform(|_, value| *value = generator.next());
     result
 }
 
@@ -80,7 +77,7 @@ fn trace_of<'c, 'r>(
 
 fn run(context: &Context<'_>) {
     let topology = Topology::new(vec![context.size()]);
-    let mut generator = Drand48(((13*context.rank()as u64)<<16)|0x330e);
+    let mut generator = Drand48(((13 * context.rank() as u64) << 16) | 0x330e);
     // One source stream per rank across the valid local entries of A/B/C/D.
     let a = random_matrix(context, &mut generator);
     let b = random_matrix(context, &mut generator);
@@ -126,14 +123,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -143,5 +140,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

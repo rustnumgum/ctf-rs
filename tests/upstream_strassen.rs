@@ -10,12 +10,12 @@
 
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     random::Generator,
-    symmetry::Symmetry::{self, AS, NS, SH, SY},
     symmetric_distribution::SymmetricDistribution,
     symmetric_tensor::SymmetricTensor,
+    symmetry::Symmetry::{self, AS, NS, SH, SY},
     tensor::Tensor,
 };
 
@@ -47,10 +47,7 @@ fn symmetric_distribution(context: &Context<'_>, link: Symmetry) -> SymmetricDis
     )
 }
 
-fn inputs<'c, 'r>(
-    context: &'c Context<'r>,
-    link: Symmetry,
-) -> (Dense<'c, 'r>, Dense<'c, 'r>) {
+fn inputs<'c, 'r>(context: &'c Context<'r>, link: Symmetry) -> (Dense<'c, 'r>, Dense<'c, 'r>) {
     let distribution = symmetric_distribution(context, link);
     let mut a = SymmetricTensor::new(context, distribution.clone(), Algebra::new());
     let mut b = SymmetricTensor::new(context, distribution, Algebra::new());
@@ -77,7 +74,11 @@ fn add<'c, 'r>(
     result
 }
 
-fn multiply<'c, 'r>(left: &Dense<'c, 'r>, right: &Dense<'c, 'r>, topology: &Topology) -> Dense<'c, 'r> {
+fn multiply<'c, 'r>(
+    left: &Dense<'c, 'r>,
+    right: &Dense<'c, 'r>,
+    topology: &Topology,
+) -> Dense<'c, 'r> {
     let shape = vec![left.distribution().shape[0], right.distribution().shape[1]];
     let mut result = dense(left.context(), shape);
     result
@@ -204,58 +205,281 @@ fn strassen_subworld<'c, 'r>(
     let mut child_a = Dense::new(&child, child_distribution.clone(), Algebra::new());
     let mut child_b = Dense::new(&child, child_distribution.clone(), Algebra::new());
     for selected in 0..7 {
-
         // Transfer only the quadrants used by this source product.  Each
         // transfer is collective on the parent, with None outside its group.
         match selected {
             0 => {
-                parent_a11.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_a22.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b11.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b22.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
+                parent_a11.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_a22.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b11.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b22.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
             }
             1 => {
-                parent_a21.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_a11.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, -1.0, 1.0);
-                parent_b11.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b12.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
+                parent_a21.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_a11.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    -1.0,
+                    1.0,
+                );
+                parent_b11.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b12.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
             }
             2 => {
-                parent_a12.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_a22.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, -1.0, 1.0);
-                parent_b22.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b21.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
+                parent_a12.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_a22.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    -1.0,
+                    1.0,
+                );
+                parent_b22.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b21.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
             }
             3 => {
-                parent_a21.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_a22.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b11.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
+                parent_a21.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_a22.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b11.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
             }
             4 => {
-                parent_a11.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_a12.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b22.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
+                parent_a11.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_a12.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b22.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
             }
             5 => {
-                parent_a11.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b12.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b22.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, -1.0, 1.0);
+                parent_a11.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b12.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b22.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    -1.0,
+                    1.0,
+                );
             }
             6 => {
-                parent_a22.add_to_subworld(if selected == color { Some(&mut child_a) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b21.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, 1.0, 1.0);
-                parent_b11.add_to_subworld(if selected == color { Some(&mut child_b) } else { None }, &child_distribution, -1.0, 1.0);
+                parent_a22.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_a)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b21.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    1.0,
+                    1.0,
+                );
+                parent_b11.add_to_subworld(
+                    if selected == color {
+                        Some(&mut child_b)
+                    } else {
+                        None
+                    },
+                    &child_distribution,
+                    -1.0,
+                    1.0,
+                );
             }
             _ => unreachable!(),
         }
-
     }
     // All seven groups execute their products independently, as in source.
     // Parent transfers are explicitly serialized by the Rust subworld API.
     let product = multiply(&child_a, &child_b, &child_topology);
     for selected in 0..7 {
         let mut parent_product = dense(context, vec![H, H]);
-        parent_product.add_from_subworld(if selected == color { Some(&product) } else { None }, &child_distribution, 1.0, 1.0);
+        parent_product.add_from_subworld(
+            if selected == color {
+                Some(&product)
+            } else {
+                None
+            },
+            &child_distribution,
+            1.0,
+            1.0,
+        );
         match selected {
             0 => {
                 put(&mut result, 0..H, 0..H, &parent_product, 1.0, 0.0);
@@ -318,14 +542,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -335,5 +559,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

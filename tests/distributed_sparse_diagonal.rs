@@ -6,7 +6,7 @@
 //! oracles.
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     sparse::SparseTensor,
     tensor::Tensor,
@@ -38,10 +38,7 @@ fn virtual2(context: &Context<'_>, shape: Vec<usize>) -> Distribution {
     Distribution::new(shape, topology, mappings)
 }
 
-fn entries_for(
-    distribution: &Distribution,
-    value: impl Fn(&[usize]) -> i64,
-) -> Vec<(usize, i64)> {
+fn entries_for(distribution: &Distribution, value: impl Fn(&[usize]) -> i64) -> Vec<(usize, i64)> {
     (0..distribution.global_len())
         .filter_map(|key| {
             let value = value(&distribution.decode_key(key));
@@ -196,9 +193,7 @@ fn repeated_a_unique_output(context: &Context<'_>) {
 }
 
 fn old_repeated_output(coordinates: &[usize]) -> i64 {
-    1_000 + 100 * coordinates[0] as i64
-        + 10 * coordinates[1] as i64
-        + coordinates[2] as i64
+    1_000 + 100 * coordinates[0] as i64 + 10 * coordinates[1] as i64 + coordinates[2] as i64
 }
 
 fn expected_repeated_output() -> Vec<i64> {
@@ -365,7 +360,10 @@ fn sparse_iik_extract_replace(context: &Context<'_>) {
     let (diagonal, labels) = source.extract_diagonal("iik");
     assert_eq!(labels, "ik");
     assert_eq!(diagonal.distribution().shape, vec![3, 2]);
-    assert_eq!(diagonal.read(&all_keys(diagonal.distribution())), expected_repeated_a_diagonal());
+    assert_eq!(
+        diagonal.read(&all_keys(diagonal.distribution())),
+        expected_repeated_a_diagonal()
+    );
     assert_eq!(source.distribution(), &distribution);
 
     let zero_distribution = cyclic(context, vec![3, 2]);
@@ -402,9 +400,7 @@ fn triple_diagonal_source(coordinates: &[usize]) -> i64 {
     if coordinates[0] == coordinates[1] && coordinates[1] == coordinates[2] {
         [7, -5, 11][coordinates[0]]
     } else {
-        30_000 + 100 * coordinates[0] as i64
-            + 10 * coordinates[1] as i64
-            + coordinates[2] as i64
+        30_000 + 100 * coordinates[0] as i64 + 10 * coordinates[1] as i64 + coordinates[2] as i64
     }
 }
 
@@ -438,7 +434,10 @@ fn triple_diagonal_extract_replace(context: &Context<'_>) {
     let zero = sparse(context, vector_distribution.clone(), &[(0, 0)]);
     let mut zeroed = source.clone();
     zeroed.replace_diagonal("iii", &zero);
-    assert_eq!(zeroed.read(&all_keys(&distribution)), triple_expected(|_| 0));
+    assert_eq!(
+        zeroed.read(&all_keys(&distribution)),
+        triple_expected(|_| 0)
+    );
 
     let explicit = sparse_fn(context, vector_distribution, |coordinates| {
         [13, -17, 29][coordinates[0]]
@@ -459,8 +458,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let world_rank = world.rank();
     run(&world);
 
@@ -476,5 +477,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

@@ -2,7 +2,7 @@
 
 use ctf::{
     algebra::{Arithmetic, Complex, CustomMonoid},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     symmetric_distribution::SymmetricDistribution,
     symmetric_tensor::SymmetricTensor,
@@ -50,14 +50,12 @@ fn run(context: &Context<'_>) {
     let mut mesh = tensor(context, vec![n, n, n], vec![NS, NS, NS]);
 
     dft.transform(|key, value| {
-        let angle = -2.0 * (key / n) as f64 * (key % n) as f64
-            * (std::f64::consts::PI / n as f64);
+        let angle = -2.0 * (key / n) as f64 * (key % n) as f64 * (std::f64::consts::PI / n as f64);
         let root = cis(angle);
         *value = Scalar::new(root.re / n as f64, root.im / n as f64);
     });
     idft.transform(|key, value| {
-        let angle = 2.0 * (key / n) as f64 * (key % n) as f64
-            * (std::f64::consts::PI / n as f64);
+        let angle = 2.0 * (key / n) as f64 * (key % n) as f64 * (std::f64::consts::PI / n as f64);
         let root = cis(angle);
         *value = Scalar::new(root.re / n as f64, root.im / n as f64);
     });
@@ -67,10 +65,7 @@ fn run(context: &Context<'_>) {
         let z = key / (n * n);
         let mut sum = Scalar::new(0.0, 0.0);
         for j in 0..n {
-            let term = cis(
-                -2.0 * std::f64::consts::PI * j as f64 / n as f64
-                    * (x + y + z) as f64,
-            );
+            let term = cis(-2.0 * std::f64::consts::PI * j as f64 / n as f64 * (x + y + z) as f64);
             sum.re += term.re;
             sum.im += term.im;
         }
@@ -111,8 +106,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -120,8 +117,10 @@ fn main() {
     run(&parity);
     parity.close();
     if world.rank() == 0 {
-        println!("DIGIT / PASS dft_3D: 3D normalized DFT contraction produces the diagonal mesh; n=6; per-element real error<1e-9; world+parity");
+        println!(
+            "DIGIT / PASS dft_3D: 3D normalized DFT contraction produces the diagonal mesh; n=6; per-element real error<1e-9; world+parity"
+        );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

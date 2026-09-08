@@ -1,6 +1,6 @@
 use ctf::{
     algebra::{Arithmetic, Complex, Monoid, Semiring, Wire},
-    context::{Context, Runtime},
+    context::Context,
     linalg::{GemmKernel, Native},
     mapping::{Distribution, Topology},
     tensor::Tensor,
@@ -84,13 +84,7 @@ fn exercise_gemm<T>(
     let tiny_a_data = tiny_a.local_storage().to_vec();
     let tiny_b_data = tiny_b.local_storage().to_vec();
     let tiny_distribution = tiny_c.distribution().clone();
-    tiny_c.gemm_2d::<Native>(
-        &tiny_a,
-        &tiny_b,
-        grid,
-        alpha.clone(),
-        beta.clone(),
-    );
+    tiny_c.gemm_2d::<Native>(&tiny_a, &tiny_b, grid, alpha.clone(), beta.clone());
     assert_eq!(tiny_c.distribution(), &tiny_distribution);
     assert!(tiny_a.local_storage() == tiny_a_data.as_slice());
     assert!(tiny_b.local_storage() == tiny_b_data.as_slice());
@@ -262,8 +256,10 @@ fn exercise(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     exercise(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -276,5 +272,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

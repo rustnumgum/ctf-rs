@@ -1,7 +1,7 @@
 //! Deterministic port of pinned CTF test/endomorphism_cust_sp.cxx.
 use ctf::{
     algebra::{Arithmetic, CustomMonoid, Wire},
-    context::{Context, Runtime},
+    context::Context,
     mapping::Distribution,
     sparse::SparseTensor,
 };
@@ -92,8 +92,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
     let parity = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -101,8 +103,10 @@ fn main() {
     run(&parity);
     parity.close();
     if world.rank() == 0 {
-        println!("DIGIT / PASS upstream_endomorphism_cust_sp: stored string lengths; exact; world+parity");
+        println!(
+            "DIGIT / PASS upstream_endomorphism_cust_sp: stored string lengths; exact; world+parity"
+        );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

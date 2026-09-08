@@ -1,6 +1,6 @@
 use ctf::{
     algebra::{Arithmetic, Complex},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     sparse::SparseTensor,
     symmetric_distribution::SymmetricDistribution,
@@ -23,11 +23,7 @@ fn replicated_distribution(context: &Context<'_>, shape: &[usize]) -> Distributi
     let topology = Topology::new(vec![context.size()]);
     let mut first = Mapping::Unmapped;
     first.augment_virtual(context.size());
-    Distribution::new(
-        shape.to_vec(),
-        topology,
-        vec![first, Mapping::Unmapped],
-    )
+    Distribution::new(shape.to_vec(), topology, vec![first, Mapping::Unmapped])
 }
 
 fn dense_i64(context: &Context<'_>, distribution: Distribution) {
@@ -43,7 +39,10 @@ fn dense_i64(context: &Context<'_>, distribution: Distribution) {
         .collect();
     assert_eq!(tensor.all_pairs(false), expected);
     assert_eq!(tensor.all_pairs(true), expected_nonzero);
-    assert_eq!(tensor.all_data(), expected.iter().map(|(_, value)| *value).collect::<Vec<_>>());
+    assert_eq!(
+        tensor.all_data(),
+        expected.iter().map(|(_, value)| *value).collect::<Vec<_>>()
+    );
 }
 
 fn dense_complex(context: &Context<'_>, distribution: Distribution) {
@@ -59,7 +58,10 @@ fn dense_complex(context: &Context<'_>, distribution: Distribution) {
         .map(|key| (key, Complex::new(key as f64 + 0.5, -(key as f64) - 1.25)))
         .collect();
     assert_eq!(tensor.all_pairs(false), expected);
-    assert_eq!(tensor.all_data(), expected.iter().map(|(_, value)| *value).collect::<Vec<_>>());
+    assert_eq!(
+        tensor.all_data(),
+        expected.iter().map(|(_, value)| *value).collect::<Vec<_>>()
+    );
 }
 
 fn dense_empty_and_shard(context: &Context<'_>) {
@@ -80,9 +82,17 @@ fn dense_empty_and_shard(context: &Context<'_>) {
     assert!(empty.all_pairs(false).is_empty());
     assert!(empty.all_pairs(true).is_empty());
     assert!(empty.all_data().is_empty());
-    let zeros = Tensor::new(context, Distribution::cyclic(vec![2], context.size()), Arithmetic::<i64>::new());
+    let zeros = Tensor::new(
+        context,
+        Distribution::cyclic(vec![2], context.size()),
+        Arithmetic::<i64>::new(),
+    );
     assert!(zeros.all_pairs(true).is_empty());
-    let sparse_empty = SparseTensor::new(context, Distribution::cyclic(vec![2], context.size()), Arithmetic::<i64>::new());
+    let sparse_empty = SparseTensor::new(
+        context,
+        Distribution::cyclic(vec![2], context.size()),
+        Arithmetic::<i64>::new(),
+    );
     assert!(sparse_empty.all_pairs(true).is_empty());
     assert_eq!(sparse_empty.all_data(), vec![0, 0]);
 }
@@ -108,7 +118,10 @@ fn sparse_case(context: &Context<'_>, token: u64, scope: usize) {
         })
         .collect();
     assert_eq!(sparse.all_pairs(false), expected);
-    assert_eq!(sparse.all_data(), expected.iter().map(|(_, value)| *value).collect::<Vec<_>>());
+    assert_eq!(
+        sparse.all_data(),
+        expected.iter().map(|(_, value)| *value).collect::<Vec<_>>()
+    );
 
     let mut dense = Tensor::new(context, distribution.clone(), Arithmetic::<i64>::new());
     dense.transform(|key, value| *value = if key % 2 == 0 { 0 } else { key as i64 });
@@ -145,11 +158,8 @@ fn symmetric_distribution(context: &Context<'_>, kind: Symmetry) -> SymmetricDis
 fn symmetric_case(context: &Context<'_>) {
     for kind in [SY, AS, SH] {
         let distribution = symmetric_distribution(context, kind);
-        let mut tensor = SymmetricTensor::new(
-            context,
-            distribution.clone(),
-            Arithmetic::<i64>::new(),
-        );
+        let mut tensor =
+            SymmetricTensor::new(context, distribution.clone(), Arithmetic::<i64>::new());
         tensor.transform(|key, value| *value = if key == 3 { 0 } else { key as i64 + 1 });
 
         let packed: Vec<_> = (0..9)
@@ -166,7 +176,10 @@ fn symmetric_case(context: &Context<'_>) {
             .filter(|(_, value)| *value != 0)
             .collect();
         assert_eq!(tensor.all_pairs(false, false), packed);
-        assert_eq!(tensor.all_data(false), packed.iter().map(|(_, value)| *value).collect::<Vec<_>>());
+        assert_eq!(
+            tensor.all_data(false),
+            packed.iter().map(|(_, value)| *value).collect::<Vec<_>>()
+        );
         assert_eq!(tensor.all_pairs(true, false), nonzero);
         assert_eq!(tensor.all_pairs(true, true), nonzero);
 
@@ -175,14 +188,21 @@ fn symmetric_case(context: &Context<'_>) {
                 let value = distribution
                     .canonicalize(key)
                     .map(|(canonical, sign)| {
-                        (if canonical == 3 { 0 } else { canonical as i64 + 1 }) * sign as i64
+                        (if canonical == 3 {
+                            0
+                        } else {
+                            canonical as i64 + 1
+                        }) * sign as i64
                     })
                     .unwrap_or(0);
                 (key, value)
             })
             .collect();
         assert_eq!(tensor.all_pairs(false, true), full);
-        assert_eq!(tensor.all_data(true), full.iter().map(|(_, value)| *value).collect::<Vec<_>>());
+        assert_eq!(
+            tensor.all_data(true),
+            full.iter().map(|(_, value)| *value).collect::<Vec<_>>()
+        );
     }
 }
 
@@ -196,14 +216,18 @@ fn run(context: &Context<'_>, token: u64, scope: usize) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let mut token = [std::process::id() as u64];
     world.broadcast(0, &mut token);
     run(&world, token[0], 0);
 
     let color = world.rank() % 2;
-    let parity = world.split(Some(color as i32), world.rank() as i32).unwrap();
+    let parity = world
+        .split(Some(color as i32), world.rank() as i32)
+        .unwrap();
     run(&parity, token[0], color + 1);
     parity.close();
 
@@ -213,5 +237,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

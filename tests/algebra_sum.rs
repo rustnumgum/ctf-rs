@@ -1,12 +1,13 @@
 use ctf::{
     algebra::{Arithmetic, CustomMonoid, CustomSemiring},
-    context::Runtime,
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let np = world.size();
     let mut a = Tensor::new(
         &world,
@@ -42,5 +43,5 @@ fn main() {
         println!("DIGIT / PASS algebra_sum: integer and Boolean Tensor reductions; ranks={np}");
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

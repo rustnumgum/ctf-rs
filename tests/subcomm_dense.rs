@@ -1,13 +1,14 @@
 use ctf::{
     algebra::Arithmetic,
-    context::Runtime,
     linalg::Native,
     mapping::{Distribution, Topology},
     tensor::Tensor,
 };
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let child = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
         .unwrap();
@@ -51,5 +52,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

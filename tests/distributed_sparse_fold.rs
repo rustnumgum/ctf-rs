@@ -5,7 +5,7 @@
 //! entries so the exact integer oracle also checks algebraic zeros.
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     sparse::SparseTensor,
     tensor::Tensor,
@@ -83,11 +83,7 @@ fn b_entries() -> Vec<(usize, i64)> {
         .collect()
 }
 
-fn folded_expected(
-    a: &[(usize, i64)],
-    b: &[(usize, i64)],
-    old: impl Fn(usize) -> i64,
-) -> Vec<i64> {
+fn folded_expected(a: &[(usize, i64)], b: &[(usize, i64)], old: impl Fn(usize) -> i64) -> Vec<i64> {
     let mut expected = vec![0; 12];
     for batch in 0..2 {
         for i in 0..2 {
@@ -116,9 +112,7 @@ fn main_fixture(context: &Context<'_>, grid: [usize; 2]) {
     let b_entries = b_entries();
     let sparse_old = [(0, 7), (5, -11), (11, 13)];
     let dense_old = |key| -17 + 4 * key as i64;
-    let expected_sparse = folded_expected(&a_entries, &b_entries, |key| {
-        lookup(&sparse_old, key)
-    });
+    let expected_sparse = folded_expected(&a_entries, &b_entries, |key| lookup(&sparse_old, key));
     let expected_dense = folded_expected(&a_entries, &b_entries, dense_old);
 
     let a = sparse(context, a_distribution.clone(), &a_entries);
@@ -188,9 +182,7 @@ fn outer_product(context: &Context<'_>, grid: [usize; 2]) {
     let c_distribution = virtual2(context, vec![3, 2]);
     let sparse_old = [(1, 9), (5, -4)];
     let dense_old = |key| 11 - key as i64;
-    let expected_sparse = outer_expected(&a_values, &b_values, |key| {
-        lookup(&sparse_old, key)
-    });
+    let expected_sparse = outer_expected(&a_values, &b_values, |key| lookup(&sparse_old, key));
     let expected_dense = outer_expected(&a_values, &b_values, dense_old);
 
     let a = sparse(context, a_distribution.clone(), &a_entries);
@@ -292,8 +284,10 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let world_rank = world.rank();
     run(&world);
 
@@ -309,5 +303,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

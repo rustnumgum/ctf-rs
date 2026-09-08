@@ -6,7 +6,7 @@
 
 use ctf::{
     algebra::{Arithmetic, Monoid, Semiring},
-    context::{Context, Runtime},
+    context::Context,
     mapping::Distribution,
     tensor::Tensor,
 };
@@ -16,12 +16,18 @@ fn run(context: &Context<'_>, n: usize, m: usize) {
     let total = n * m * n * m;
     let algebra = Arithmetic::<f64>::new();
     let mut state = 0x330e_u64;
-    let reference: Vec<_> = (0..total).map(|_| {
-        state = state.wrapping_mul(0x5deece66d).wrapping_add(0xb) & ((1_u64<<48)-1);
-        state as f64 / (1_u64<<48) as f64
-    }).collect();
+    let reference: Vec<_> = (0..total)
+        .map(|_| {
+            state = state.wrapping_mul(0x5deece66d).wrapping_add(0xb) & ((1_u64 << 48) - 1);
+            state as f64 / (1_u64 << 48) as f64
+        })
+        .collect();
 
-    let mut tensor = Tensor::new(context, Distribution::cyclic(shape.clone(), context.size()), algebra);
+    let mut tensor = Tensor::new(
+        context,
+        Distribution::cyclic(shape.clone(), context.size()),
+        algebra,
+    );
 
     // Preserve the source's rank-zero MPI_SELF path without implicit contexts.
     let child = context.split((context.rank() == 0).then_some(0), context.rank() as i32);
@@ -46,26 +52,31 @@ fn run(context: &Context<'_>, n: usize, m: usize) {
     assert_eq!(actual.len(), total);
     for (key, value) in actual.iter().enumerate() {
         let expected = reference[key];
-        assert!((value - expected).abs() <= 1e-10, "key {key}: {value} != {expected}");
+        assert!(
+            (value - expected).abs() <= 1e-10,
+            "key {key}: {value} != {expected}"
+        );
     }
 
     let pairs = tensor.all_pairs(false);
     assert_eq!(pairs.len(), total);
-    assert!(pairs
-        .iter()
-        .enumerate()
-        .all(|(key, &(actual_key, _))| key == actual_key));
+    assert!(
+        pairs
+            .iter()
+            .enumerate()
+            .all(|(key, &(actual_key, _))| key == actual_key)
+    );
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world, 2, 3);
 
     let rank = world.rank();
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity, 2, 3);
     parity.close();
 
@@ -76,5 +87,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

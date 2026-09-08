@@ -1,11 +1,6 @@
 //! Bounded deterministic port of pinned CTF test/sptensor_sum.cxx.
 
-use ctf::{
-    algebra::Arithmetic,
-    context::{Context, Runtime},
-    mapping::Distribution,
-    sparse::SparseTensor,
-};
+use ctf::{algebra::Arithmetic, context::Context, mapping::Distribution, sparse::SparseTensor};
 
 const N: usize = 2;
 const TOLERANCE: f64 = 1.0e-9;
@@ -60,14 +55,14 @@ fn run(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let rank = world.rank();
     run(&world);
 
-    let parity = world
-        .split(Some((rank % 2) as i32), rank as i32)
-        .unwrap();
+    let parity = world.split(Some((rank % 2) as i32), rank as i32).unwrap();
     run(&parity);
     parity.close();
 
@@ -77,5 +72,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

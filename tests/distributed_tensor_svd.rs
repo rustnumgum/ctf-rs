@@ -1,6 +1,6 @@
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     multilinear::tensor_svd::TensorSvd,
     tensor::Tensor,
@@ -29,9 +29,8 @@ fn rank_one<'c, 'r>(context: &'c Context<'r>) -> Dense<'c, 'r> {
     let distribution = tensor.distribution().clone();
     tensor.transform(|key, value| {
         let coordinates = distribution.decode_key(key);
-        *value = (coordinates[0] + 1) as f64
-            * (coordinates[1] + 2) as f64
-            * (coordinates[2] + 3) as f64;
+        *value =
+            (coordinates[0] + 1) as f64 * (coordinates[1] + 2) as f64 * (coordinates[2] + 3) as f64;
     });
     tensor
 }
@@ -39,7 +38,13 @@ fn rank_one<'c, 'r>(context: &'c Context<'r>) -> Dense<'c, 'r> {
 fn rename_auxiliary(labels: &str, auxiliary: char, replacement: char) -> String {
     labels
         .chars()
-        .map(|label| if label == auxiliary { replacement } else { label })
+        .map(|label| {
+            if label == auxiliary {
+                replacement
+            } else {
+                label
+            }
+        })
         .collect()
 }
 
@@ -62,12 +67,7 @@ fn factor_shape(
         .collect()
 }
 
-fn scale_left(
-    left: &mut Dense<'_, '_>,
-    singular: &Dense<'_, '_>,
-    indices: &str,
-    auxiliary: char,
-) {
+fn scale_left(left: &mut Dense<'_, '_>, singular: &Dense<'_, '_>, indices: &str, auxiliary: char) {
     let rank = singular.distribution().shape[0];
     let values = singular.read(&(0..rank).collect::<Vec<_>>());
     let auxiliary_axis = indices.find(auxiliary).unwrap();
@@ -90,7 +90,10 @@ fn normalized_residual(reference: &Dense<'_, '_>, actual: &Dense<'_, '_>) {
     }
     reference.context().sum_f64(&mut error);
     let normalized = error[0].sqrt() / reference.distribution().global_len() as f64;
-    assert!(normalized < 1e-6, "normalized reconstruction error={normalized}");
+    assert!(
+        normalized < 1e-6,
+        "normalized reconstruction error={normalized}"
+    );
 }
 
 fn assert_orthogonal(
@@ -108,23 +111,26 @@ fn assert_orthogonal(
         Distribution::cyclic(vec![rank, rank], factor.context().size()),
         Arithmetic::new(),
     );
-    gram
-        .contract_from(
-            &output_indices,
-            factor,
-            factor_indices,
-            factor,
-            renamed.as_str(),
-            topology,
-            1.,
-            0.,
-        )
-        .unwrap();
+    gram.contract_from(
+        &output_indices,
+        factor,
+        factor_indices,
+        factor,
+        renamed.as_str(),
+        topology,
+        1.,
+        0.,
+    )
+    .unwrap();
 
     let mut residual = [0., 0.];
     for (key, value) in gram.local_pairs() {
         let coordinates = gram.distribution().decode_key(key);
-        let expected = if coordinates[0] == coordinates[1] { 1. } else { 0. };
+        let expected = if coordinates[0] == coordinates[1] {
+            1.
+        } else {
+            0.
+        };
         residual[0] += (value - expected).abs();
         residual[1] += expected.abs();
     }
@@ -263,26 +269,10 @@ fn exercise_tensor_svd(context: &Context<'_>, grid: [usize; 2]) {
         )
         .unwrap();
     assert_factor_shapes(
-        &low_rank,
-        "abc",
-        "caq",
-        "qb",
-        'q',
-        &left,
-        &singular,
-        &right,
-        1,
+        &low_rank, "abc", "caq", "qb", 'q', &left, &singular, &right, 1,
     );
     reconstruct(
-        &low_rank,
-        "abc",
-        "caq",
-        "qb",
-        'q',
-        grid,
-        left,
-        &singular,
-        &right,
+        &low_rank, "abc", "caq", "qb", 'q', grid, left, &singular, &right,
     );
 
     let (left, singular, right) = low_rank
@@ -301,26 +291,10 @@ fn exercise_tensor_svd(context: &Context<'_>, grid: [usize; 2]) {
         )
         .unwrap();
     assert_factor_shapes(
-        &low_rank,
-        "abc",
-        "caq",
-        "qb",
-        'q',
-        &left,
-        &singular,
-        &right,
-        1,
+        &low_rank, "abc", "caq", "qb", 'q', &left, &singular, &right, 1,
     );
     reconstruct(
-        &low_rank,
-        "abc",
-        "caq",
-        "qb",
-        'q',
-        grid,
-        left,
-        &singular,
-        &right,
+        &low_rank, "abc", "caq", "qb", 'q', grid, left, &singular, &right,
     );
 
     let source = deterministic(context, vec![4, 5, 6, 3]);
@@ -381,7 +355,11 @@ fn exercise_tensor_svd(context: &Context<'_>, grid: [usize; 2]) {
     }
 }
 
-fn changed_distribution(shape: Vec<usize>, topology: Topology, physical_axis: usize) -> Distribution {
+fn changed_distribution(
+    shape: Vec<usize>,
+    topology: Topology,
+    physical_axis: usize,
+) -> Distribution {
     let mut mappings = vec![Mapping::Unmapped; shape.len()];
     mappings[physical_axis].augment_physical(&topology, 0);
     Distribution::new(shape, topology, mappings)
@@ -423,8 +401,10 @@ fn exercise(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     exercise(&world);
     let child = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -438,5 +418,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

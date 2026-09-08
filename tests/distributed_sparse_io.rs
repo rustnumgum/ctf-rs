@@ -1,6 +1,6 @@
 use ctf::{
     algebra::{Arithmetic, CustomMonoid},
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     sparse::SparseTensor,
 };
@@ -39,11 +39,7 @@ fn arithmetic_io(context: &Context<'_>) {
     assert_eq!(tensor.read(&[34, 0, 6]), vec![0, key_zero, key_six]);
     assert_eq!(tensor.reduce(), key_zero + key_six);
 
-    let replicated = Distribution::new(
-        vec![5, 7],
-        topology,
-        vec![Mapping::Unmapped; 2],
-    );
+    let replicated = Distribution::new(vec![5, 7], topology, vec![Mapping::Unmapped; 2]);
     tensor.redistribute(replicated.clone());
     assert_eq!(tensor.distribution(), &replicated);
     assert_eq!(tensor.read(&[0, 6, 4]), vec![key_zero, key_six, 0]);
@@ -161,7 +157,13 @@ fn max_monoid_io(context: &Context<'_>) {
     let expected_duplicate = 2 * (context.size() as i64 - 1) + 1;
     assert_eq!(
         tensor.read(&[4, 3, 3, 8, 34]),
-        vec![i64::MIN, expected_duplicate, expected_duplicate, 100, i64::MIN]
+        vec![
+            i64::MIN,
+            expected_duplicate,
+            expected_duplicate,
+            100,
+            i64::MIN
+        ]
     );
     assert_eq!(tensor.reduce(), 100);
 }
@@ -171,19 +173,24 @@ fn run(context: &Context<'_>) {
     analytic_views(context);
     max_monoid_io(context);
     // Source sp_write combines the first new value before an existing value.
-    let mut first = SparseTensor::new(context,
-        Distribution::cyclic(vec![1], context.size()), CustomMonoid {
+    let mut first = SparseTensor::new(
+        context,
+        Distribution::cyclic(vec![1], context.size()),
+        CustomMonoid {
             identity: 0i64,
             addition: |a: &i64, b: &i64| if *a != 0 { *a } else { *b },
-        });
+        },
+    );
     first.write_add(if context.rank() == 0 { &[(0, 9)] } else { &[] });
     first.write_add(if context.rank() == 0 { &[(0, 3)] } else { &[] });
     assert_eq!(first.read(&[0]), vec![3]);
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     let world_rank = world.rank();
     run(&world);
 
@@ -199,5 +206,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

@@ -3,15 +3,10 @@
 //! The pinned Vector/Scalar constructors are represented by one- and
 //! zero-order dense `Tensor`s.  This test exercises the only new algorithms
 //! (`vector::arange` and scalar root-set/root-broadcast) and checks the
-//! existing `Runtime`/`Context` world responsibilities on both communicators.
+//! host `Universe`/`Context` world responsibilities on both communicators.
 
 use ctf::{
-    algebra::Arithmetic,
-    context::{Context, Runtime},
-    mapping::Distribution,
-    scalar,
-    tensor::Tensor,
-    vector,
+    algebra::Arithmetic, context::Context, mapping::Distribution, scalar, tensor::Tensor, vector,
 };
 
 fn run(context: &Context<'_>) {
@@ -20,9 +15,14 @@ fn run(context: &Context<'_>) {
     assert_eq!(vector.distribution().shape, vec![len]);
     assert_eq!(
         vector.read(&(0..len).collect::<Vec<_>>()),
-        (0..len).map(|index| 3 + 4 * index as i64).collect::<Vec<_>>(),
+        (0..len)
+            .map(|index| 3 + 4 * index as i64)
+            .collect::<Vec<_>>(),
     );
-    assert_eq!(vector.reduce(), (0..len).map(|index| 3 + 4 * index as i64).sum());
+    assert_eq!(
+        vector.reduce(),
+        (0..len).map(|index| 3 + 4 * index as i64).sum()
+    );
 
     // Direct Tensor construction is the native replacement for Vector's
     // inherited constructors and storage; its rank-one shape is explicit.
@@ -32,7 +32,10 @@ fn run(context: &Context<'_>) {
         Arithmetic::<i64>::new(),
     );
     direct.transform(|index, value| *value = 3 + 4 * index as i64);
-    assert_eq!(direct.read(&(0..len).collect::<Vec<_>>()), vector.read(&(0..len).collect::<Vec<_>>()));
+    assert_eq!(
+        direct.read(&(0..len).collect::<Vec<_>>()),
+        vector.read(&(0..len).collect::<Vec<_>>())
+    );
 
     // Scalar uses a zero-order Tensor.  set_value updates only the canonical
     // root; value performs the source-equivalent broadcast to all replicas.
@@ -43,18 +46,23 @@ fn run(context: &Context<'_>) {
     );
     scalar::set_value(&mut scalar_tensor, 17);
     assert_eq!(scalar::value(&scalar_tensor), 17);
-    scalar::set_value(&mut scalar_tensor, if context.rank() == 0 { -9 } else { 12345 });
+    scalar::set_value(
+        &mut scalar_tensor,
+        if context.rank() == 0 { -9 } else { 12345 },
+    );
     assert_eq!(scalar::value(&scalar_tensor), -9);
 
-    // Runtime/Context is the native replacement for World; this assertion is
+    // Universe/Context is the native replacement for World; this assertion is
     // intentionally kept in the D5 value test instead of adding a wrapper.
     assert!(context.rank() < context.size());
     context.barrier();
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     run(&world);
 
     let parity = world
@@ -70,5 +78,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }

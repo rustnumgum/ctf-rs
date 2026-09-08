@@ -1,6 +1,6 @@
 use ctf::{
     algebra::Arithmetic,
-    context::{Context, Runtime},
+    context::Context,
     mapping::{Distribution, Mapping, Topology},
     tensor::Tensor,
 };
@@ -123,11 +123,7 @@ fn make_matrix_factors<'c, 'r>(
         .collect()
 }
 
-fn vector_expected(
-    output_coordinate: usize,
-    tensor_shape: &[usize],
-    output_mode: usize,
-) -> f64 {
+fn vector_expected(output_coordinate: usize, tensor_shape: &[usize], output_mode: usize) -> f64 {
     let mut expected = 0.;
     for tensor_key in 0..global_len(tensor_shape) {
         let coordinates = decode_key(tensor_key, tensor_shape);
@@ -179,12 +175,7 @@ fn assert_vectors(tensor: &Dense<'_, '_>, shape: &[usize], output_mode: usize) {
     assert_output_count(tensor, shape[output_mode]);
 }
 
-fn assert_matrices(
-    tensor: &Dense<'_, '_>,
-    shape: &[usize],
-    output_mode: usize,
-    auxiliary: usize,
-) {
+fn assert_matrices(tensor: &Dense<'_, '_>, shape: &[usize], output_mode: usize, auxiliary: usize) {
     let mut error = [0.];
     for (key, actual) in tensor.local_pairs() {
         let coordinates = decode_key(key, &tensor.distribution().shape);
@@ -202,8 +193,7 @@ fn exercise_vectors(context: &Context<'_>, shape: &[usize], layout: SourceLayout
         let tensor = make_tensor(context, shape, layout);
         let factors = make_vector_factors(context, shape, output_mode);
         let references: Vec<_> = factors.iter().collect();
-        let output_distribution =
-            Distribution::cyclic(vec![shape[output_mode]], context.size());
+        let output_distribution = Distribution::cyclic(vec![shape[output_mode]], context.size());
         let actual = tensor.mttkrp(output_mode, &references, output_distribution.clone());
         assert_eq!(actual.distribution(), &output_distribution);
         assert_vectors(&actual, shape, output_mode);
@@ -238,8 +228,10 @@ fn exercise(context: &Context<'_>) {
 }
 
 fn main() {
-    let runtime = Runtime::initialize();
-    let world = runtime.world();
+    let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
+        .expect("MPI initialization failed");
+    assert!(provided >= mpi::Threading::Funneled);
+    let world = ctf::context::Context::world(&universe);
     exercise(&world);
     let child = world
         .split(Some((world.rank() % 2) as i32), world.rank() as i32)
@@ -253,5 +245,5 @@ fn main() {
         );
     }
     world.close();
-    runtime.finalize();
+    drop(universe);
 }
