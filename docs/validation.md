@@ -94,12 +94,29 @@ the three prescribed acceptance-script invocations were used. The separate
 confirmation and full acceptance repetitions were explicitly requested; no
 additional passing check was rerun. S1 was not started and ctf-rs was not pushed.
 
-Scope note: the separate `dgtog_redistribution` test is not selected by the
-prescribed runtime scripts. Its root-only Tensor scalar assertion conflicts
-with the replica-populated Tensor contract explicitly required by
-`cyclic_reshuffle`. It was left unchanged, as instructed, and no runtime pass
-is claimed for that target. The low-level root-only primitive semantics remain
-unchanged; this is a public Tensor-layer correction.
+The separate `dgtog_redistribution` test contract is now closed under BRIEF-5
+(2026-09-09), test commit `cccd5e8ef8bf2ebd66148dfeb8e7070bae240f63`.
+The scalar assertion now requires `[29]` on every rank, not zero on nonroots;
+the local-storage helper requires `key + 11` for every valid global key and
+zero only for padding. Empty storage, high-order values and all other exact
+assertions remain intact. No `src/` file or low-level primitive test changed.
+
+```text
+DIGIT / PASS
+Q: every dgtog_redistribution assertion under the public Tensor replica contract
+class: R; ref: test committed at cccd5e8; bound: exact equality, 0
+Delta: all unchanged or authorized replica-contract assertions passed, difference 0
+checks: populated replicas, padding, virtual/scalar/empty/high-order storage;
+        world and parity contexts at each rank configuration
+runs: WSL 1/2/4 once each, three runs total; exit 0; no diagnostics
+closed: dgtog_redistribution contract; prior G-CTF-R1 passes remain closed
+```
+
+Command:
+`wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-dgtog-test/confirm.sh`.
+Log: `D:/projects/runs/ctf-dgtog-test/confirmation.log`; the adjacent
+`confirm.sh` and `commands.md` record the exact nested commands and supervisor.
+No full R1 rerun, native runtime run, or ctf-rs push was performed for this item.
 
 ### CTF-R1-2 diagnostic 3 (2026-09-09)
 
