@@ -2,6 +2,105 @@
 
 ## rsmpi binding
 
+### CTF-R1-4 direct replica restoration (2026-09-09)
+
+The user stopped B1's history search; its bisect scratch copies, build patches
+and targets were discarded.
+
+Fix `a558e30c57bcb0e12abf18c8d2906237d41ccf90` changes only `src/tensor.rs`.
+The optimized equal-phase block reshuffle and DGTOG ROR primitives populate
+primary physical layers only. `Tensor::redistribute` returned those buffers
+without restoring the public tensor invariant: every rank for which
+`Distribution::global_key` returns a key must hold that key's value, including
+replicas; only padding slots are zero. The legacy exchange already populated
+all owning ranks.
+
+One scratch-only two-rank trace named the mechanism: for shape `[3,5]`, cyclic
+to fully unmapped redistribution, rank 1 has `receive_root=false`, receive
+counts `[10,5]`, and 15 unpopulated valid local slots. Rank 0 unpacks the data;
+rank 1 returns zero at offset 0 although that slot is key 0, whose i8 value is
+`-5`. This is replica loss, not a wrong MPI exchange or padding index.
+
+After either optimized path, the fix groups ranks by their mapped physical
+residues, uses original-rank ordering to put the canonical owner at subgroup
+rank 0, broadcasts that local block, and explicitly closes the subgroup.
+This also restores scalar and partially mapped replicas while preserving
+padding, the low-level primary-only primitives and the higher-order legacy
+path. No test, fixture, driver, metric or tolerance changed.
+
+```text
+DIGIT / PASS
+Q: cyclic_reshuffle exact values/padding/replicas, virtual phases, empty/scalar,
+   i8/bool/complex/non-Copy Wire, world and parity contexts; class: R
+ref: existing unchanged test assertions; bound: exact equality, 0
+Delta: prior rank 1 offset 0 difference 5 (actual 0, expected -5);
+       after fix every unchanged assertion passed, exact difference 0
+runs: one pre-fix two-rank diagnostic (exit 124 after assertion panic);
+      one post-fix confirmation at each of 1/2/4 ranks (exit 0)
+closed: the single-test confirmation; no further diagnostic after the fix
+```
+
+The diagnostic was instrumented only in a scratch archive of `622ef10`, with
+unchanged assertions. The current-tree layout review and trace agree on the
+mechanism; no history result was used to choose the fix. Evidence and exact
+commands are under `D:/projects/runs/ctf-rs-r1-4/`: `diagnostic.log`,
+`confirmation.log`, `diagnostic.sh`, `confirm.sh`, and `commands.md`.
+
+```powershell
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-r1-4/diagnostic.sh
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-r1-4/confirm.sh
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-r1-4/acceptance.sh
+$env:CARGO_BUILD_JOBS='2'
+cmd.exe /d /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/acceptance-native.ps1 -BuildOnly > D:\projects\runs\ctf-rs-r1-4\native-build.log 2>&1"
+cmd.exe /d /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/acceptance-native.ps1 -D6Only > D:\projects\runs\ctf-rs-r1-4\native-d6.log 2>&1"
+```
+
+Native commands run from `D:/projects/ctf-rs`; all runtime logs are outside
+the source tree. The acceptance scripts are unchanged, including their own
+rank loops and complete driver selections.
+
+```text
+DIGIT / PASS
+Q: every WSL acceptance driver's own metric and required invariants; class: R
+ref: pinned upstream f69cbb46; bound: exact or upstream per driver, unchanged
+Delta: every unchanged assertion passed; emitted numerical metrics remain in wsl.log
+checks: all 175 MPI drivers completed at each of 1/2/4 ranks, followed by
+        all prescribed library/local checks and the seven-rank Strassen run
+runs: acceptance-wsl.sh once, each configured rank set once; exit 0
+closed: WSL numerical verification; no extra diagnostics or precision checks
+
+DIGIT / PASS
+Q: native Windows GNU compile/link of all tests and examples; class: R
+ref: plan.v2 native build gate; bound: successful compile/link, exit 0
+Delta: no compile/link failure; no numerical delta applies
+runs: acceptance-native.ps1 -BuildOnly once
+```
+
+```text
+DIGIT / PASS
+Q: native D6 drivers' own metrics and invariants; class: R
+ref: pinned upstream f69cbb46; bound: exact or upstream per driver, unchanged
+Delta: every unchanged assertion passed; emitted metrics remain in native-d6.log
+checks: all 50 dense drivers completed at each of 1/2/4 ranks, plus four
+        local scaling tests; 150 driver PASS stamps and the scaling target passed
+runs: acceptance-native.ps1 -D6Only once, each rank configuration once; exit 0
+closed: native numerical verification; no diagnostics or additional checks
+```
+
+**G-CTF-R1 is closed: DIGIT / PASS.** The direct replica-restoration defect
+is fixed, its 1/2/4 confirmation passes, and the entire prescribed WSL/native
+acceptance set passes. One diagnostic, three single-test confirmations, and
+the three prescribed acceptance-script invocations were used. The separate
+confirmation and full acceptance repetitions were explicitly requested; no
+additional passing check was rerun. S1 was not started and ctf-rs was not pushed.
+
+Scope note: the separate `dgtog_redistribution` test is not selected by the
+prescribed runtime scripts. Its root-only Tensor scalar assertion conflicts
+with the replica-populated Tensor contract explicitly required by
+`cyclic_reshuffle`. It was left unchanged, as instructed, and no runtime pass
+is claimed for that target. The low-level root-only primitive semantics remain
+unchanged; this is a public Tensor-layer correction.
+
 ### CTF-R1-2 diagnostic 3 (2026-09-09)
 
 Harness evt-0055 and BRIEF-2 authorize exactly two diagnostic runs: trace
