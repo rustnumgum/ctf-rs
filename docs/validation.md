@@ -2,6 +2,66 @@
 
 ## rsmpi binding
 
+### CTF-R1-2 diagnostic 3 (2026-09-09)
+
+Harness evt-0055 and BRIEF-2 authorize exactly two diagnostic runs: trace
+`Comm::exchange` at `813d90a` and raw-MPI baseline `f2039d3`, then fix only
+the translation identified by the first divergent line. Identical traces
+require handoff without a fix or acceptance rerun. The five R1 commits stand.
+
+```text
+DIGIT / HANDOFF
+Q: per-call/rank exchange send_counts, recv_counts, and each sent/received
+   bucket's FNV-1a-64 hash; existing exact i8 cyclic_reshuffle assertions
+class: R; ref: f2039d3; candidate: 813d90a
+bound: exact trace equality; exact driver equality, unchanged
+Delta: zero differing trace fields across two rows (call 0, ranks 0 and 1)
+driver result: both revisions fail at rank 1 local offset 0, actual 0,
+               expected -5; absolute difference 5 against exact bound 0
+runs: diagnostic 3 only, one two-rank run per revision, two runs total
+exits: current 124 at the 60-second supervisor after assertion panic;
+       baseline 101 after the same assertion panic and MPI process failure
+finding: no first divergent exchange line and no wrapper identified;
+         the same driver failure is reproduced on the pre-R1 baseline
+scope: no fix(mpi) commit, no acceptance rerun, no further diagnostics;
+       diagnostic 2 not applicable; R1 remains open, S1 held
+open: what scope is authorized for the baseline failure with identical
+      exchange traces, rather than an R1 wrapper translation defect?
+```
+
+Both traces, sorted by call and rank:
+
+```text
+call=0 rank=0 send_counts=[10, 0] recv_counts=[10, 0] sent_hashes=[3bc129cffea72d2d, cbf29ce484222325] received_hashes=[3bc129cffea72d2d, cbf29ce484222325]
+call=0 rank=1 send_counts=[0, 10] recv_counts=[0, 10] sent_hashes=[cbf29ce484222325, 4a98c824fe6e7321] received_hashes=[cbf29ce484222325, 4a98c824fe6e7321]
+```
+
+Instrumentation and i8-only call selection were applied only to two scratch
+archives, with separate Linux target directories. No assertions, layouts,
+initialization, split, cleanup, or delivery code were changed. FNV-1a uses
+offset `0xcbf29ce484222325` and wrapping multiplier `0x100000001b3`.
+The raw logs' PowerShell line wrapping was joined when extracting complete
+trace tuples; no count or hash field was discarded. This establishes the
+baseline failure, not a claim that all R1 behavior is equivalent.
+
+Exact commands (each once):
+
+```powershell
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-r1-2/diagnostic-3.sh current > D:/projects/runs/ctf-rs-r1-2/current.log 2>&1
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-r1-2/diagnostic-3.sh baseline > D:/projects/runs/ctf-rs-r1-2/baseline.log 2>&1
+```
+
+`D:/projects/runs/ctf-rs-r1-2/commands.md` and `diagnostic-3.sh` record the
+scratch revisions, narrowing, instrumentation, no-run builds, exact nested
+commands and supervisor. `current.trace` and `baseline.trace` contain the
+two complete rows each; `current.log` and `baseline.log` preserve both failed
+assertions. Copies accompany harness evd-1010 under
+`evidence/2026-09-09-ctf-rs-r1-2/`. The conditional acceptance rerun was **not
+executed**, as recorded by evd-1011; the initial native passes below remain
+closed and are not relabeled as new evidence.
+
+### Initial R1 acceptance
+
 R1, 2026-09-09, implementation `f072971` (series starts after `f2039d3`).
 The host owns MPI initialization/finalization; contexts borrow its rsmpi
 universe and communicator, check Funneled/main-thread support, and free only
