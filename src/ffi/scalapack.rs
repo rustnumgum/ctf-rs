@@ -7,8 +7,8 @@ use crate::algebra::Complex;
 use ::mpi::{ffi as sys, topology::Communicator, traits::AsRaw};
 use std::{ffi::c_char, marker::PhantomData, rc::Rc};
 
-#[cfg_attr(target_os = "windows", link(name = "scalapack"))]
-#[cfg_attr(not(target_os = "windows"), link(name = "scalapack-openmpi"))]
+#[cfg_attr(any(target_os = "windows", target_os = "macos"), link(name = "scalapack"))]
+#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link(name = "scalapack-openmpi"))]
 unsafe extern "C" {
     fn Csys2blacs_handle(comm: sys::MPI_Comm) -> i32;
     fn Cfree_blacs_system_handle(context: i32);

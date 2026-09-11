@@ -6,8 +6,8 @@ use crate::{
 };
 use std::ffi::c_char;
 
-#[cfg_attr(target_os = "windows", link(name = "openblas"))]
-#[cfg_attr(not(target_os = "windows"), link(name = "blas"))]
+#[cfg_attr(any(target_os = "windows", target_os = "macos"), link(name = "openblas"))]
+#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link(name = "blas"))]
 unsafe extern "C" {
     fn dormqr_(
         side: *const c_char,
@@ -137,8 +137,8 @@ unsafe extern "C" {
         lda: *const i32,
     );
 }
-#[cfg_attr(target_os = "windows", link(name = "openblas"))]
-#[cfg_attr(not(target_os = "windows"), link(name = "lapack"))]
+#[cfg_attr(any(target_os = "windows", target_os = "macos"), link(name = "openblas"))]
+#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link(name = "lapack"))]
 unsafe extern "C" {
     fn dpotrf_(uplo: *const c_char, n: *const i32, a: *mut f64, lda: *const i32, info: *mut i32);
     fn dgeqrf_(
