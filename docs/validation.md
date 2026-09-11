@@ -1,5 +1,28 @@
 # Validation evidence
 
+## C1 close
+
+### C1.2 contraction-path symmetrization correspondence
+
+Pinned `CTF_int::desymmetrize` (`symmetry/symmetrization.cxx:12-238`)
+is implemented by `SymmetricTensor::desymmetrized` in
+`src/symmetric_sy_sum.rs`. Pinned `CTF_int::symmetrize`
+(`symmetry/symmetrization.cxx:240-399`) is implemented by
+`SymmetricTensor::symmetrize_from` in the same Rust module. Both are called
+by the broken-symmetry contraction orchestration in `src/symmetric_contract.rs`:
+inputs use `desymmetrized(..., false)`, output uses
+`desymmetrized(..., true)`, and final output uses `symmetrize_from`.
+This preserves SY diagonal/coincidence factors, AS signs, a zero relaxed
+output, and the source's active accumulation branch rather than its disabled
+alternative.
+
+The existing `upstream_gemm4d` driver exercises both functions through its
+NS/SY/AS/SH branches at WSL 1, 2, and 4 ranks. The C1 full script also includes
+`upstream_sy_times_ns`, `upstream_multi_tsr_sym`, `upstream_diag_sym`, and
+`upstream_weigh4d`. These are the unchanged C1.2 acceptance drivers; the
+implementation already exists, so C1.2 closes by correspondence documentation.
+The C1 acceptance result is recorded below only after execution.
+
 ## rsmpi binding
 
 ### CTF-R1-4 direct replica restoration (2026-09-09)
