@@ -1,0 +1,245 @@
+target	class	ranks	sets	note
+foundation	mpi	1 2 4		
+dense_views	mpi	1 2 4		
+replicated_sum	mpi	1 2 4		
+tensor_sum	mpi	1 2 4		
+custom_reduce	mpi	1 2 4		
+algebra_sum	mpi	1 2 4		
+complex_scalar	mpi	1 2 4		
+sum_remap	mpi	1 2 4		
+replicated_contraction	mpi	1 2 4		
+ctr_2d	mpi	1 2 4		
+tensor_gemm	mpi	1 2 4		
+algebra_contraction	mpi	1 2 4		
+tensor_contract	mpi	1 2 4		
+contract_remap	mpi	1 2 4		
+dense_semantics	mpi	1 2 4		
+upstream_dense	mpi	1 2 4		
+subcomm_dense	mpi	1 2 4		
+plan_cache	mpi	1 2 4		
+model_training	mpi	1 2 4		
+selector	mpi	1 2 4		
+selection_objective	mpi	1 2 4		
+tensor_blas_fold	mpi	1 2 4		
+upstream_gemm4d	mpi	1 2 4	d6	
+distributed_matrix	mpi	1 2 4		
+distributed_qr_svd	mpi	1 2 4		
+distributed_svd_paths	mpi	1 2 4		
+distributed_eigh	mpi	1 2 4		
+distributed_spd	mpi	1 2 4		
+distributed_tttp	mpi	1 2 4		
+distributed_mttkrp	mpi	1 2 4		
+distributed_tensor_svd	mpi	1 2 4		
+distributed_solve_factor	mpi	1 2 4		
+distributed_sparse_io	mpi	1 2 4	c1	
+distributed_sparse_sum	mpi	1 2 4		
+distributed_sparse_gemm	mpi	1 2 4		
+distributed_sparse_fold	mpi	1 2 4		
+upstream_sparse_mp3	mpi	1 2 4		
+distributed_sparse_transform	mpi	1 2 4		
+distributed_dense_sparse	mpi	1 2 4		
+upstream_sparse_mp3_t	mpi	1 2 4		
+distributed_sparse_diagonal	mpi	1 2 4		
+upstream_fast_3mm	mpi	1 2 4	d6	
+upstream_fast_diagram	mpi	1 2 4	d6	
+upstream_fast_sym_4d	mpi	1 2 4	d6	
+upstream_fast_sym	mpi	1 2 4	d6	
+upstream_fast_as_as_sy_tensor_ctr	mpi	1 2 4	d6	
+upstream_fast_sy_as_as_tensor_ctr	mpi	1 2 4	d6	
+upstream_fast_tensor_ctr	mpi	1 2 4	d6	
+d4_memcontrol	mpi	1 2 4	d6	
+d4_timer_util	mpi	1 2 4	d6	
+d4_blas_flops	mpi	1 2 4	d6	
+d5_common	mpi	1 2 4	d6	
+d5_value_interfaces	mpi	1 2 4	d6	
+d5_algebra_interfaces	mpi	1 2 4	d6	
+upstream_fft_with_idx_partition	mpi	1 2 4	d6	
+upstream_fft	mpi	1 2 4	d6	
+upstream_dft_3d	mpi	1 2 4	d6	
+upstream_test_suite_dense	mpi	1 2 4	d6	
+upstream_matmul	mpi	1 2 4	d6	
+upstream_recursive_matmul	mpi	1 2 4	d6	
+upstream_ccsd	mpi	1 2 4	d6	
+upstream_ao_mo_transf	mpi	1 2 4	d6	
+upstream_neural_network	mpi	1 2 4	d6	
+upstream_bitonic_sort	mpi	1 2 4	d6	
+upstream_checkpoint	mpi	1 2 4	d6	
+upstream_force_integration	mpi	1 2 4	d6	
+upstream_particle_interaction	mpi	1 2 4	d6	
+upstream_qinformatics	mpi	1 2 4	d6	
+upstream_mttkrp	mpi	1 2 4	d6	
+distributed_symmetric_io	mpi	1 2 4		
+distributed_symmetric_operations	mpi	1 2 4		
+distributed_symmetric_repack	mpi	1 2 4	d6	
+distributed_packed_sum	mpi	1 2 4		
+distributed_packed_contraction	mpi	1 2 4		
+distributed_canonical_sum	mpi	1 2 4		
+distributed_hollow_sum	mpi	1 2 4		
+distributed_symmetric_diagonal	mpi	1 2 4		
+distributed_sy_sum	mpi	1 2 4		
+distributed_sy_scalars	mpi	1 2 4		
+distributed_canonical_contraction	mpi	1 2 4		
+distributed_symmetric_contraction	mpi	1 2 4		
+upstream_diag_sym	mpi	1 2 4	d6	
+distributed_cross_diagonal	mpi	1 2 4		
+upstream_diag_ctr	mpi	1 2 4		
+upstream_sy_times_ns	mpi	1 2 4	d6	
+upstream_multi_tsr_sym	mpi	1 2 4	d6	
+upstream_reduce_bcast	mpi	1 2 4	d6	
+distributed_sparse_multilinear	mpi	1 2 4		
+distributed_sparse_solve_factor	mpi	1 2 4		
+distributed_sparse_input_reduction	mpi	1 2 4		
+distributed_sparse_general	mpi	1 2 4		
+distributed_sparse_function	mpi	1 2 4		
+distributed_sparse_gemm_function	mpi	1 2 4		
+distributed_sparse_function_output	mpi	1 2 4		
+distributed_sparse_fold_function	mpi	1 2 4		
+upstream_bivar_function	mpi	1 2 4	d6	
+distributed_dense_function	mpi	1 2 4		
+upstream_univar_function	mpi	1 2 4	d6	
+upstream_endomorphism	mpi	1 2 4	d6	
+upstream_bivar_transform	mpi	1 2 4	d6	
+upstream_endomorphism_cust	mpi	1 2 4	d6	
+upstream_endomorphism_cust_sp	mpi	1 2 4	d6	
+distributed_exhaustive_mapping	mpi	1 2 4		
+distributed_normal_mapping	mpi	1 2 4		
+selected_mapping	mpi	1 2 4		
+dense_search	mpi	1 2 4		
+dense_execution	mpi	1 2 4		
+dense_execution_algebra	mpi	1 2 4		
+dense_folded_execution	mpi	1 2 4		
+distributed_node_fold	mpi	1 2 4		
+dense_low_memory	mpi	1 2 4	d6	
+typed_folded_execution	mpi	1 2 4		
+typed_matrix_factors	mpi	1 2 4		
+typed_distributed_qr	mpi	1 2 4		
+typed_distributed_svd	mpi	1 2 4		
+typed_svd_truncation	mpi	1 2 4		
+randomized_guess	mpi	1 2 4		
+distributed_random_fill	mpi	1 2 4		
+typed_grid_blas	mpi	1 2 4		
+typed_randomized_svd	mpi	1 2 4		
+typed_distributed_eigh	mpi	1 2 4		
+typed_tensor_svd	mpi	1 2 4		
+typed_multilinear	mpi	1 2 4		
+tttp_memory	mpi	1 2 4		
+tensor_norms	mpi	1 2 4		
+storage_conversion	mpi	1 2 4		
+sparse_random_fill	mpi	1 2 4		
+subworld_transfer	mpi	1 2 4		
+sparse_text_io	mpi	1 2 4	c1	
+symmetric_norms	mpi	1 2 4		
+symmetric_text_io	mpi	1 2 4		
+pair_read	mpi	1 2 4		
+binary_io	mpi	1 2 4		
+schedule	mpi	1 2 4		
+cyclic_reshuffle	mpi	1 2 4		
+bool_norm	mpi	1 2 4		
+symmetric_reshuffle	mpi	1 2 4		
+symmetric_subworld	mpi	1 2 4		
+upstream_subworld_gemm	mpi	1 2 4	d6	
+upstream_readall	mpi	1 2 4	d6	
+upstream_readwrite	mpi	1 2 4	d6	
+upstream_sptensor_sum	mpi	1 2 4		
+upstream_permute_multiworld	mpi	1 2 4	d6	
+indexed_write_order	mpi	1 2 4		
+symmetric_permuted_io	mpi	1 2 4		
+sparse_permuted_io	mpi	1 2 4		
+upstream_scalar	mpi	1 2 4	d6	
+upstream_speye	mpi	1 2 4		
+upstream_ccsdt_map	mpi	1 2 4	d6	
+upstream_ccsdt_t3_to_t2	mpi	1 2 4	d6	
+symmetric_random	mpi	1 2 4		
+upstream_weigh4d	mpi	1 2 4	d6	
+upstream_dft	mpi	1 2 4	d6	
+distributed_symmetric_function	mpi	1 2 4		
+integer_random	mpi	1 2 4		
+distributed_sparse_dense_output	mpi	1 2 4		
+distributed_sparse_storage_dispatch	mpi	1 2 4		
+upstream_spmv	mpi	1 2 4		
+distributed_sparse_reduce	mpi	1 2 4		
+distributed_sparse_replicate	mpi	1 2 4		
+upstream_scan	mpi	1 2 4		
+distributed_sparse_2d	mpi	1 2 4		
+upstream_trace	mpi	1 2 4		
+distributed_sparse_2d_dense	mpi	1 2 4		
+distributed_sparse_2d_pairs	mpi	1 2 4		
+distributed_coo_2d	mpi	1 2 4		
+upstream_sssp	mpi	1 2 4		
+distributed_mixed_coo	mpi	1 2 4		
+upstream_strassen	mpi	1 2 4 7		
+distributed_sparse_plan	mpi	1 2 4		
+upstream_spectral_element	mpi	1 2 4		
+upstream_jacobi	mpi	1 2 4		
+upstream_hosvd	mpi	1 2 4		
+distributed_sparse_raw	mpi	1 2 4		
+distributed_sparse_search	mpi	1 2 4		
+upstream_apsp	mpi	1 2 4		
+upstream_algebraic_multigrid	mpi	1 2 4		
+upstream_block_sparse	mpi	1 2 4		
+upstream_force_integration_sparse	mpi	1 2 4		
+upstream_btwn_central	mpi	1 2 4		
+upstream_checkpoint_sparse	mpi	1 2 4		
+upstream_mis	mpi	1 2 4		
+upstream_mis2	mpi	1 2 4		
+sparse_einsum_hadamard	mpi	1 2 4		
+sparse_scaled_expression	mpi	1 2 4		
+sparse_complex	mpi	1 2 4		
+sparse_sy	mpi	1 2 4		
+sparse_sample	mpi	1 2 4		
+dgtog_redistribution	mpi	1 2 4		
+model_io	mpi	1 2 4		
+tttp_blocking	lib	-		
+sparse_text	lib	-		
+schedule	lib	-		
+cyclic_reshuffle	lib	-		
+symmetric_reshuffle	lib	-		
+sparse_virtual	lib	-		
+cost_models	local	-		
+fold_indices	local	-		
+fold_layout	local	-		
+fold_selection	local	-		
+fold_storage	local	-		
+folded_contraction	local	-		
+folded_cost	local	-		
+folding	local	-		
+grid_plan_cost	local	-		
+local_linalg	local	-		
+map_tensor	local	-		
+mapped_cost	local	-		
+mapping_preflight	local	-		
+mapping_variants	local	-		
+mixed_kernel	local	-		
+mixed_sparse_output	local	-		
+narrow_algebra	local	-		
+node_aware	local	-		
+node_peer_counts	local	-		
+normal_mapping	local	-		
+partial_fold	local	-		
+partial_fold_kernel	local	-		
+plan_cost	local	-		
+random_generator	local	-		
+redist_cost	local	-		
+scalar_blas	local	-		
+scaling	local	-		
+self_mapping	local	-		
+sequential_contraction	local	-		
+sequential_sum	local	-		
+sparse_coo	local	-		
+sparse_cost	local	-		
+sparse_formats	local	-		
+sparse_function	local	-		
+sparse_function_kernel	local	-		
+sparse_keys	local	-		
+sparse_mapped_cost	local	-		
+sparse_matricize	local	-		
+sparse_sequential	local	-		
+sym_indices	local	-		
+sym_operations	local	-		
+sym_triple	local	-		
+symmetry_layout	local	-		
+topology_candidates	local	-		
+topology_canonicalization	local	-		
+virtual_sum	local	-		
+upstream_bench_contraction	excluded	-		prints INFO only, no DIGIT/PASS line; informational driver, not a gate
+upstream_model_trainer	excluded	-		requires a -write argument the acceptance scripts do not supply
