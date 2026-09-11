@@ -56,13 +56,13 @@ src/interface/common.h	src/common.rs; src/context.rs	ported: common CPU helpers 
 src/interface/decomposition.cxx	src/tensor_svd.rs; src/reshape.rs	incomplete upstream HoSVD class and excluded C++ expression machinery, not a working class API to port; indexed tensor SVD exists; the working examples/hosvd.cxx algorithm is ported separately, see tests/upstream_hosvd.rs
 src/interface/decomposition.h	Rust direct tensor/matrix APIs	unfinished upstream HoSVD declaration and excluded expression interface; see docs/coverage.md
 src/interface/flop_counter.cxx	src/flop_counter.rs; src/ffi/linalg.rs	ported process-global accumulation, interval snapshot/zero and communicator MPI_SUM; production GEMM instrumentation has exact D4 coverage
-src/interface/fun_term.cxx	src/interface	replaced: direct Rust operations replace the expression interface
-src/interface/fun_term.h	src/interface	replaced: direct Rust operations replace the expression interface
+src/interface/fun_term.cxx	no direct module; see coverage.md	replaced: direct Rust operations replace the expression interface
+src/interface/fun_term.h	no direct module; see coverage.md	replaced: direct Rust operations replace the expression interface
 src/interface/functions.h	src/sparse_function_kernel.rs; src/sparse_gemm.rs; src/sparse_fold_function.rs	partial: Bivar_Function CSR sparse/dense and sparse/sparse dense/sparse-output kernels with distributed panels and fullyfoldable high-order custom dispatch; remaining function kernels and general dense dispatch pending
 src/interface/graph_io_aux.cxx	src/sparse_text.rs; src/ffi/mpi_io.rs	implemented: four typed coordinate codecs and communicator-scoped MPI-IO; fixed source overlap and prefix writes; unsafe EOF, MPI_COMM_WORLD and scanf-pointer behavior corrected; C1 WSL1/2/4 and native1/2/4 PASS, native compile/link PASS
 src/interface/group.h	src/algebra.rs	replaced: native Group trait and typed additive inverses replace the C++ hierarchy
-src/interface/idx_tensor.cxx	src/interface	replaced: direct Rust operations replace the expression interface
-src/interface/idx_tensor.h	src/interface	replaced: direct Rust operations replace the expression interface
+src/interface/idx_tensor.cxx	no direct module; see coverage.md	replaced: direct Rust operations replace the expression interface
+src/interface/idx_tensor.h	no direct module; see coverage.md	replaced: direct Rust operations replace the expression interface
 src/interface/kernel.h	src/sparse_coo.rs; src/kernel.rs; src/sparse_2d.rs	partial: mixed-type Kernel<f,g> COO, dense GEMM, CSR/dense, CSR/CSR dense/sparse-output loops plus Monoid strided xpy; explicit typed COO 2D communication, arbitrary accumulator and source coefficient restrictions; automatic distributed mixed-type dispatch pending
 src/interface/logger.h	src/memcontrol.rs; src/int_timer.rs	partial: resident-memory and timer evidence have explicit owners; C++ event/plan logger hooks are not part of the native API
 src/interface/Makefile	Cargo/build tooling	replaced
@@ -88,8 +88,8 @@ src/interface/sparse_tensor.cxx	src/tensor.rs (Tensor::write_scaled, Tensor::rea
 src/interface/sparse_tensor.h	src/tensor.rs (Tensor::write_scaled, Tensor::read); src/sparse.rs (SparseTensor::write_scaled)	ported; the C++ operator sugar is not retained
 src/interface/tensor.cxx	src/tensor.rs; src/sparse.rs; src/random.rs; src/norms.rs; src/subworld.rs; src/symmetric_subworld.rs; src/sparse_text.rs; src/symmetric_unpack.rs; src/pair_read.rs	partial: direct dense operations, ownership dense/sparse conversion, four-type dense random fill, seven-type sparse-pattern random fill, dense/sparse/compressed real norms and complex norm2 plus bool NS norm2/infinity, generic dense/compressed cross-world accumulation, four-type dense/sparse/compressed text MPI-IO, distributed symmetry unpack and explicit all-rank sorted pair/data extraction; optimized cross-world reshuffle pending; pinned bool norm1 and sparse subworld path are type/storage unsafe rather than coherent supported computations (docs/source-runtime-boundaries.md)
 src/interface/tensor.h	src/tensor.rs; src/sparse.rs; src/symmetric_tensor.rs; src/matrix.rs; src/vector.rs; src/scalar.rs; src/context.rs	replaced: owned typed Rust tensors and contexts replace the public C++ wrapper hierarchy
-src/interface/term.cxx	src/interface	replaced: direct Rust operations replace the expression interface
-src/interface/term.h	src/interface	replaced: direct Rust operations replace the expression interface
+src/interface/term.cxx	no direct module; see coverage.md	replaced: direct Rust operations replace the expression interface; Sum_Term's automatic multi-term chain ordering (estimate_time term.cxx:426, execute :486-518) has no Rust equivalent, see coverage.md "Remaining tensor-interface boundaries"
+src/interface/term.h	no direct module; see coverage.md	replaced: direct Rust operations replace the expression interface; Sum_Term's automatic multi-term chain ordering (estimate_time term.cxx:426, execute :486-518) has no Rust equivalent, see coverage.md "Remaining tensor-interface boundaries"
 src/interface/timer.h	src/int_timer.rs; src/flop_counter.rs	replaced: owned timer records/registry and explicit flop snapshots replace global C++ timers
 src/interface/vector.cxx	src/vector.rs; src/tensor.rs	ported: typed distributed arange; rank-one Tensor is the native vector representation
 src/interface/vector.h	src/vector.rs; src/tensor.rs	ported: no redundant Vector subclass or C++ wrapper

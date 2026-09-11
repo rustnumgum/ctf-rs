@@ -14,6 +14,13 @@ kernels initially; their internal Rust interface must remain replaceable by faer
 distributed decomposition implementation, independently of local kernel choice.
 Do not introduce a plugin framework or replace distributed algorithms with gather.
 
+The C++ expression-template layer's automatic ordering of multi-term
+contraction chains (`Sum_Term::estimate_time`/`execute`, `term.cxx:426,486-518`)
+has no Rust equivalent: `interface/{term,idx_tensor,fun_term}` are replaced by
+direct operations, not ported, so a chain written as successive
+`contract_from`/`sum_from` calls executes in the order the caller writes it.
+This is a scope limit, not a pending port item; see `docs/coverage.md`.
+
 ## Validation contract
 
 Class R: preserve the pinned CPU algorithms, layouts and communication steps.

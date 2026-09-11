@@ -20,7 +20,7 @@ post-fill padding cleanup; integers truncate after double-precision scaling.
 | 4 | symmetry/*; symmetric sequential kernels | symmetry; symmetric_distribution; symmetric_tensor | NS/SY/AS/SH compressed layouts, mixed symmetry and repeated indices | distributed compressed I/O, redistribution, repack, general diagonal stack, symmetry-aware summation and automatic dense contraction/sum mapping implemented; canonical compressed sparse storage and selected custom accumulation implemented |
 | 4 | interface/{functions,fun_term}; transforms in tensor | algebra; tensor; dense_function; symmetric_contract; sparse_functions; sparse_function_kernel; sparse_fold_function | univar_function, bivar_function, bivar_transform, endomorphism* | local transforms, typed sparse maps, subset-index accumulators, distributed CSR custom products, fullyfoldable high-order sparse custom contractions, explicitly mapped general dense functions and packed symmetry custom-function CPU/MPI dispatch implemented; selected heterogeneous folded sparse and custom summation kernels implemented; source restricted combinations remain explicitly unsupported |
 | 5 | interface/matrix; shared/lapack_symbs | matrix; ffi/linalg; ffi/scalapack | qr, svd, eigh, Cholesky, SPD/triangular solves, randomized SVD | f32/f64/complex32/complex64 distributed Cholesky/triangular solve/thin QR/SVD, truncated/randomized SVD, padded virtual-column SPD and square-subworld symmetric/Hermitian eigh implemented; the pinned dense QR/SVD/eigh drivers are closed, while optional undeployed routine families are not claimed |
-| 5 | interface/multilinear | multilinear; multilinear_factor; sparse_multilinear; solve_factor; tensor_svd; reshape | TTTP, MTTKRP, Solve_Factor, tensor SVD | generic semiring dense/sparse TTTP, source fiber-grouped four-type MTTKRP, f64 distributed weighted Solve_Factor, four-type indexed tensor SVD and key-based reshape implemented; remaining work is sparse-path optimization rather than a dense acceptance gap |
+| 5 | interface/multilinear | multilinear; multilinear_factor; sparse_multilinear; solve_factor; tensor_svd; reshape | TTTP, MTTKRP, Solve_Factor, tensor SVD | generic semiring dense/sparse TTTP, source fiber-grouped four-type MTTKRP, f64 distributed weighted Solve_Factor, four-type indexed tensor SVD and key-based reshape implemented; open items are the remaining scalar kernels, the vector memory diagnostic and process memory accounting (see the multilinear.cxx inventory row), not a dense acceptance gap |
 | 5 | interface/{partition,vector,scalar,common}; schedule; tensor persistence/graph I/O; shared diagnostics | partition; vector; scalar; common; schedule; tensor; shared; sparse_text; ffi/mpi_io | FFT partitioning, scalar/value access, schedules, checkpoint, graph input, diagnostics | native indexed partitions, tensor-backed vector/scalar operations, common helpers, dense MPI-IO checkpointing, scheduling, timers and flop snapshots implemented; graph/sparse persistence native runtime passed C1; source-default n7 sparse checkpoint passed CK7 WSL/native1/2/4 with unchanged text precision and bound expression |
 
 All CPU test, example, benchmark and study files are inventoried separately;
@@ -50,6 +50,14 @@ CUDA/offload code and Python/C++ API compatibility are excluded, not CPU paths.
 - Dense/sparse/compressed real norms and complex norm2 are implemented in norms.rs,
   including original-precision compressed squaring and the source NS manual path.
   Bool norm1/norm_infty and compressed Boolean algebra contracts remain open.
+- Expression-layer chain ordering: `Sum_Term::estimate_time` (`term.cxx:426`)
+  and `execute` (`term.cxx:486-518`) cost-estimate and reorder a chain of
+  summed terms before executing it. Rust has no expression-template layer;
+  `interface/{term,idx_tensor,fun_term}` are replaced by direct operations,
+  not ported. A chain written as successive `contract_from`/`sum_from` calls
+  therefore executes in the order the caller writes it, with no automatic
+  reordering. This is a scope limit of the direct-port boundary, not a
+  pending port item.
 
 Solve_Factor is f64-only in the pinned working implementation: multilinear.cxx
 uses double buffers and MPI_DOUBLE (935-965). Missing f32/complex versions are
