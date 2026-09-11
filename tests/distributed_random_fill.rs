@@ -109,7 +109,7 @@ fn main() {
     child.close();
     if world.rank() == 0 {
         println!(
-            "PASS distributed_random_fill: four types, pre-scaling precision and padding draw consumption exact; world+parity"
+            "DIGIT / PASS distributed_random_fill: four types, pre-scaling precision and padding draw consumption exact; world+parity"
         );
     }
     world.close();
