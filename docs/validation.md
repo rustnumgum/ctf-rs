@@ -141,6 +141,43 @@ sparse output is reduced, depinned and returned to its original layout.
 Cache hits retain mappings, not values or nonzero counts. No C1 acceptance
 check is rerun under S1a.
 
+### S1a outcome (2026-09-11)
+
+Prescribed WSL runs: each of the five drivers once at 1/2/4, revision
+`bebe3a4`. Native compile/link of all five passed once successfully (two WSL
+and one native build-only type-error attempts preceded it; no numerical runs
+occurred in those attempts). Native runtime is reserved for S1c.
+
+| Driver | Stamp | Quantity / delta at 1, 2, 4 ranks |
+|---|---|---|
+| upstream_apsp | DIGIT / PASS | differing weights = 0, 0, 0; exact bound 0 |
+| sparse_complex | DIGIT / PASS | sum(abs(diff)) = 0, 0, 0; strict bound 1e-14 |
+| sparse_einsum_hadamard | DIGIT / HANDOFF | selected=None at all ranks; Q and delta uncomputed; source rejects sparse ABC weigh indices |
+| sparse_scaled_expression | DIGIT / HANDOFF | selected=None at all ranks; Q and delta uncomputed; same source restriction |
+| upstream_algebraic_multigrid | DIGIT / HANDOFF | original runs stop at matricization row-order assertion; residual uncomputed |
+
+Static AMG diagnosis found the selected inner ordering, not original tensor
+dimension order, defines the row prefix. Source-derived fix `1285771` changes
+only that metadata interpretation. One named rank-count split diagnostic at
+1 rank then passed: rnorm=0.004937970528833717 versus
+rnorm_alt=0.005547611182988828, strict less-than bound, difference
+-0.000609640654155111; one recorded V-cycle timing 0.022667 s. This closes
+that diagnostic, not the failed original 2/4-rank acceptance. No further
+numerical verification or repeated passing driver was run. AMG diagnostic
+budget used 1/3; each Python failure used 0/3 (decisive static source boundary).
+
+Commands and logs under `D:/projects/runs/ctf-rs-s1/S1a/`:
+`wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-s1/S1a/acceptance.sh`,
+`native-build.ps1` via the exact command in `commands.md`, and
+`wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-s1/S1a/amg-rank-split.sh`.
+`wsl.log`, `build.json`, each `<driver>-<ranks>.log`, `native-build.log`,
+`amg-rank-split.log` and its build JSON retain the complete evidence.
+HANDOFF: may source-forbidden sparse ABC expressions remain unsupported, and
+does the repaired AMG layout also pass the remaining distributed ranks?
+S1b/S1c continue; their GEMM-shaped drivers do not require sparse ABC weigh
+support, but custom folded work uses the repaired layout metadata. Final
+native execution still includes all thirteen S1 drivers/semantics.
+
 ## rsmpi binding
 
 ### CTF-R1-4 direct replica restoration (2026-09-09)

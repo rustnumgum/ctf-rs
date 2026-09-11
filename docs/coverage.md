@@ -80,6 +80,14 @@ These are Frobenius norms (`norm2`), not entrywise vector comparisons.
 
 ## Current evidence
 
+S1a implements raw cached folded k1-k5 candidate selection and direct selected
+SDD/SSD/SSS/SDS execution including nested panels, virtual traversal and output
+depinning. APSP and Python complex pass at WSL 1/2/4; all five S1a targets
+compile/link natively. AMG's row-order repair passes one permitted rank-1
+diagnostic; its original distributed gate remains HANDOFF. Two Python ABC
+expressions are source-ineligible and remain HANDOFF, not accepted coverage.
+Compressed/custom sparse and optimized sparse summation continue in S1b/S1c.
+
 C1 closed on 2026-09-11: source-format model I/O, contraction-path
 symmetrization, dense custom folded kernels and dense/packed folded sums,
 working selector agreement, and graph I/O native runtime are complete under

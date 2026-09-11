@@ -1,4 +1,14 @@
-# Unfolded sparse search and execution
+# Raw sparse search and execution
+
+S1a adds `SearchCache` with fixed model/storage configuration and structural
+cache keys, global canonical nonzero counts on misses, and local hits.
+`Selected` retains the actual distributions, sparse fold descriptor and COO
+capability. Folded k1-k5 candidates use sparse density/transpose, twelve CPU
+leaf models and A/B/C pin layers. Selected execution performs redistribution,
+folding, replication, nested panels, virtual traversal and output depinning;
+it does not substitute a GridPlan. APIs cover SDD, SSD, SSS and SDS storage.
+Sparse ABC weigh labels remain source-ineligible. Compressed-symmetry and
+custom mixed-type selected execution remain S1b; summation remains S1c.
 
 `sparse_search::search_unfolded` selects raw mappings for NS sparse A / dense
 B / dense C. It reuses the existing source normal and exhaustive enumerators,
@@ -28,8 +38,6 @@ The execution entry point consumes structural descriptors only: density fields
 do not influence that assembly, and no cost estimate is evaluated during it.
 Search separately computes actual density-based estimates.
 
-This connects selection to execution for the unfolded unique-label sparse-A
-path, not all sparse planning. Folded k1-k5 candidate assembly/selection, sparse
-B/C output combinations, compressed-symmetry automatic plans and search-cache
-integration remain pending. Existing aligned GridPlan caching remains available;
-it is not mislabeled as a cache for this arbitrary raw search.
+The older `search_unfolded` entry remains explicitly restricted to k0 SDD.
+The S1a selected APIs described above extend it without changing that contract.
+Existing aligned GridPlan caching is distinct from the raw SearchCache.
