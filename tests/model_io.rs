@@ -95,15 +95,27 @@ fn check(context: &Context<'_>, output: PathBuf) {
 }
 
 fn main() {
-    let output = std::env::args_os()
-        .nth(1)
-        .map(PathBuf::from)
-        .expect("usage: model_io OUTPUT_DIRECTORY");
+    let argument = std::env::args_os().nth(1).map(PathBuf::from);
     let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
         .expect("MPI initialization failed");
     assert!(provided >= mpi::Threading::Funneled);
     let world = Context::world(&universe);
-    check(&world, output);
+    // Without an argument every rank agrees on one fresh temporary directory
+    // named by rank 0's process id, and rank 0 removes it at the end; an
+    // explicit directory is left in place for inspection.
+    let (output, temporary) = match argument {
+        Some(path) => (path, false),
+        None => {
+            let mut token = [std::process::id() as u64];
+            world.broadcast(0, &mut token);
+            (std::env::temp_dir().join(format!("ctf-model-io-{}", token[0])), true)
+        }
+    };
+    check(&world, output.clone());
+    world.barrier();
+    if temporary && world.rank() == 0 {
+        let _ = fs::remove_dir_all(&output);
+    }
     world.close();
     drop(universe);
 }
