@@ -50,8 +50,9 @@ use libffi.
 In WSL Ubuntu-26.04, install the Rust toolchain, MPI development files,
 `libclang-dev`, BLAS/LAPACK and ScaLAPACK development libraries. Run
 `bash scripts/acceptance-wsl.sh` from this project. It uses the Linux filesystem
-for Cargo's target directory. The script currently covers only the foundation
-and local-linalg subset; do not treat it as the complete acceptance suite.
+for Cargo's target directory. The script covers the current 175 MPI drivers at
+1, 2, and 4 ranks, plus its local/library checks and seven-rank Strassen check.
+It is not the still-pending S1 acceptance set.
 Recorded results and remaining gates are in `docs/validation.md`.
 
 To avoid Windows-drive source I/O, run `bash scripts/sync-wsl.sh` from the

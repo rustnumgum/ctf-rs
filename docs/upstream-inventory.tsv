@@ -1,14 +1,14 @@
 source	rust_destination	status
 src/Makefile	Cargo/build tooling	replaced
 src/sparse_formats/ccsr.cxx	src/sparse_formats.rs	partial: row encoding, partition/assemble, addition; local exact tests pass
-src/sparse_formats/ccsr.h	src/sparse_formats	pending
+src/sparse_formats/ccsr.h	src/sparse_formats.rs	partial: row encoding, partition/assemble, addition; local exact tests pass
 src/sparse_formats/coo.cxx	src/sparse_formats.rs; src/sparse_coo.rs; src/sparse_2d.rs; src/sparse_matricize.rs	partial: native default/generic/Kernel COO leaves, order-preserving 2D panels, phase/permutation-aware tensor matricization with source folded binomial ranking and defined unfolded reverse; automatic folding-route assembly/selection pending
-src/sparse_formats/coo.h	src/sparse_formats	pending
+src/sparse_formats/coo.h	src/sparse_formats.rs; src/sparse_coo.rs; src/sparse_2d.rs; src/sparse_matricize.rs	partial: native default/generic/Kernel COO leaves, order-preserving 2D panels, phase/permutation-aware tensor matricization with source folded binomial ranking and defined unfolded reverse; automatic folding-route assembly/selection pending
 src/sparse_formats/csr.cxx	src/sparse_formats.rs	partial: partition/assemble, addition; local exact tests pass
-src/sparse_formats/csr.h	src/sparse_formats	pending
+src/sparse_formats/csr.h	src/sparse_formats.rs	partial: partition/assemble, addition; local exact tests pass
 src/sparse_formats/Makefile	Cargo/build tooling	replaced
 src/sparse_formats/sparse_matrix.cxx	src/sparse_formats.rs	replaced: assertion-only abstract methods are not executable CPU algorithms; concrete CSR/CCSR implementations ported
-src/sparse_formats/sparse_matrix.h	src/sparse_formats.rs	replaced: C++ virtual base and packed-buffer ABI replaced by concrete owned Rust sparse types
+src/sparse_formats/sparse_matrix.h	src/sparse_formats.rs	replaced: assertion-only abstract methods are not executable CPU algorithms; concrete CSR/CCSR implementations ported
 src/mapping/distribution.cxx	src/mapping.rs	ported generic layout responsibilities: ownership, phases, padding-aware local offsets/global keys and source calc_dim integer metadata walk; C++ raw snapshot serialization replaced
 src/mapping/distribution.h	src/mapping.rs	replaced: owned shape/topology/map description plus explicit calc_dim metadata replace C++ ABI descriptor
 src/mapping/Makefile	Cargo/build tooling	replaced
@@ -42,8 +42,8 @@ src/shared/Makefile	Cargo/build tooling	replaced
 src/shared/memcontrol.cxx	src/memcontrol.rs; examples/mpi_low_memory_bench.rs	ported cap/process-share/used-memory budgeting and low-memory selection; OS resident set replaces allocator registry and Linux cgroup limit corrects bare-host assumption
 src/shared/memcontrol.h	src/memcontrol.rs	replaced: exact budget value types and RAII allocation replace raw allocation/deallocation/profiler hooks
 src/shared/mkl_symbs.h	src/algebra.rs; src/kernel.rs; src/sparse_formats.rs; src/sparse_coo.rs	partial: elementwise operations are native Rust; optional MKL sparse backends remain a sparse-only concern
-src/shared/model.cxx	src/model.rs	partial: linear/cubic prediction, rolling observations, distributed QR/SVD update; model I/O and global registry pending
-src/shared/model.h	src/model.rs	partial: owned model interfaces; planner integration pending
+src/shared/model.cxx	src/model.rs; src/cost.rs	ported: linear/cubic prediction, rolling observations, distributed QR/SVD update and explicit CPU registry coefficient write/load, rank-ordered dumps and printing; C1.1 source-format roundtrip pending acceptance
+src/shared/model.h	src/model.rs; src/cost.rs	replaced: explicit typed CPU model registry methods; no process-global registry or environment-triggered load
 src/shared/offload.cu	excluded: CUDA/offload	excluded
 src/shared/offload.cxx	excluded: CUDA/offload	excluded
 src/shared/offload.h	excluded: CUDA/offload	excluded
@@ -96,7 +96,7 @@ src/interface/vector.h	src/vector.rs; src/tensor.rs	ported: no redundant Vector 
 src/interface/world.cxx	src/runtime.rs; src/context.rs	ported: native MPI runtime, contexts, splits and parity worlds
 src/interface/world.h	src/runtime.rs; src/context.rs	ported: native ownership replaces the C++ World wrapper
 src/contraction/contraction_plan.h	src/planning.rs	partial: executable explicit-grid mapping plan; costs, diagnostic steps and packing pending
-src/contraction/contraction_selector.h	src/selector.rs; src/planning.rs	replaced: context-owned candidate filtering/selection; pinned allgather is an unconditional upstream assertion, not a working capability
+src/contraction/contraction_selector.h	src/selector.rs; src/dense_search.rs	replaced: typed candidate selection; working winner agreement and exhaustive valid-mapping Allreduce implemented; unused upstream allgather assertion is not the working protocol
 src/contraction/contraction_signature.cxx	src/planning.rs; src/sparse_contract_general.rs	partial: dense and NS sparse-A/dense-B/dense-C structural grid-plan reuse and context-scoped cache; compressed symmetry and automatic sparse candidate assembly pending
 src/contraction/contraction_signature.h	src/planning.rs	partial: dense structural signature, full collision-safe equality
 src/contraction/contraction.cxx	src/folding.rs; src/sparse_fold.rs; src/planning.rs; src/selector.rs; src/symmetric_contract_tensor.rs; src/symmetric_contract.rs; src/normal_mapping.rs; src/mapping_variants.rs; src/dense_search.rs; src/dense_execution.rs; src/sparse_mapped_cost.rs; src/sparse_cost.rs; src/redist_cost.rs; src/sparse_search.rs; src/sparse_contract_general.rs	partial: dense folded/unfolded cached normal/exhaustive selection, raw execution, replication and automatic compressed symmetry planning; unfolded sparse-A original-density/redistribution/tree costs feed executable raw pin/replication/panel/virtual/k0 mappings; folded/sparse-output automatic candidates and raw sparse search cache pending
@@ -111,16 +111,16 @@ src/contraction/ctr_tsr.cxx	src/contraction.rs; src/symmetric_contraction_comm.r
 src/contraction/ctr_tsr.h	src/contraction.rs; src/symmetric_contract.rs	replaced: direct typed Tensor and SymmetricTensor contraction methods replace execution-tree ownership
 src/contraction/Makefile	Cargo/build tooling	replaced
 src/contraction/sp_seq_ctr.cxx	src/sparse_sequential.rs; src/sparse_fold.rs; src/sparse_diagonal.rs; src/sparse_gemm.rs; src/sparse_formats.rs	partial: general NS sparse-A/dense-B/dense-C recursion including pinned limited custom-function branch; folded sparse/mixed children and input pre-reduction; folded custom functions and other general sparse combinations pending
-src/contraction/sp_seq_ctr.h	src/contraction	pending
+src/contraction/sp_seq_ctr.h	src/sparse_sequential.rs; src/sparse_fold.rs; src/sparse_diagonal.rs; src/sparse_gemm.rs; src/sparse_formats.rs	partial: general NS sparse-A/dense-B/dense-C recursion including pinned limited custom-function branch; folded sparse/mixed children and input pre-reduction; folded custom functions and other general sparse combinations pending
 src/contraction/spctr_2d_general.cxx	src/sparse_gemm.rs; src/sparse_2d.rs; src/sparse_cost.rs	partial: stationary-output matrix LCM panels plus explicit CSR/CSR/CSR, CCSR/dense/CCSR, CSR/dense/dense, CSR/CSR/dense, COO/dense/dense and raw pairs/dense/dense moving A/B/C, strip packing, cyclic output reduction/reassembly, literal beta and layer scheduling, recursive children; direct source time/memory formulas; automatic tensor-to-plan assembly pending; sparse node-aware reordering disabled upstream
-src/contraction/spctr_2d_general.h	src/contraction	pending
+src/contraction/spctr_2d_general.h	src/sparse_gemm.rs; src/sparse_2d.rs; src/sparse_cost.rs	partial: stationary-output matrix LCM panels plus explicit CSR/CSR/CSR, CCSR/dense/CCSR, CSR/dense/dense, CSR/CSR/dense, COO/dense/dense and raw pairs/dense/dense moving A/B/C, strip packing, cyclic output reduction/reassembly, literal beta and layer scheduling, recursive children; direct source time/memory formulas; automatic tensor-to-plan assembly pending; sparse node-aware reordering disabled upstream
 src/contraction/spctr_comm.cxx	src/sparse_contract_general.rs; src/sparse_contraction_comm.rs; src/sparse_cost.rs	partial: mapped sparse-A/dense-B/dense-C broadcasts/root beta/reduction and owner restore; explicit CSR/CSR/CSR and CCSR/dense/CCSR replicated virtual blocks, sparse output-fiber reductions and input cleanup; direct source replication time/memory formulas; automatic plan assembly pending
-src/contraction/spctr_comm.h	src/contraction	pending
+src/contraction/spctr_comm.h	src/sparse_contract_general.rs; src/sparse_contraction_comm.rs; src/sparse_cost.rs	partial: mapped sparse-A/dense-B/dense-C broadcasts/root beta/reduction and owner restore; explicit CSR/CSR/CSR and CCSR/dense/CCSR replicated virtual blocks, sparse output-fiber reductions and input cleanup; direct source replication time/memory formulas; automatic plan assembly pending
 src/contraction/spctr_offload.cxx	excluded: CUDA/offload	excluded
 src/contraction/spctr_offload.h	excluded: CUDA/offload	excluded
 src/contraction/spctr_tsr.cxx	src/sparse_virtual.rs; src/sparse_contract_general.rs; src/sparse_gemm.rs; src/sparse_fold.rs; src/sparse_cost.rs; src/sparse_cost_local.rs; src/sparse_keys.rs	partial: source virtual strides/order, repeated-index offsets and per-output beta-first tracking, mapped sparse-A pinning and virtual blocks, native krnl5 CCSR output; virtual and pin time/memory plus all twelve CPU leaf models; explicit output depin avoids invalid source null-pointer orchestration; automatic sparse-output/nested panel assembly pending; non-inner sparse-output is a source assertion, not a working leaf
-src/contraction/spctr_tsr.h	src/contraction	pending
-src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs; src/symmetric_contract.rs	partial: NS/folded and packed scalar/custom-function kernels, four-type distributed folded integration and automatic compressed orchestration; standalone custom-function folded BLAS specialization remains pending
+src/contraction/spctr_tsr.h	src/sparse_virtual.rs; src/sparse_contract_general.rs; src/sparse_gemm.rs; src/sparse_fold.rs; src/sparse_cost.rs; src/sparse_cost_local.rs; src/sparse_keys.rs	partial: source virtual strides/order, repeated-index offsets and per-output beta-first tracking, mapped sparse-A pinning and virtual blocks, native krnl5 CCSR output; virtual and pin time/memory plus all twelve CPU leaf models; explicit output depin avoids invalid source null-pointer orchestration; automatic sparse-output/nested panel assembly pending; non-inner sparse-output is a source assertion, not a working leaf
+src/contraction/sym_seq_ctr.cxx	src/contraction.rs; src/symmetric_contraction.rs; src/partial_fold_kernel.rs; src/symmetric_contract.rs; src/folding.rs; src/dense_function.rs	ported: NS/packed reference and four-type folded kernels; custom CPU folded GEMM with source alpha-one/single-batch restrictions and transposed-output swapping; explicit mapped specialization, automatic dense-custom no-fold retained
 src/contraction/sym_seq_ctr.h	src/contraction.rs; src/symmetric_contraction.rs	replaced: typed slice kernels replace raw virtual-block execution objects
 src/redistribution/cyclic_reshuffle.cxx	src/cyclic_reshuffle.rs; src/symmetric_reshuffle.rs; src/subworld.rs; src/symmetric_subworld.rs; src/tensor.rs; src/symmetric_tensor.rs	ported dense high-order legacy and value-only subworld paths; low-order dense dispatches to DGTOG and symmetric arbitrary-phase traffic to global reshuffle
 src/redistribution/cyclic_reshuffle.h	src/cyclic_reshuffle.rs; src/glb_cyclic_reshuffle.rs	replaced: owned exact plans replace raw offset/count buffers
@@ -142,22 +142,22 @@ src/redistribution/redist.h	src/redist.rs	replaced: BlockReshufflePlan replaces 
 src/redistribution/slice.cxx	src/slice.rs; src/tensor.rs	ported dense NS local intersection, cyclic physical rank shift and local alpha/beta insertion
 src/redistribution/slice.h	src/slice.rs	replaced: SlicePlan and typed accumulation replace C++ raw pointer API
 src/redistribution/sparse_rw.cxx	src/sparse.rs	partial: sorted virtual-block storage, indexed additive/scaled writes, absent-key reads and owner routing; optimized sparse communication kernels pending
-src/redistribution/sparse_rw.h	src/redistribution	pending
+src/redistribution/sparse_rw.h	src/sparse.rs	partial: sorted virtual-block storage, indexed additive/scaled writes, absent-key reads and owner routing; optimized sparse communication kernels pending
 src/symmetry/Makefile	Cargo/build tooling	replaced
 src/symmetry/sym_indices.cxx	src/sym_indices.rs	pair/triple alignment, relative signs and both multiplicity factors; exact local checks pass
 src/symmetry/sym_indices.h	src/sym_indices.rs	Rust direct helper APIs; integration into distributed symmetry pending
-src/symmetry/symmetrization.cxx	src/sym_permutations.rs	partial: order/add/get permutations and circular generator; tensor symmetrize/desymmetrize pending
-src/symmetry/symmetrization.h	src/sym_permutations.rs	partial: permutation APIs
+src/symmetry/symmetrization.cxx	src/sym_permutations.rs; src/symmetric_sy_sum.rs; src/symmetric_contract.rs	ported: permutation helpers and contraction-path SymmetricTensor::desymmetrized/symmetrize_from; C1.2 per-function driver correspondence in validation.md
+src/symmetry/symmetrization.h	src/sym_permutations.rs; src/symmetric_sy_sum.rs	replaced: typed permutation and tensor symmetrization APIs; C1.2 correspondence documented
 src/summation/Makefile	Cargo/build tooling	replaced
 src/summation/spr_seq_sum.cxx	src/sparse_sum.rs	partial: NS sparse/mixed indexed sum semantics; optimized mapped sequential kernels and custom function paths pending
-src/summation/spr_seq_sum.h	src/summation	pending
+src/summation/spr_seq_sum.h	src/sparse_sum.rs	partial: NS sparse/mixed indexed sum semantics; optimized mapped sequential kernels and custom function paths pending
 src/summation/spsum_tsr.cxx	src/sparse_sum.rs	partial: distributed canonical-key sum routing; optimized sparse summation planner/communication pending
-src/summation/spsum_tsr.h	src/summation	pending
+src/summation/spsum_tsr.h	src/sparse_sum.rs	partial: distributed canonical-key sum routing; optimized sparse summation planner/communication pending
 src/summation/sum_tsr.cxx	src/summation.rs; src/symmetric_sum_comm.rs; src/symmetric_sum_tensor.rs	ported dense NS/packed virtual blocks, input-broadcast/output-reduce execution and automatic compressed symmetry plan construction
 src/summation/sum_tsr.h	src/summation.rs; src/symmetric_sum_tensor.rs	replaced: direct typed indexed-sum methods replace execution-tree ownership
 src/summation/summation.cxx	src/symmetric_sum_tensor.rs; src/symmetric_hollow_sum.rs; src/symmetric_sy_sum.rs; src/symmetric_diagonal.rs; src/summation.rs	partial: canonical and symmetry-aware sums, generic SY recursion, source run_diag stack and automatic dense mapper; remaining upstream driver coverage pending
 src/summation/summation.h	src/summation.rs; src/symmetric_sum_tensor.rs	replaced: direct typed Rust summation functions and tensor methods replace C++ execution objects
-src/summation/sym_seq_sum.cxx	src/summation.rs; src/symmetric_sum.rs	partial: NS and physical packed scalar reference kernels; optimized folded/custom-function branches pending
+src/summation/sym_seq_sum.cxx	src/summation.rs; src/symmetric_sum.rs; src/tensor.rs	ported: NS and packed canonical kernels, matched-group folded contiguous summation and mapped non-inner custom-function branches; source alpha/function/beta order
 src/summation/sym_seq_sum.h	src/summation.rs; src/symmetric_sum.rs	replaced: generic direct dense/symmetric kernels replace C++ declarations
 src/scaling/Makefile	Cargo/build tooling	replaced
 src/scaling/scale_tsr.cxx	src/scale_tsr.rs	ported dense virtual tuple order, repeated-label stride aggregation and recursive block traversal; exact D1 checks pass
@@ -248,7 +248,7 @@ bench/bench_nosym_transp.cxx	tests/upstream/bench/bench_nosym_transp.rs	pending
 bench/bench_redistribution.cxx	tests/upstream/bench/bench_redistribution.rs	pending
 bench/Makefile	Cargo/build tooling	replaced
 bench/model_trainer_kernels.cxx	tests/upstream/bench/model_trainer.rs	ported dense kernel subset: TTM and dense vector/matrix function/transform chain; sparse/offload kernels excluded from D6
-bench/model_trainer.cxx	tests/upstream/bench/model_trainer.rs	ported dense subset: original hierarchical communicator rounds, time/dimension progression and one four-rank timing; global C++ model registry replaced by explicit ownership
+bench/model_trainer.cxx	tests/upstream/bench/model_trainer.rs	ported existing dense subset: original hierarchical communicator/timing progression, explicit model write/load and print; sparse/offload/CCSD workloads outside this subset
 bench/python/bench_smttkrp.py	Rust semantic tests (no Python interface)	pending
 bench/python/bench_solve.py	Rust semantic tests (no Python interface)	pending
 bench/python/bench_sttm.py	Rust semantic tests (no Python interface)	pending
