@@ -3,7 +3,7 @@
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Explicit-grid sparse-A/dense-B/dense-C contraction.
 use crate::{
-    algebra::{Monoid, Semiring, Wire},
+    algebra::{Arithmetic, Monoid, Semiring, Wire},
     context::Context,
     mapping::{Distribution, Mapping, Topology},
     sparse::SparseTensor,
@@ -152,6 +152,119 @@ impl LabelMetadata {
             .collect();
         Self { labels, dimensions, index_maps, occurrences }
     }
+}
+
+struct WeighIndex {
+    axis_a: usize,
+    axis_b: usize,
+    expand_a: bool,
+    fresh_label: u8,
+}
+
+fn canonical_nnz<A: Monoid>(tensor: &SparseTensor<'_, '_, A>) -> u64
+where
+    A::Element: Wire,
+{
+    let rank = tensor.context().rank();
+    let local = tensor.local_pairs().into_iter()
+        .filter(|(key, _)| tensor.distribution().owner(*key) == rank)
+        .count() as u64;
+    tensor.context().all_reduce(&Arithmetic::<u64>::new(), &local)
+}
+
+fn sparse_weigh_index(
+    distributions: [&Distribution; 3],
+    indices: [&str; 3],
+    nonzeros: [Option<u64>; 2],
+) -> Option<WeighIndex> {
+    let metadata = LabelMetadata::new(distributions, indices);
+    let mut size_a_1 = 1u64;
+    let mut size_a_2 = 1u64;
+    let mut size_b_1 = 1u64;
+    let mut size_b_2 = 1u64;
+    let mut last = None;
+    for label in 0..metadata.labels.len() {
+        let positions = std::array::from_fn::<_, 3, _>(|operand| {
+            metadata.index_maps[operand].iter().position(|&candidate| candidate == label)
+        });
+        match positions {
+            [Some(axis_a), Some(axis_b), Some(_)] => {
+                let extent_a = distributions[0].shape[axis_a] as u64;
+                let extent_b = distributions[1].shape[axis_b] as u64;
+                size_a_1 *= extent_a;
+                size_a_2 *= extent_a;
+                size_b_1 *= extent_b;
+                size_b_2 *= extent_b;
+                last = Some((axis_a, axis_b));
+            }
+            [Some(axis_a), Some(axis_b), None] => {
+                size_a_1 *= distributions[0].shape[axis_a] as u64;
+                size_b_1 *= distributions[1].shape[axis_b] as u64;
+            }
+            [Some(axis_a), None, Some(_)] => {
+                size_a_1 *= distributions[0].shape[axis_a] as u64;
+            }
+            [None, Some(axis_b), Some(_)] => {
+                size_b_1 *= distributions[1].shape[axis_b] as u64;
+            }
+            _ => {}
+        }
+    }
+    let (axis_a, axis_b) = last?;
+    let size_a = nonzeros[0].unwrap_or(distributions[0].global_len() as u64)
+        .max(size_a_1.min(size_a_2));
+    let size_b = nonzeros[1].unwrap_or(distributions[1].global_len() as u64)
+        .max(size_b_1.min(size_b_2));
+    let fresh_label = (b'a'..=b'z')
+        .chain(b'A'..=b'Z')
+        .chain(b'0'..=b'9')
+        .chain(1..=127)
+        .find(|label| !metadata.labels.contains(label))
+        .expect("sparse contraction exhausted ASCII labels");
+    Some(WeighIndex {
+        axis_a,
+        axis_b,
+        expand_a: nonzeros[0].is_some() && (nonzeros[1].is_none() || size_a < size_b),
+        fresh_label,
+    })
+}
+
+fn insert_label(indices: &str, axis: usize, label: u8) -> String {
+    let mut indices = indices.as_bytes().to_vec();
+    indices.insert(axis, label);
+    String::from_utf8(indices).unwrap()
+}
+
+fn replace_label(indices: &str, axis: usize, label: u8) -> String {
+    let mut indices = indices.as_bytes().to_vec();
+    indices[axis] = label;
+    String::from_utf8(indices).unwrap()
+}
+
+fn expand_sparse_diagonal<'c, 'r, A>(
+    tensor: &SparseTensor<'c, 'r, A>,
+    axis: usize,
+) -> SparseTensor<'c, 'r, A>
+where
+    A: Monoid + Clone,
+    A::Element: Wire,
+{
+    let mut shape = tensor.distribution().shape.clone();
+    shape.insert(axis, shape[axis]);
+    let distribution = Distribution::cyclic(shape, tensor.context().size());
+    let rank = tensor.context().rank();
+    let pairs: Vec<_> = tensor.local_pairs().into_iter().filter_map(|(key, value)| {
+        if tensor.distribution().owner(key) != rank {
+            return None;
+        }
+        let mut coordinates = tensor.distribution().decode_key(key);
+        let diagonal = coordinates[axis];
+        coordinates.insert(axis, diagonal);
+        Some((distribution.encode_key(&coordinates), value))
+    }).collect();
+    let mut expanded = SparseTensor::new(tensor.context(), distribution, tensor.algebra().clone());
+    expanded.write_add(&pairs);
+    expanded
 }
 
 fn mapping_uses_axis(mapping: &Mapping, axis: usize) -> bool {
@@ -963,6 +1076,63 @@ impl<A: Semiring + Clone> Tensor<'_, '_, A>
 where
     A::Element: Wire,
 {
+    /// Eliminate sparse Hadamard indices before selecting and executing the
+    /// sparse-A/dense-B/dense-C contraction.
+    #[allow(clippy::too_many_arguments)]
+    pub fn contract_sparse(
+        &mut self,
+        indices_c: &str,
+        a: &SparseTensor<'_, '_, A>,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        cache: &mut crate::sparse_search::SearchCache<'_, '_>,
+        alpha: A::Element,
+        beta: A::Element,
+        output_fraction: Option<f64>,
+        commutative: bool,
+    ) -> Result<(), crate::sparse_search::Error> {
+        let nonzeros_a = canonical_nnz(a);
+        let distributions = [a.distribution(), b.distribution(), self.distribution()];
+        let indices = [indices_a, indices_b, indices_c];
+        if let Some(weigh) = sparse_weigh_index(distributions, indices, [Some(nonzeros_a), None]) {
+            assert!(weigh.expand_a, "dense Hadamard-index expansion is unsupported");
+            let expanded = expand_sparse_diagonal(a, weigh.axis_a);
+            let expanded_indices = insert_label(indices_a, weigh.axis_a, weigh.fresh_label);
+            let relabeled_b = replace_label(indices_b, weigh.axis_b, weigh.fresh_label);
+            return self.contract_sparse(
+                indices_c,
+                &expanded,
+                &expanded_indices,
+                b,
+                &relabeled_b,
+                cache,
+                alpha,
+                beta,
+                output_fraction,
+                commutative,
+            );
+        }
+        let selected = cache.prepare(
+            distributions,
+            indices,
+            [Some(nonzeros_a), None, None],
+            output_fraction,
+        )?.expect("sparse contraction search found no eligible plan").clone();
+        self.contract_sparse_from_selected(
+            indices_c,
+            a,
+            indices_a,
+            b,
+            indices_b,
+            &selected,
+            alpha,
+            beta,
+            commutative,
+        );
+        Ok(())
+    }
+
     /// Execute the source unfolded sparse-A/dense-B/dense-C tree for arbitrary
     /// preflight-valid raw mappings, including shared-label mapping mismatches
     /// that require nested 2D panel movement.
@@ -1306,6 +1476,83 @@ impl<A: Semiring + Clone> SparseTensor<'_, '_, A>
 where
     A::Element: Wire,
 {
+    /// Eliminate sparse Hadamard indices before selecting and executing the
+    /// sparse-A/sparse-B/sparse-C contraction.
+    #[allow(clippy::too_many_arguments)]
+    pub fn contract_sparse(
+        &mut self,
+        indices_c: &str,
+        a: &SparseTensor<'_, '_, A>,
+        indices_a: &str,
+        b: &SparseTensor<'_, '_, A>,
+        indices_b: &str,
+        cache: &mut crate::sparse_search::SearchCache<'_, '_>,
+        alpha: A::Element,
+        beta: A::Element,
+        output_fraction: Option<f64>,
+        commutative: bool,
+    ) -> Result<(), crate::sparse_search::Error> {
+        let nonzeros = [canonical_nnz(a), canonical_nnz(b)];
+        let distributions = [a.distribution(), b.distribution(), self.distribution()];
+        let indices = [indices_a, indices_b, indices_c];
+        if let Some(weigh) = sparse_weigh_index(
+            distributions,
+            indices,
+            nonzeros.map(Some),
+        ) {
+            if weigh.expand_a {
+                let expanded = expand_sparse_diagonal(a, weigh.axis_a);
+                let expanded_indices = insert_label(indices_a, weigh.axis_a, weigh.fresh_label);
+                let relabeled_b = replace_label(indices_b, weigh.axis_b, weigh.fresh_label);
+                return self.contract_sparse(
+                    indices_c,
+                    &expanded,
+                    &expanded_indices,
+                    b,
+                    &relabeled_b,
+                    cache,
+                    alpha,
+                    beta,
+                    output_fraction,
+                    commutative,
+                );
+            }
+            let expanded = expand_sparse_diagonal(b, weigh.axis_b);
+            let relabeled_a = replace_label(indices_a, weigh.axis_a, weigh.fresh_label);
+            let expanded_indices = insert_label(indices_b, weigh.axis_b, weigh.fresh_label);
+            return self.contract_sparse(
+                indices_c,
+                a,
+                &relabeled_a,
+                &expanded,
+                &expanded_indices,
+                cache,
+                alpha,
+                beta,
+                output_fraction,
+                commutative,
+            );
+        }
+        let selected = cache.prepare(
+            distributions,
+            indices,
+            [Some(nonzeros[0]), Some(nonzeros[1]), Some(canonical_nnz(self))],
+            output_fraction,
+        )?.expect("sparse contraction search found no eligible plan").clone();
+        self.contract_sparse_from_selected(
+            indices_c,
+            a,
+            indices_a,
+            b,
+            indices_b,
+            &selected,
+            alpha,
+            beta,
+            commutative,
+        );
+        Ok(())
+    }
+
     /// Execute the exact folded sparse-A/sparse-B/sparse-C selection. The old
     /// sparse output is scaled once before the execution tree, then added only
     /// after the distributed product has been reduced.
@@ -1462,6 +1709,87 @@ impl<C: Monoid + Clone> SparseTensor<'_, '_, C>
 where
     C::Element: Wire,
 {
+    /// Eliminate sparse Hadamard indices before selecting and executing the
+    /// heterogeneous sparse contraction, retaining its custom functions.
+    #[allow(clippy::too_many_arguments)]
+    pub fn contract_sparse_function<AA, BB, F, G>(
+        &mut self,
+        indices_c: &str,
+        a: &SparseTensor<'_, '_, AA>,
+        indices_a: &str,
+        b: &SparseTensor<'_, '_, BB>,
+        indices_b: &str,
+        cache: &mut crate::sparse_search::SearchCache<'_, '_>,
+        output_fraction: Option<f64>,
+        function: &F,
+        accumulate: &G,
+    ) -> Result<(), crate::sparse_search::Error>
+    where
+        AA: Monoid + Clone,
+        BB: Monoid + Clone,
+        AA::Element: Wire,
+        BB::Element: Wire,
+        F: Fn(&AA::Element, &BB::Element) -> C::Element,
+        G: Fn(C::Element, &mut C::Element),
+    {
+        let nonzeros = [canonical_nnz(a), canonical_nnz(b)];
+        let distributions = [a.distribution(), b.distribution(), self.distribution()];
+        let indices = [indices_a, indices_b, indices_c];
+        if let Some(weigh) = sparse_weigh_index(
+            distributions,
+            indices,
+            nonzeros.map(Some),
+        ) {
+            if weigh.expand_a {
+                let expanded = expand_sparse_diagonal(a, weigh.axis_a);
+                let expanded_indices = insert_label(indices_a, weigh.axis_a, weigh.fresh_label);
+                let relabeled_b = replace_label(indices_b, weigh.axis_b, weigh.fresh_label);
+                return self.contract_sparse_function(
+                    indices_c,
+                    &expanded,
+                    &expanded_indices,
+                    b,
+                    &relabeled_b,
+                    cache,
+                    output_fraction,
+                    function,
+                    accumulate,
+                );
+            }
+            let expanded = expand_sparse_diagonal(b, weigh.axis_b);
+            let relabeled_a = replace_label(indices_a, weigh.axis_a, weigh.fresh_label);
+            let expanded_indices = insert_label(indices_b, weigh.axis_b, weigh.fresh_label);
+            return self.contract_sparse_function(
+                indices_c,
+                a,
+                &relabeled_a,
+                &expanded,
+                &expanded_indices,
+                cache,
+                output_fraction,
+                function,
+                accumulate,
+            );
+        }
+        let selected = cache.prepare(
+            distributions,
+            indices,
+            [Some(nonzeros[0]), Some(nonzeros[1]), Some(canonical_nnz(self))],
+            output_fraction,
+        )?.expect("sparse contraction search found no eligible plan").clone();
+        self.contract_sparse_function_from_selected(
+            indices_c,
+            a,
+            indices_a,
+            b,
+            indices_b,
+            &selected,
+            function,
+            accumulate,
+        );
+        Ok(())
+    }
+
     /// Execute the exact folded heterogeneous sparse/sparse/sparse selection.
     /// The selected raw distributions, replication, panels and virtual tree are
     /// retained. `function` creates one path contribution and `accumulate`

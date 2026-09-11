@@ -7,7 +7,8 @@ capability. Folded k1-k5 candidates use sparse density/transpose, twelve CPU
 leaf models and A/B/C pin layers. Selected execution performs redistribution,
 folding, replication, nested panels, virtual traversal and output depinning;
 it does not substitute a GridPlan. APIs cover SDD, SSD, SSS and SDS storage.
-Sparse ABC weigh labels remain source-ineligible. Compressed-symmetry and
+Sparse ABC weigh labels are eliminated recursively at the contraction entry
+before `SearchCache::prepare`, following `contraction::execute`. Compressed-symmetry and
 custom mixed-type selected execution were delivered in S1b; explicit raw
 summation search/cache and mapped execution were delivered in S1c. See the
 per-platform stamps and remaining HANDOFF cases in validation.md.

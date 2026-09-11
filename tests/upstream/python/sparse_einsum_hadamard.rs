@@ -25,40 +25,6 @@ fn options() -> Options {
     }
 }
 
-fn canonical_nnz(tensor: &SparseTensor<'_, '_, F64>) -> u64 {
-    let local = tensor
-        .local_pairs()
-        .into_iter()
-        .filter(|(key, _)| tensor.distribution().owner(*key) == tensor.context().rank())
-        .count() as u64;
-    tensor.context().all_reduce(&Arithmetic::<u64>::new(), &local)
-}
-
-fn prepare(
-    context: &Context<'_>,
-    old: [&Distribution; 3],
-    indices: [&str; 3],
-    nonzeros: [Option<u64>; 3],
-    pattern: Pattern,
-) -> ctf::sparse_search::Selected {
-    let catalog = topology_candidates::all_shapes(context.size());
-    let models = Models::upstream(1);
-    let mut cache = SearchCache::new(
-        context,
-        &catalog,
-        &models,
-        [StorageSize { element_bytes: 8, pair_bytes: 16 }; 3],
-        false,
-        pattern,
-        options(),
-    );
-    cache
-        .prepare(old, indices, nonzeros, None)
-        .unwrap()
-        .unwrap()
-        .clone()
-}
-
 fn dense_einsum<'c, 'r>(
     context: &'c Context<'r>,
     a: &Tensor<'c, 'r, F64>,
@@ -147,28 +113,29 @@ fn run(context: &Context<'_>) {
         Distribution::cyclic(output_shape.clone(), context.size()),
         F64::new(),
     );
-    let selected_sparse = prepare(
+    let catalog = topology_candidates::all_shapes(context.size());
+    let models = Models::upstream(1);
+    let mut cache = SearchCache::new(
         context,
-        [a.distribution(), b.distribution(), actual_sparse.distribution()],
-        ["ijk", "jkl", "ijkl"],
-        [
-            Some(canonical_nnz(&a)),
-            Some(canonical_nnz(&b)),
-            Some(canonical_nnz(&actual_sparse)),
-        ],
+        &catalog,
+        &models,
+        [StorageSize { element_bytes: 8, pair_bytes: 16 }; 3],
+        false,
         Pattern::SparseSparseSparse,
+        options(),
     );
-    actual_sparse.contract_sparse_from_selected(
+    actual_sparse.contract_sparse(
         "ijkl",
         &a,
         "ijk",
         &b,
         "jkl",
-        &selected_sparse,
+        &mut cache,
         1.0,
         0.0,
+        None,
         true,
-    );
+    ).unwrap();
     let actual_sparse_dense = actual_sparse.into_dense();
     allclose("d1 vs e1", &reference_sparse, &actual_sparse_dense);
 
@@ -187,24 +154,27 @@ fn run(context: &Context<'_>) {
         Distribution::cyclic(output_shape, context.size()),
         F64::new(),
     );
-    let selected_dense = prepare(
+    let mut cache = SearchCache::new(
         context,
-        [a.distribution(), dense_c.distribution(), actual_dense.distribution()],
-        ["ijk", "jkl", "ijkl"],
-        [Some(canonical_nnz(&a)), None, None],
+        &catalog,
+        &models,
+        [StorageSize { element_bytes: 8, pair_bytes: 16 }; 3],
+        false,
         Pattern::SparseDenseDense { coo_kernel: false },
+        options(),
     );
-    actual_dense.contract_sparse_from_selected(
+    actual_dense.contract_sparse(
         "ijkl",
         &a,
         "ijk",
         &dense_c,
         "jkl",
-        &selected_dense,
+        &mut cache,
         1.0,
         0.0,
+        None,
         true,
-    );
+    ).unwrap();
     allclose("d2 vs e2", &reference_dense, &actual_dense);
 }
 

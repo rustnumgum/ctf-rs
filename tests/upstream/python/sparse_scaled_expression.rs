@@ -25,40 +25,6 @@ fn options() -> Options {
     }
 }
 
-fn canonical_nnz(tensor: &SparseTensor<'_, '_, F64>) -> u64 {
-    let local = tensor
-        .local_pairs()
-        .into_iter()
-        .filter(|(key, _)| tensor.distribution().owner(*key) == tensor.context().rank())
-        .count() as u64;
-    tensor.context().all_reduce(&Arithmetic::<u64>::new(), &local)
-}
-
-fn prepare(
-    context: &Context<'_>,
-    old: [&Distribution; 3],
-    indices: [&str; 3],
-    nonzeros: [Option<u64>; 3],
-    pattern: Pattern,
-) -> ctf::sparse_search::Selected {
-    let catalog = topology_candidates::all_shapes(context.size());
-    let models = Models::upstream(1);
-    let mut cache = SearchCache::new(
-        context,
-        &catalog,
-        &models,
-        [StorageSize { element_bytes: 8, pair_bytes: 16 }; 3],
-        false,
-        pattern,
-        options(),
-    );
-    cache
-        .prepare(old, indices, nonzeros, None)
-        .unwrap()
-        .unwrap()
-        .clone()
-}
-
 fn allclose(label: &str, reference: &Tensor<'_, '_, F64>, actual: &Tensor<'_, '_, F64>) {
     assert_eq!(reference.distribution().shape, actual.distribution().shape);
     let keys: Vec<_> = (0..reference.distribution().global_len()).collect();
@@ -133,25 +99,30 @@ fn sparse_expression<'c, 'r>(
     c: SparseTensor<'c, 'r, F64>,
 ) -> Tensor<'c, 'r, F64> {
     let old_c = c.clone();
-    let selected = prepare(
+    let catalog = topology_candidates::all_shapes(context.size());
+    let models = Models::upstream(1);
+    let mut cache = SearchCache::new(
         context,
-        [a.distribution(), b.distribution(), c.distribution()],
-        ["ijl", "kjl", "ijk"],
-        [Some(canonical_nnz(a)), Some(canonical_nnz(b)), Some(canonical_nnz(&c))],
+        &catalog,
+        &models,
+        [StorageSize { element_bytes: 8, pair_bytes: 16 }; 3],
+        false,
         Pattern::SparseSparseSparse,
+        options(),
     );
     let mut result = c;
-    result.contract_sparse_from_selected(
+    result.contract_sparse(
         "ijk",
         a,
         "ijl",
         b,
         "kjl",
-        &selected,
+        &mut cache,
         2.3,
         1.0,
+        None,
         true,
-    );
+    ).unwrap();
     result.sum_from("ijk", &old_c, "ijk", 7.0, 1.0);
     result.sum_from("ijk", a, "ijk", -1.0, 1.0);
     result.sum_from("ijk", a, "ijk", -1.0, 1.0);
