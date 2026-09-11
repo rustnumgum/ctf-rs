@@ -251,6 +251,31 @@ name = "mpi_gemm_bench"
 path = "examples/mpi_gemm_bench.rs"
 required-features = ["native-linalg"]
 
+[[example]]
+name = "mpi_low_memory_bench"
+path = "examples/mpi_low_memory_bench.rs"
+required-features = ["native-linalg"]
+
+[[example]]
+name = "mpi_structured_bench"
+path = "examples/mpi_structured_bench.rs"
+required-features = ["native-linalg"]
+
+[[example]]
+name = "sparse_gemm_bench"
+path = "examples/sparse_gemm_bench.rs"
+required-features = ["native-linalg"]
+
+[[example]]
+name = "bench_redistribution"
+path = "examples/bench_redistribution.rs"
+required-features = ["native-linalg"]
+
+[[example]]
+name = "bench_nosym_transp"
+path = "examples/bench_nosym_transp.rs"
+required-features = ["native-linalg"]
+
 [[test]]
 name = "plan_cache"
 path = "tests/plan_cache.rs"
