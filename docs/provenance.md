@@ -450,8 +450,10 @@ handles remain internal; the grid comes from the supplied MPI subcommunicator,
 not an implicit MPI_COMM_WORLD. Explicit gridexit/system-handle cleanup occurs
 before returning, including LAPACK info errors; Drop never communicates.
 native-scalapack is default-enabled and depends on native-linalg. WSL links
-scalapack-openmpi; native Windows library selection remains pending. Local
-BLAS/LAPACK's compile-time replacement boundary is unchanged.
+scalapack-openmpi; native Windows and macOS library names were resolved
+later (`scalapack`/`openblas` on both, see `docs/native-windows.md` and the
+README's macOS note). Local BLAS/LAPACK's compile-time replacement boundary
+is unchanged.
 
 Validation ports Cholesky/triangular reconstruction and triangle criteria from
 test/python/test_la.py into Rust (no Python interface/runtime). Fixtures are
