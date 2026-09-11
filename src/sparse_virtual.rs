@@ -4,22 +4,20 @@
 /// Visit every virtual-label coordinate with dimension zero varying fastest.
 /// The callback receives the A/B/C virtual block offsets and the output
 /// coefficient: `beta` on the first visit to that C block, then `one`.
-pub fn execute<E: Clone>(
+pub fn execute<E: Clone, const N: usize>(
     dimensions: &[usize],
-    indices: [&[usize]; 3],
+    indices: [&[usize]; N],
     beta: &E,
     one: &E,
-    mut kernel: impl FnMut([usize; 3], &E),
+    mut kernel: impl FnMut([usize; N], &E),
 ) {
+    assert!(N > 0);
     assert!(dimensions.iter().all(|&dimension| dimension > 0));
 
-    let mut block_counts = [1usize; 3];
-    let mut union_strides = [
-        vec![0usize; dimensions.len()],
-        vec![0usize; dimensions.len()],
-        vec![0usize; dimensions.len()],
-    ];
-    for operand in 0..3 {
+    let mut block_counts = [1usize; N];
+    let mut union_strides: [Vec<usize>; N] =
+        std::array::from_fn(|_| vec![0usize; dimensions.len()]);
+    for operand in 0..N {
         for &index in indices[operand] {
             assert!(index < dimensions.len());
             let stride = block_counts[operand];
@@ -28,21 +26,21 @@ pub fn execute<E: Clone>(
         }
     }
 
-    let mut output_visited = vec![false; block_counts[2]];
+    let mut output_visited = vec![false; block_counts[N - 1]];
     let mut coordinates = vec![0usize; dimensions.len()];
-    let mut offsets = [0usize; 3];
+    let mut offsets = [0usize; N];
     loop {
-        let coefficient = if output_visited[offsets[2]] {
+        let coefficient = if output_visited[offsets[N - 1]] {
             one
         } else {
-            output_visited[offsets[2]] = true;
+            output_visited[offsets[N - 1]] = true;
             beta
         };
         kernel(offsets, coefficient);
 
         let mut dimension = 0;
         while dimension < dimensions.len() {
-            for operand in 0..3 {
+            for operand in 0..N {
                 offsets[operand] -=
                     union_strides[operand][dimension] * coordinates[dimension];
             }
@@ -50,7 +48,7 @@ pub fn execute<E: Clone>(
             if coordinates[dimension] >= dimensions[dimension] {
                 coordinates[dimension] = 0;
             }
-            for operand in 0..3 {
+            for operand in 0..N {
                 offsets[operand] +=
                     union_strides[operand][dimension] * coordinates[dimension];
             }
