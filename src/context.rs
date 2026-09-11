@@ -90,12 +90,14 @@ impl<'u> Context<'u> {
     pub fn reduce_f64(&self, root: usize, values: &mut [f64]) {
         self.inner.reduce_f64(root, values);
     }
+    #[must_use = "a split communicator leaks unless the caller calls close on it"]
     pub fn split(&self, color: Option<i32>, key: i32) -> Option<Context<'_>> {
         self.inner.split(color, key).map(|inner| Context {
             inner,
             _universe: self._universe,
         })
     }
+    #[must_use = "a split communicator leaks unless the caller calls close on it"]
     pub fn split_shared(&self) -> Context<'_> {
         Context {
             inner: self.inner.split_shared(),
