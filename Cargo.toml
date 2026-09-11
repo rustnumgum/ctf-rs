@@ -267,6 +267,31 @@ path = "tests/model_io.rs"
 harness = false
 
 [[test]]
+name = "upstream_apsp"
+path = "tests/upstream/examples/apsp.rs"
+harness = false
+
+[[test]]
+name = "upstream_algebraic_multigrid"
+path = "tests/upstream/examples/algebraic_multigrid.rs"
+harness = false
+
+[[test]]
+name = "sparse_einsum_hadamard"
+path = "tests/upstream/python/sparse_einsum_hadamard.rs"
+harness = false
+
+[[test]]
+name = "sparse_scaled_expression"
+path = "tests/upstream/python/sparse_scaled_expression.rs"
+harness = false
+
+[[test]]
+name = "sparse_complex"
+path = "tests/upstream/python/sparse_complex.rs"
+harness = false
+
+[[test]]
 name = "selector"
 path = "tests/selector.rs"
 harness = false

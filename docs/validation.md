@@ -108,6 +108,39 @@ or assertion changed; no numerical failure, diagnostic, or rerun occurred.
 One accidental broad formatter invocation was removed outside the owned C1
 files before acceptance. C1 is closed; S1a follows. ctf-rs is not pushed.
 
+## S1a sparse contraction planning
+
+### Fixed acceptance contract
+
+Class R, pinned f69cbb46; WSL 1/2/4 once per driver and native compile/link
+once. `block_sparse` moves to S1b for its matrix-of-tensors custom folded
+kernel dependency (harness evt-1006); it remains required for the S1 close.
+
+| Driver | Fixture | Q and reference | Unchanged bound |
+|---|---|---|---|
+| upstream_apsp | n=9, rank-seeded integer adjacency, dense and augmented sparse path doubling | differing path-weight entries versus dense tropical result | exact zero |
+| upstream_algebraic_multigrid | n=4, original nlvl=2, ndiv=2, nsmooth=3, source Poisson/transfer formulas | V-cycle residual versus twice-smoothed fine-grid Jacobi residual | rnorm < rnorm_alt |
+| sparse_einsum_hadamard | n=11, density .1, ijk,jkl->ijkl, sparse/sparse and sparse/dense | each dense Rust expression comparison | sum(abs(diff)) < 1e-14 |
+| sparse_scaled_expression | n=5, density .1, literal 2.3/7/-1/-1/-2 expression and accumulated old C | source grouped dense expression versus dense and sparse executions | sum(abs(diff)) < 1e-14 |
+| sparse_complex | real C-order arange(27), 3x3x3, aliased kij indexed view | .2*b0 + .7*a0.transpose([1,2,0]) | sum(abs(diff)) < 1e-14 |
+
+The Python file defines its own strict sum-absolute `allclose`; the brief's
+requirement to retain that rule takes precedence over plan.v3's mistaken
+description as NumPy defaults. No tolerance is chosen from observed results.
+Before execution, source tracing identified that the sparse/sparse Hadamard
+and scaled expressions contain ABC weigh indices: pinned sparse `can_fold`
+rejects them, and its non-inner constructor asserts dense B and C. The Rust
+planner retains this boundary instead of admitting a dense-eligibility fold
+or inventing an unsupported sparse-output leaf. Their runtime outcomes are
+not pre-labeled as passes.
+
+New raw sparse selections carry the storage/COO capability, selected original
+distributions and sparse fold descriptor through execution. COO/CSR/CCSR
+leaves reuse the source panel, replication, virtual and key-pinning paths;
+sparse output is reduced, depinned and returned to its original layout.
+Cache hits retain mappings, not values or nonzero counts. No C1 acceptance
+check is rerun under S1a.
+
 ## rsmpi binding
 
 ### CTF-R1-4 direct replica restoration (2026-09-09)
