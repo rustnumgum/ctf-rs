@@ -198,6 +198,29 @@ The source force-key transpose and duplicate AS canonical additions are
 preserved. Sparse SY conversions keep canonical primary sparse entries;
 neither planned force accumulation nor custom contraction gathers an operand.
 
+### S1b outcome (2026-09-11)
+
+DIGIT / PASS, revision `40e6350`: all four drivers ran once at WSL 1/2/4,
+world/parity. Block sparse residual norm=0 at all ranks (bound <=1e-4);
+betweenness residual norm=0 at all ranks (bound <=6e-6); every sparse SY
+sum-absolute delta=0 (strict <1e-14). Force's exact source Boolean criterion
+is 1 at all ranks: some particle changed by >1e-6, and every dx/dy was
+restored within 1e-6; the source does not report a numerical maximum delta.
+Native compile/link of all four passed once successfully. Two WSL and one
+native build-only attempts failed on Rust type/literal syntax before any
+numerical execution; they consumed no numerical acceptance run.
+
+Runs: 12 prescribed WSL invocations, 0 diagnostics, no repeated passing
+checks. Numerical verification is closed. Commands and logs:
+`D:/projects/runs/ctf-rs-s1/S1b/{commands.md,acceptance.sh,native-build.ps1}`,
+`wsl.log`, `build.json`, `<driver>-<ranks>.log`, `native-build.log`.
+Exact entry commands:
+`wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-s1/S1b/acceptance.sh`
+and the redirected PowerShell native-build command in `commands.md`.
+HANDOFF: none for S1b; S1a's three open drivers retain their recorded status.
+The source block flattening quirk is retained without opening an extra study.
+Continue S1c; the final native set still includes all thirteen S1 targets.
+
 ## rsmpi binding
 
 ### CTF-R1-4 direct replica restoration (2026-09-09)

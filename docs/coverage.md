@@ -80,6 +80,13 @@ These are Frobenius norms (`norm2`), not entrywise vector comparisons.
 
 ## Current evidence
 
+S1b passes once at WSL 1/2/4 and native compile/link: compressed sparse
+canonical storage and selected direct custom accumulation (force), mixed-type
+raw selected SSS custom kernels (betweenness), local CSR Tensor-block kernels
+(block_sparse), and six Python sparse SY shapes. Raw costs now use precise
+per-operand widths. Sparse summation optimization/read-write remains S1c;
+source-forbidden ABC sparse expressions retain S1a HANDOFF status.
+
 S1a implements raw cached folded k1-k5 candidate selection and direct selected
 SDD/SSD/SSS/SDS execution including nested panels, virtual traversal and output
 depinning. APSP and Python complex pass at WSL 1/2/4; all five S1a targets
