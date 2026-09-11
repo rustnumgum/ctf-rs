@@ -12,7 +12,7 @@ use ctf::{
     topology_candidates,
 };
 
-const N: usize = 3;
+const N: usize = 7;
 const SPARSE_FRACTION: f64 = 0.1;
 const NORM_BOUND: f64 = 1.0e-7 * N as f64 * N as f64 * 0.1 * N as f64;
 
@@ -80,7 +80,7 @@ fn main() {
 
     if world.rank() == 0 {
         println!(
-            "DIGIT / PASS checkpoint_sparse: rank-seeded MT sparse 3D .1 text round trip; n=3; Q={q:e}; ref=source six-decimal sparse file round trip; bound=1e-8*n^3=2.7e-7; world+parity"
+            "DIGIT / PASS checkpoint_sparse: rank-seeded MT sparse 3D .1 text round trip; n={N}; Q={q:e}; ref=source six-decimal sparse file round trip; bound=1e-8*n^3={NORM_BOUND:e}; world+parity"
         );
     }
     world.close();
