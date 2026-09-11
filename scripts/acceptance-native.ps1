@@ -1,179 +1,256 @@
+# ctf-rs acceptance run (native Windows, MSYS2 mingw64 + MS-MPI).
+#
+# Reads scripts\acceptance-targets.tsv (the same manifest scripts\check-
+# targets.sh checks on Linux/macOS) for the set of gating cargo test
+# targets, builds every needed test binary once, then runs each one,
+# recording a per-target RUN_EXIT line and log so a failure partway through
+# does not void the evidence of everything that ran after it (audit
+# findings E1, E2, E4, E5). mpi targets run the built executable directly
+# under mpiexec via Start-Process with a 600s wait, bypassing Cargo's
+# per-host-triple runner variable. This script has no bash available, so
+# the manifest-completeness check below is a native PowerShell equivalent
+# of scripts\check-targets.sh, built on `cargo metadata | ConvertFrom-Json`
+# instead of calling bash.
 param(
     [string]$MingwRoot = 'C:\msys64\mingw64',
     [string]$TargetDir = 'D:\ctf-rs-native-target',
+    [string]$MsMpiBin = 'C:\Program Files\Microsoft MPI\Bin',
     [switch]$BuildOnly,
     [switch]$D6Only,
     [switch]$C1Only
 )
 $ErrorActionPreference = 'Stop'
-$env:PATH = "$HOME\.cargo\bin;$MingwRoot\bin;C:\Program Files\Microsoft MPI\Bin;" + $env:PATH
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $repoRoot
+
+$env:PATH = "$HOME\.cargo\bin;$MingwRoot\bin;$MsMpiBin;" + $env:PATH
 $env:MSMPI_INC = "$MingwRoot\include"
 $env:MSMPI_LIB64 = "$MingwRoot\lib"
 $env:LIBCLANG_PATH = "$MingwRoot\bin"
 $env:RUSTFLAGS = "-L native=$($MingwRoot.Replace('\','/'))/lib"
-$env:CARGO_TARGET_DIR = $TargetDir
+if (-not $env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR = $TargetDir }
 $env:OPENBLAS_NUM_THREADS = '1'
+
+$manifestPath = Join-Path $PSScriptRoot 'acceptance-targets.tsv'
+if (-not (Test-Path $manifestPath)) {
+    Write-Host "acceptance-native: missing $manifestPath"
+    exit 1
+}
+
+$mpiexecPath = Join-Path $MsMpiBin 'mpiexec.exe'
+if (-not (Test-Path $mpiexecPath)) {
+    Write-Host "acceptance-native: mpiexec.exe not found at $mpiexecPath"
+    exit 1
+}
+
+function Test-AcceptanceManifest {
+    param([string]$ManifestPath)
+
+    $metaText = cargo metadata --no-deps --format-version 1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host 'acceptance-native: cargo metadata failed'
+        exit $LASTEXITCODE
+    }
+    $meta = $metaText | ConvertFrom-Json
+
+    $metaNames = @(
+        $meta.packages | ForEach-Object { $_.targets } |
+            Where-Object { $_.kind -contains 'test' } |
+            ForEach-Object { $_.name }
+    ) | Sort-Object -Unique
+
+    $rows = Import-Csv -Delimiter "`t" -Path $ManifestPath
+    $manifestNames = @(
+        $rows | Where-Object { $_.class -in @('mpi', 'local', 'excluded') } |
+            ForEach-Object { $_.target }
+    ) | Sort-Object -Unique
+
+    $diff = Compare-Object -ReferenceObject $metaNames -DifferenceObject $manifestNames
+    $missing = @($diff | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject })
+    $extra = @($diff | Where-Object { $_.SideIndicator -eq '=>' } | ForEach-Object { $_.InputObject })
+
+    if ($missing.Count -gt 0 -or $extra.Count -gt 0) {
+        if ($missing.Count -gt 0) {
+            Write-Host "acceptance-native: test targets missing from $ManifestPath (not listed as mpi/local/excluded):"
+            foreach ($m in $missing) { Write-Host "  $m" }
+        }
+        if ($extra.Count -gt 0) {
+            Write-Host "acceptance-native: manifest rows (class mpi/local/excluded) name no existing target:"
+            foreach ($e in $extra) { Write-Host "  $e" }
+        }
+        exit 1
+    }
+
+    Write-Host "acceptance-native: OK, $($metaNames.Count) cargo test targets all accounted for in $ManifestPath"
+    return $rows
+}
+
+$rows = Test-AcceptanceManifest -ManifestPath $manifestPath
+
+# $ErrorActionPreference = 'Stop' would otherwise turn ordinary stderr
+# output from a native command (cargo's own build warnings included) into
+# a terminating exception the moment that stream is redirected to a file
+# or merged with *>/2>&1; every cargo invocation from here on redirects
+# stderr, so relax it before the build and the run loop, where a failing
+# target must not stop the run anyway (E2).
+$ErrorActionPreference = 'Continue'
+
 if ($BuildOnly) {
-    cargo test --tests --no-run
+    $allMpi = @($rows | Where-Object { $_.class -eq 'mpi' })
+    $allLocal = @($rows | Where-Object { $_.class -eq 'local' } | ForEach-Object { $_.target })
+    $hasLib = @($rows | Where-Object { $_.class -eq 'lib' }).Count -gt 0
+    $buildOnlyArgs = @()
+    foreach ($r in $allMpi) { $buildOnlyArgs += @('--test', $r.target) }
+    foreach ($t in $allLocal) { $buildOnlyArgs += @('--test', $t) }
+    if ($hasLib) { $buildOnlyArgs += '--lib' }
+    cargo test --no-run @buildOnlyArgs
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     cargo build --examples
     exit $LASTEXITCODE
 }
 
-if ($C1Only) {
-    foreach ($ranks in 1,2,4) {
-        $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = "mpiexec -n $ranks"
-        cargo test --test sparse_text_io --test distributed_sparse_io
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    }
-    exit 0
-}
+$mpiRows = @($rows | Where-Object { $_.class -eq 'mpi' })
+$libFilters = @($rows | Where-Object { $_.class -eq 'lib' } | ForEach-Object { $_.target })
+$localTargets = @($rows | Where-Object { $_.class -eq 'local' } | ForEach-Object { $_.target })
 
 if ($D6Only) {
-    $denseTests = @(
-        'upstream_scalar','upstream_diag_sym','upstream_weigh4d','upstream_dft',
-        'upstream_readwrite','upstream_readall','distributed_symmetric_repack',
-        'upstream_permute_multiworld','upstream_reduce_bcast','upstream_subworld_gemm',
-        'upstream_gemm4d','upstream_sy_times_ns','upstream_ccsdt_t3_to_t2',
-        'upstream_ccsdt_map','upstream_multi_tsr_sym','upstream_fast_3mm',
-        'upstream_fast_diagram','upstream_fast_sym_4d','upstream_fast_sym',
-        'upstream_fast_as_as_sy_tensor_ctr','upstream_fast_sy_as_as_tensor_ctr',
-        'upstream_fast_tensor_ctr','d4_memcontrol','d4_timer_util','d4_blas_flops',
-        'dense_low_memory','d5_common','d5_value_interfaces','d5_algebra_interfaces',
-        'upstream_fft_with_idx_partition','upstream_fft','upstream_dft_3d',
-        'upstream_endomorphism','upstream_endomorphism_cust','upstream_endomorphism_cust_sp',
-        'upstream_univar_function','upstream_bivar_function','upstream_bivar_transform',
-        'upstream_test_suite_dense','upstream_matmul','upstream_recursive_matmul',
-        'upstream_ccsd','upstream_ao_mo_transf','upstream_neural_network',
-        'upstream_bitonic_sort','upstream_checkpoint','upstream_force_integration',
-        'upstream_particle_interaction','upstream_qinformatics','upstream_mttkrp'
-    )
-    $denseArguments = @()
-    foreach ($test in $denseTests) { $denseArguments += @('--test', $test) }
-    foreach ($ranks in 1,2,4) {
-        $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = "mpiexec -n $ranks"
-        cargo test @denseArguments
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    }
-    Remove-Item Env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER
-    cargo test --test scaling
-    exit $LASTEXITCODE
+    $mpiRows = @($mpiRows | Where-Object { ($_.sets -split ',') -contains 'd6' })
+    $libFilters = @()
+    $localTargets = @()
+} elseif ($C1Only) {
+    $mpiRows = @($mpiRows | Where-Object { ($_.sets -split ',') -contains 'c1' })
+    $libFilters = @()
+    $localTargets = @()
 }
 
-$mpiTests = @(
-    'foundation','dense_views','replicated_sum','tensor_sum','custom_reduce',
-    'd4_memcontrol','d4_timer_util','d4_blas_flops',
-    'd5_common','d5_value_interfaces','d5_algebra_interfaces',
-    'upstream_fft_with_idx_partition','upstream_fft','upstream_dft_3d',
-    'upstream_test_suite_dense','upstream_matmul','upstream_recursive_matmul',
-    'upstream_ccsd','upstream_ao_mo_transf','upstream_neural_network',
-    'upstream_bitonic_sort','upstream_checkpoint','upstream_force_integration',
-    'upstream_particle_interaction','upstream_qinformatics','upstream_mttkrp',
-    'algebra_sum','complex_scalar','sum_remap','replicated_contraction','ctr_2d',
-    'tensor_gemm','algebra_contraction','tensor_contract','contract_remap',
-    'dense_semantics','upstream_dense','subcomm_dense','plan_cache','model_training',
-    'selector','selection_objective','tensor_blas_fold','upstream_gemm4d',
-    'upstream_fast_3mm','upstream_fast_diagram','upstream_fast_sym_4d','upstream_fast_sym',
-    'upstream_fast_as_as_sy_tensor_ctr','upstream_fast_sy_as_as_tensor_ctr','upstream_fast_tensor_ctr',
-    'distributed_matrix','distributed_qr_svd','distributed_svd_paths','distributed_eigh',
-    'distributed_spd','distributed_tttp','distributed_mttkrp','distributed_tensor_svd',
-    'distributed_solve_factor','distributed_sparse_io','distributed_sparse_sum',
-    'distributed_sparse_gemm','distributed_sparse_fold','upstream_sparse_mp3',
-    'distributed_sparse_transform','distributed_dense_sparse','upstream_sparse_mp3_t',
-    'distributed_sparse_diagonal','distributed_symmetric_io','distributed_symmetric_operations',
-    'distributed_symmetric_repack','distributed_packed_sum','distributed_packed_contraction',
-    'distributed_canonical_sum','distributed_hollow_sum','distributed_symmetric_diagonal',
-    'distributed_sy_sum','distributed_sy_scalars','distributed_canonical_contraction',
-    'distributed_symmetric_contraction','upstream_diag_sym','distributed_cross_diagonal',
-    'upstream_diag_ctr','upstream_sy_times_ns','upstream_multi_tsr_sym','upstream_reduce_bcast',
-    'distributed_sparse_multilinear','distributed_sparse_solve_factor','distributed_sparse_input_reduction',
-    'distributed_sparse_general','distributed_sparse_function','distributed_sparse_gemm_function',
-    'distributed_sparse_function_output','distributed_sparse_fold_function',
-    'upstream_bivar_function','distributed_dense_function',
-    'upstream_univar_function','upstream_endomorphism','upstream_bivar_transform',
-    'upstream_endomorphism_cust','upstream_endomorphism_cust_sp','distributed_exhaustive_mapping','distributed_normal_mapping','selected_mapping','dense_search','dense_execution','dense_execution_algebra','dense_folded_execution','distributed_node_fold','dense_low_memory','typed_folded_execution','typed_matrix_factors','typed_distributed_qr','typed_distributed_svd','typed_svd_truncation','randomized_guess','distributed_random_fill'
-)
-$arguments = @()
-foreach ($test in $mpiTests) { $arguments += @('--test', $test) }
-$arguments += @('--test', 'binary_io')
-$arguments += @('--test', 'schedule')
-$arguments += @('--test', 'cyclic_reshuffle')
-$arguments += @('--test', 'bool_norm')
-$arguments += @('--test', 'symmetric_reshuffle')
-$arguments += @('--test', 'symmetric_subworld')
-$arguments += @('--test', 'upstream_permute_multiworld')
-$arguments += @('--test', 'indexed_write_order')
-$arguments += @('--test', 'symmetric_permuted_io')
-$arguments += @('--test', 'sparse_permuted_io')
-$arguments += @('--test', 'upstream_scalar', '--test', 'upstream_speye')
-$arguments += @('--test', 'upstream_ccsdt_map', '--test', 'upstream_ccsdt_t3_to_t2')
-$arguments += @('--test', 'symmetric_random')
-$arguments += @('--test', 'upstream_weigh4d', '--test', 'upstream_dft', '--test', 'distributed_symmetric_function')
-$arguments += @('--test', 'integer_random')
-$arguments += @('--test', 'distributed_sparse_dense_output')
-$arguments += @('--test', 'distributed_sparse_storage_dispatch')
-$arguments += @('--test', 'upstream_spmv')
-$arguments += @('--test', 'distributed_sparse_reduce')
-$arguments += @('--test', 'distributed_sparse_replicate')
-$arguments += @('--test', 'upstream_scan')
-$arguments += @('--test', 'distributed_sparse_2d', '--test', 'upstream_trace')
-$arguments += @('--test', 'distributed_sparse_2d_dense')
-$arguments += @('--test', 'distributed_sparse_2d_pairs')
-$arguments += @('--test', 'distributed_coo_2d')
-$arguments += @('--test', 'upstream_sssp')
-$arguments += @('--test', 'distributed_mixed_coo')
-$arguments += @('--test', 'upstream_strassen')
-$arguments += @('--test', 'distributed_sparse_plan', '--test', 'upstream_spectral_element')
-$arguments += @('--test', 'upstream_jacobi')
-$arguments += @('--test', 'upstream_hosvd')
-$arguments += @('--test', 'distributed_sparse_raw', '--test', 'distributed_sparse_search')
-foreach ($test in @('upstream_subworld_gemm','upstream_readall','upstream_readwrite','upstream_sptensor_sum')) { $arguments += @('--test', $test) }
-foreach ($test in @('typed_grid_blas','typed_randomized_svd','typed_distributed_eigh','typed_tensor_svd','typed_multilinear','tttp_memory','tensor_norms','storage_conversion','sparse_random_fill','subworld_transfer','sparse_text_io','symmetric_norms','symmetric_text_io','pair_read')) { $arguments += @('--test', $test) }
-foreach ($ranks in 1,2,4) {
-    $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = "mpiexec -n $ranks"
-    cargo test @arguments
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$logDir = Join-Path $env:TEMP "ctf-rs-acceptance\$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+Write-Host "acceptance-native: logs in $logDir"
+
+# Build every selected mpi/local test binary once, plus the lib test binary
+# if any lib filter is selected, and capture cargo's JSON build artifacts so
+# each mpi target's executable path can be resolved without a runner
+# env var (keeps this script triple-agnostic, matching scripts\
+# acceptance-wsl.sh).
+$buildArgs = @()
+foreach ($r in $mpiRows) { $buildArgs += @('--test', $r.target) }
+foreach ($t in $localTargets) { $buildArgs += @('--test', $t) }
+if ($libFilters.Count -gt 0) { $buildArgs += '--lib' }
+
+$buildJsonPath = Join-Path $logDir 'build.json'
+$buildErrPath = Join-Path $logDir 'build.stderr.log'
+if ($buildArgs.Count -gt 0) {
+    cargo test --no-run --message-format=json @buildArgs 1> $buildJsonPath 2> $buildErrPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "acceptance-native: build failed, see $buildErrPath"
+        exit $LASTEXITCODE
+    }
 }
-Remove-Item Env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER
-cargo test --lib tttp_blocking
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --lib sparse_text
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --test narrow_algebra
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --test sparse_cost
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --test sparse_mapped_cost
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --test sparse_keys
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --test sparse_coo
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --test mixed_kernel
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --test sparse_matricize
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --test mixed_sparse_output
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --test self_mapping
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-$env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = 'mpiexec -n 7'
-cargo test --test upstream_strassen
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-Remove-Item Env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER
-$localTests = @('scaling','random_generator','scalar_blas','node_peer_counts','folded_cost','partial_fold_kernel','fold_storage','partial_fold','fold_indices','fold_layout','fold_selection','mapped_cost','local_linalg','topology_candidates','node_aware','map_tensor',
-    'sequential_sum','virtual_sum','sequential_contraction','folded_contraction',
-    'sparse_formats','sparse_sequential','sparse_function','sparse_function_kernel','cost_models','plan_cost','grid_plan_cost','redist_cost','mapping_preflight','mapping_variants','topology_canonicalization','normal_mapping','symmetry_layout','sym_indices',
-    'sym_triple','sym_operations','folding')
-$arguments = @()
-foreach ($test in $localTests) { $arguments += @('--test', $test) }
-cargo test @arguments -- --nocapture
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --lib schedule
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --lib cyclic_reshuffle
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --lib symmetric_reshuffle
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cargo test --lib sparse_virtual
-exit $LASTEXITCODE
+
+$exeMap = @{}
+if (Test-Path $buildJsonPath) {
+    Get-Content $buildJsonPath | ForEach-Object {
+        if ([string]::IsNullOrWhiteSpace($_)) { return }
+        $msg = $null
+        try { $msg = $_ | ConvertFrom-Json } catch { return }
+        if ($msg.reason -eq 'compiler-artifact' -and $msg.profile -and $msg.profile.test -eq $true -and $msg.executable) {
+            $exeMap[$msg.target.name] = $msg.executable
+        }
+    }
+}
+
+foreach ($r in $mpiRows) {
+    if (-not $exeMap.ContainsKey($r.target)) {
+        Write-Host "acceptance-native: no built executable for mpi target '$($r.target)', see $buildErrPath"
+        exit 1
+    }
+}
+
+function Invoke-MpiAcceptanceTarget {
+    param(
+        [string]$Target,
+        [int]$Ranks,
+        [string]$Exe,
+        [string]$LogDir,
+        [string]$MpiexecPath
+    )
+    $outPath = Join-Path $LogDir "$Target-$Ranks.out.tmp"
+    $errPath = Join-Path $LogDir "$Target-$Ranks.err.tmp"
+    $logPath = Join-Path $LogDir "$Target-$Ranks.log"
+
+    $proc = Start-Process -FilePath $MpiexecPath -ArgumentList @('-n', "$Ranks", $Exe) `
+        -NoNewWindow -PassThru `
+        -RedirectStandardOutput $outPath -RedirectStandardError $errPath
+
+    $finished = $proc.WaitForExit(600000)
+    if (-not $finished) {
+        & taskkill /PID $proc.Id /T /F | Out-Null
+        Add-Content -Path $errPath -Value 'acceptance-native: timed out after 600s'
+        $code = 124
+    } else {
+        $code = $proc.ExitCode
+    }
+
+    Get-Content -Path $outPath, $errPath -ErrorAction SilentlyContinue | Set-Content -Path $logPath
+    Remove-Item -Path $outPath, $errPath -ErrorAction SilentlyContinue
+    return $code
+}
+
+# From here a failing target must not stop the run (E2): every RUN_EXIT
+# below is recorded regardless of the target's exit code, matching
+# scripts\acceptance-wsl.sh's `set +e` after its own build step.
+$passCount = 0
+$failCount = 0
+$failing = @()
+
+foreach ($r in $mpiRows) {
+    $ranksList = $r.ranks -split ' '
+    $exe = $exeMap[$r.target]
+    foreach ($ranksStr in $ranksList) {
+        $ranks = [int]$ranksStr
+        $code = Invoke-MpiAcceptanceTarget -Target $r.target -Ranks $ranks -Exe $exe -LogDir $logDir -MpiexecPath $mpiexecPath
+        Write-Host "RUN_EXIT $($r.target) ranks=$ranks exit=$code"
+        if ($code -eq 0) {
+            $passCount++
+        } else {
+            $failCount++
+            $failing += "$($r.target) ranks=$ranks exit=$code"
+        }
+    }
+}
+
+foreach ($filter in $libFilters) {
+    $logPath = Join-Path $logDir "lib-$filter.log"
+    cargo test --lib $filter --no-fail-fast -- --nocapture *> $logPath
+    $code = $LASTEXITCODE
+    Write-Host "RUN_EXIT $filter ranks=- exit=$code"
+    if ($code -eq 0) {
+        $passCount++
+    } else {
+        $failCount++
+        $failing += "$filter exit=$code"
+    }
+}
+
+foreach ($target in $localTargets) {
+    $logPath = Join-Path $logDir "$target.log"
+    cargo test --test $target --no-fail-fast -- --nocapture *> $logPath
+    $code = $LASTEXITCODE
+    Write-Host "RUN_EXIT $target ranks=- exit=$code"
+    if ($code -eq 0) {
+        $passCount++
+    } else {
+        $failCount++
+        $failing += "$target exit=$code"
+    }
+}
+
+$total = $passCount + $failCount
+Write-Host "acceptance-native: summary $passCount/$total passed"
+if ($failCount -gt 0) {
+    Write-Host "acceptance-native: failing ($failCount):"
+    foreach ($f in $failing) { Write-Host "  $f" }
+    exit 1
+}
+exit 0
