@@ -67,7 +67,7 @@ fn canonical_nnz<A: Monoid>(tensor: &SparseTensor<'_, '_, A>) -> u64 {
 
 fn adjacency<'c, 'r>(context: &'c Context<'r>) -> SparseTensor<'c, 'r, AdjacencyAlgebra> {
     let distribution = Distribution::cyclic(vec![N, N], context.size());
-    let mut result = SparseTensor::new(context, distribution.clone(), AdjacencyAlgebra);
+    let mut result = SparseTensor::new(context, distribution.clone(), Tropical);
     let edges_per_row = ((N as f64 * SPARSITY) as usize).max(1);
     let weight_bound = (N * N).min(20);
     let mut generator = GlibcRand::new((context.rank() + 1) as u32);
@@ -94,8 +94,8 @@ fn adjacency<'c, 'r>(context: &'c Context<'r>) -> SparseTensor<'c, 'r, Adjacency
         .map(|index| (distribution.encode_key(&[index, index]), 0))
         .filter(|(key, _)| distribution.owner(*key) == context.rank())
         .collect();
-    let one = AdjacencyAlgebra.one();
-    let zero = AdjacencyAlgebra.zero();
+    let one = Tropical.one();
+    let zero = Tropical.zero();
     result.write_scaled(&diagonal, &one, &zero);
     result
 }
