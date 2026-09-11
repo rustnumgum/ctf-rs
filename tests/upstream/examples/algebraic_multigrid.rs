@@ -41,7 +41,7 @@ fn vector<'c, 'r>(context: &'c Context<'r>, length: usize) -> Vector<'c, 'r> {
     )
 }
 
-fn write_primary(matrix: &mut Matrix<'_, '_>, pairs: Vec<(usize, f32)>) {
+fn write_primary<'c, 'r>(matrix: &mut Matrix<'c, 'r>, pairs: Vec<(usize, f32)>) {
     let rank = matrix.context().rank();
     let pairs: Vec<_> = pairs
         .into_iter()
@@ -50,7 +50,7 @@ fn write_primary(matrix: &mut Matrix<'_, '_>, pairs: Vec<(usize, f32)>) {
     matrix.write_add(&pairs);
 }
 
-fn nonzeros(matrix: &Matrix<'_, '_>) -> u64 {
+fn nonzeros<'c, 'r>(matrix: &Matrix<'c, 'r>) -> u64 {
     let rank = matrix.context().rank();
     let local = matrix
         .local_pairs()
@@ -62,12 +62,12 @@ fn nonzeros(matrix: &Matrix<'_, '_>) -> u64 {
         .all_reduce(&Arithmetic::<u64>::new(), &local)
 }
 
-fn sparse_product(
-    output: &mut Matrix<'_, '_>,
+fn sparse_product<'c, 'r>(
+    output: &mut Matrix<'c, 'r>,
     indices_c: &str,
-    a: &Matrix<'_, '_>,
+    a: &Matrix<'c, 'r>,
     indices_a: &str,
-    b: &Matrix<'_, '_>,
+    b: &Matrix<'c, 'r>,
     indices_b: &str,
     alpha: f32,
     beta: f32,
@@ -99,12 +99,12 @@ fn sparse_product(
     );
 }
 
-fn sparse_matvec(
-    output: &mut Vector<'_, '_>,
+fn sparse_matvec<'c, 'r>(
+    output: &mut Vector<'c, 'r>,
     indices_c: &str,
-    a: &Matrix<'_, '_>,
+    a: &Matrix<'c, 'r>,
     indices_a: &str,
-    x: &Vector<'_, '_>,
+    x: &Vector<'c, 'r>,
     indices_x: &str,
     alpha: f32,
     beta: f32,
@@ -132,14 +132,14 @@ fn sparse_matvec(
     );
 }
 
-fn multiply_pointwise(output: &mut Vector<'_, '_>, right: &Vector<'_, '_>) {
+fn multiply_pointwise<'c, 'r>(output: &mut Vector<'c, 'r>, right: &Vector<'c, 'r>) {
     let left = output.clone();
     output.transform_from("i", &left, "i", right, "i", |left, right, value| {
         *value = *left * *right;
     });
 }
 
-fn add_scaled(output: &mut Vector<'_, '_>, input: &Vector<'_, '_>, alpha: f32) {
+fn add_scaled<'c, 'r>(output: &mut Vector<'c, 'r>, input: &Vector<'c, 'r>, alpha: f32) {
     output
         .sum_from(
             "i",
@@ -165,10 +165,10 @@ fn diagonal_reciprocal<'c, 'r>(a: &Matrix<'c, 'r>, length: usize) -> Vector<'c, 
     d
 }
 
-fn smooth_jacobi(
-    a: &Matrix<'_, '_>,
-    x: &mut Vector<'_, '_>,
-    b: &Vector<'_, '_>,
+fn smooth_jacobi<'c, 'r>(
+    a: &Matrix<'c, 'r>,
+    x: &mut Vector<'c, 'r>,
+    b: &Vector<'c, 'r>,
     nsm: usize,
     cache: &mut SearchCache<'_, '_>,
 ) {
@@ -212,12 +212,12 @@ fn residual<'c, 'r>(
     r
 }
 
-fn vcycle(
-    a: &Matrix<'_, '_>,
-    x: &mut Vector<'_, '_>,
-    b: &Vector<'_, '_>,
-    interpolation: &[Matrix<'_, '_>],
-    coarse: &[Matrix<'_, '_>],
+fn vcycle<'c, 'r>(
+    a: &Matrix<'c, 'r>,
+    x: &mut Vector<'c, 'r>,
+    b: &Vector<'c, 'r>,
+    interpolation: &[Matrix<'c, 'r>],
+    coarse: &[Matrix<'c, 'r>],
     level: usize,
     smoothing: &[usize],
     cache: &mut SearchCache<'_, '_>,
