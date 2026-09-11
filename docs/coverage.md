@@ -80,6 +80,14 @@ These are Frobenius norms (`norm2`), not entrywise vector comparisons.
 
 ## Current evidence
 
+C1 closed on 2026-09-11: source-format model I/O, contraction-path
+symmetrization, dense custom folded kernels and dense/packed folded sums,
+working selector agreement, and graph I/O native runtime are complete under
+the fixed C1 gate. Full WSL 1/2/4 and prescribed local checks, native build,
+and both native I/O drivers at 1/2/4 passed once. Remaining custom summation
+and compressed sparse work in the phase rows refers to S1, not C1 dense paths.
+See `validation.md` section "C1 close" for stamps and commands.
+
 See `validation.md`: basic exact foundation checks pass at 1/2/4 MPI ranks;
 local f64 BLAS GEMM and LAPACK QR/SVD/eigh checks pass. This does not close any
 whole phase. `upstream-inventory.tsv` remains a per-file backlog, not a pass list.

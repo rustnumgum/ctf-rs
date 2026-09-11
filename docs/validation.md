@@ -43,6 +43,71 @@ The prescribed `upstream_gemm4d`, `upstream_ccsdt_map`, `upstream_subworld_gemm`
 and NS `upstream_permute_multiworld` remain unchanged in the full C1 run;
 explicit-mapping drivers are not mislabeled as standalone selector tests.
 
+### C1 acceptance (2026-09-11)
+
+Implementation series: `9e84575`, `8da79b1`, `f53220a`, `7155249`,
+`cbc8fb1`, `0968f16`, in C1.1 through C1.6 order. The C1.1 coefficient
+bound was committed before the first numerical run. C1.3 implements custom
+CPU folded GEMM (alpha one, one batch, including transposed output), ordinary
+dense/packed folded summation and mapped non-inner custom summation.
+C1.5 selects only the two prescribed native I/O drivers. C1.6 corrects the
+README and propagates sparse `.cxx` status to all eleven matching headers.
+
+```text
+DIGIT / PASS — model_io
+Q: every registered model coefficient; class: A
+ref: in-memory coefficients before write, tests/model_io.rs
+bound: 0.5*10^(floor(log10(abs(ref)))-4), zero exact; source %1.4E
+Delta: max normalized difference d=0.9940440900019784 at each rank count
+runs: WSL 1/2/4 once each; no diagnostics; closed
+
+INFO — upstream_model_trainer
+existing dense workload, time=5, iterations=5, time_jump=1.5
+one four-rank invocation with explicit write and load; seconds=24.90146141
+informational only; not a speedup or model-training accuracy gate
+
+DIGIT / PASS — full WSL acceptance
+Q: each driver's unchanged metric and required invariants; class: R
+ref: pinned f69cbb46 and the existing Rust driver assertions
+bound: each driver's existing exact/absolute/relative/norm rule, unchanged
+Delta: all assertions passed; emitted per-driver values/stamps are in wsl.log
+runs: acceptance-wsl.sh once, all 175 MPI drivers at 1/2/4 once each,
+      then its prescribed local/library checks and seven-rank Strassen run
+exit: 0; diagnostics: 0; numerical verification closed
+
+DIGIT / PASS — native compile/link
+Q: all test/example targets compile and link; ref: C1 native gate
+bound: successful exit; Delta: no compile/link failure
+runs: acceptance-native.ps1 -BuildOnly once; exit 0
+
+DIGIT / PASS — sparse_text_io (native)
+Q: four-type coordinate I/O, duplicates, reverse/no-value, empty/tiny files
+ref: unchanged driver assertions; bound: exact; Delta: 0
+runs: native 1/2/4 once each, world+parity; exit 0; closed
+
+DIGIT / PASS — distributed_sparse_io (native)
+Q: sparse indexed I/O, redistribution, views, custom identity/order
+ref: unchanged driver assertions; bound: exact; Delta: 0
+runs: native 1/2/4 once each, world+parity; exit 0; closed
+```
+
+Commands from `D:/projects/ctf-rs`:
+
+```powershell
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-s1/C1/model.sh
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-s1/C1/acceptance.sh
+$env:CARGO_BUILD_JOBS='2'
+cmd.exe /d /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/acceptance-native.ps1 -BuildOnly > D:\projects\runs\ctf-rs-s1\C1\native-build.log 2>&1"
+cmd.exe /d /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/acceptance-native.ps1 -C1Only > D:\projects\runs\ctf-rs-s1\C1\native-runtime.log 2>&1"
+```
+
+Logs: `D:/projects/runs/ctf-rs-s1/C1/{model,wsl,native-build,native-runtime}.log`;
+adjacent `commands.md`, `model.sh`, and `acceptance.sh` retain nested commands.
+The existing keepalive was reused. No tolerance, existing driver, fixture,
+or assertion changed; no numerical failure, diagnostic, or rerun occurred.
+One accidental broad formatter invocation was removed outside the owned C1
+files before acceptance. C1 is closed; S1a follows. ctf-rs is not pushed.
+
 ## rsmpi binding
 
 ### CTF-R1-4 direct replica restoration (2026-09-09)

@@ -42,7 +42,7 @@ src/shared/Makefile	Cargo/build tooling	replaced
 src/shared/memcontrol.cxx	src/memcontrol.rs; examples/mpi_low_memory_bench.rs	ported cap/process-share/used-memory budgeting and low-memory selection; OS resident set replaces allocator registry and Linux cgroup limit corrects bare-host assumption
 src/shared/memcontrol.h	src/memcontrol.rs	replaced: exact budget value types and RAII allocation replace raw allocation/deallocation/profiler hooks
 src/shared/mkl_symbs.h	src/algebra.rs; src/kernel.rs; src/sparse_formats.rs; src/sparse_coo.rs	partial: elementwise operations are native Rust; optional MKL sparse backends remain a sparse-only concern
-src/shared/model.cxx	src/model.rs; src/cost.rs	ported: linear/cubic prediction, rolling observations, distributed QR/SVD update and explicit CPU registry coefficient write/load, rank-ordered dumps and printing; C1.1 source-format roundtrip pending acceptance
+src/shared/model.cxx	src/model.rs; src/cost.rs	ported: linear/cubic prediction, rolling observations, distributed QR/SVD update and explicit CPU registry coefficient write/load, rank-ordered dumps and printing; C1.1 source-format roundtrip PASS WSL1/2/4
 src/shared/model.h	src/model.rs; src/cost.rs	replaced: explicit typed CPU model registry methods; no process-global registry or environment-triggered load
 src/shared/offload.cu	excluded: CUDA/offload	excluded
 src/shared/offload.cxx	excluded: CUDA/offload	excluded
@@ -59,7 +59,7 @@ src/interface/flop_counter.cxx	src/flop_counter.rs; src/ffi/linalg.rs	ported pro
 src/interface/fun_term.cxx	src/interface	replaced: direct Rust operations replace the expression interface
 src/interface/fun_term.h	src/interface	replaced: direct Rust operations replace the expression interface
 src/interface/functions.h	src/sparse_function_kernel.rs; src/sparse_gemm.rs; src/sparse_fold_function.rs	partial: Bivar_Function CSR sparse/dense and sparse/sparse dense/sparse-output kernels with distributed panels and fullyfoldable high-order custom dispatch; remaining function kernels and general dense dispatch pending
-src/interface/graph_io_aux.cxx	src/sparse_text.rs; src/ffi/mpi_io.rs	implemented: four typed coordinate codecs and communicator-scoped MPI-IO; fixed source overlap and prefix writes; unsafe EOF, MPI_COMM_WORLD and scanf-pointer behavior corrected; WSL1/2/4 PASS, native compile PASS/runtime pending
+src/interface/graph_io_aux.cxx	src/sparse_text.rs; src/ffi/mpi_io.rs	implemented: four typed coordinate codecs and communicator-scoped MPI-IO; fixed source overlap and prefix writes; unsafe EOF, MPI_COMM_WORLD and scanf-pointer behavior corrected; C1 WSL1/2/4 and native1/2/4 PASS, native compile/link PASS
 src/interface/group.h	src/algebra.rs	replaced: native Group trait and typed additive inverses replace the C++ hierarchy
 src/interface/idx_tensor.cxx	src/interface	replaced: direct Rust operations replace the expression interface
 src/interface/idx_tensor.h	src/interface	replaced: direct Rust operations replace the expression interface
