@@ -52,7 +52,11 @@ In WSL Ubuntu-26.04, install the Rust toolchain, MPI development files,
 `bash scripts/acceptance-wsl.sh` from this project. It uses the Linux filesystem
 for Cargo's target directory. The script covers the current 175 MPI drivers at
 1, 2, and 4 ranks, plus its local/library checks and seven-rank Strassen check.
-It is not the still-pending S1 acceptance set.
+The separate C1/S1a/S1b/S1c delivery ran all thirteen S1 targets at WSL and
+native 1/2/4 under the fixed brief. Ten targets passed the full native set;
+two source-ineligible Python expressions and bounded sparse checkpointing
+remain HANDOFF, as does AMG's original distributed WSL gate after its repair.
+These records are not permission to rerun closed numerical checks.
 Recorded results and remaining gates are in `docs/validation.md`.
 
 To avoid Windows-drive source I/O, run `bash scripts/sync-wsl.sh` from the

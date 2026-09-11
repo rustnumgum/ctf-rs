@@ -1,5 +1,16 @@
 # Native Windows GNU build and acceptance
 
+## C1/S1 delivery (2026-09-11)
+
+C1 full native compile/link and both sparse I/O drivers at 1/2/4 passed.
+Each S1 batch compiled/linked; the final thirteen-target native set ran once
+at 1/2/4: ten targets passed all ranks, with checkpoint precision and the two
+source-ineligible sparse Python expressions marked HANDOFF. Repaired AMG
+passed native1/2/4; its original distributed WSL failures are not relabeled.
+No missing MS-MPI symbol or native timeout occurred. Exact commands, logs and
+per-target bounds are in validation.md and D:/projects/runs/ctf-rs-s1/.
+Historical installation notes below do not describe this completed run.
+
 This route uses the installed x86_64-pc-windows-gnu Rust toolchain and MSYS2
 MINGW64 native Windows libraries. It is not WSL or Cygwin execution.
 Install the matching MINGW64 packages (not mixed UCRT64/CLANG64 binaries):

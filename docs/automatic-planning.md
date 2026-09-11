@@ -264,6 +264,20 @@ buffer for MPI_Sendrecv_replace and decoded afterward; Rust object layout is
 never treated as an MPI datatype. This communication workspace is distinct
 from the retained home copies eliminated by low-memory execution.
 
+## Explicit sparse planning configuration (S1)
+
+`sparse_search::SearchCache` selects raw k0-k5 contraction mappings with
+per-operand `StorageSize`; selected ordinary and heterogeneous custom methods
+execute those distributions directly. `sparse_symmetric_search` selects
+compressed sparse custom accumulation layouts, consumed without a dense force
+matrix. `sparse_sum_search::SearchCache` selects source two-pass summation
+mappings with pin/permutation/replication/virtual execution metadata.
+Drivers explicitly own catalogs, Models and memory options; old direct-key
+sum APIs do not silently construct defaults. Cache signatures omit values and
+nonzero counts; a miss is collective and a structural hit reuses the plan.
+Sparse folding and sparse-output replication rejection remain source rules.
+Acceptance and the source-restricted HANDOFF cases are in `validation.md`.
+
 ## Typed native BLAS boundary
 
 `Gemm<T>` and `GemmKernel<T>` carry the scalar type through the local matrix

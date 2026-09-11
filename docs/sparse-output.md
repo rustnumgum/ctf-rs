@@ -43,8 +43,10 @@ the process grid before using the sparse-first CCSR path; indexed execution
 swaps operand labels. Noncommutative elements consequently multiply as B*A,
 not A*B. This behavior is preserved and tested, not silently corrected.
 
-These source boundaries do not establish full Rust automatic dispatch:
-automatic sparse plan assembly and complete mixed/raw moving-output integration
-remain unfinished. Explicit CSR/CCSR recursive levels are in sparse-2d.md.
+S1a/S1b now assemble raw folded sparse plans and consume their actual mappings,
+including mixed storage and moving-output levels; heterogeneous custom SSS
+execution uses the source typed callbacks. Sparse ABC weigh expressions still
+have no legal pinned-source leaf and remain HANDOFF, not automatic fallback.
+Explicit CSR/CCSR recursive levels are in sparse-2d.md.
 Sparse virtual/replicated communication in the source wraps these
 inner CSR/CCSR leaves rather than supplying a new general scalar sparse output.

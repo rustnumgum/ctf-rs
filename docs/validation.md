@@ -245,6 +245,82 @@ source's zero tensor; neither fixture is strengthened or tuned after a run.
 The checkpoint source uses fixed six-decimal text; no precision change may
 be made to force its bounded residual gate to pass.
 
+### S1c and full native S1 outcome (2026-09-11)
+
+Run revision `1a0d822`. The four S1c WSL drivers ran once at each of 1/2/4
+(12 invocations). MIS, MIS2 and sampling passed; checkpoint remains HANDOFF.
+Native compile/link of all thirteen S1 targets passed once successfully.
+One WSL and one native build-only attempt failed on shared helper lifetimes
+before numerical execution; no fixture, assertion or criterion was changed.
+
+| S1c driver | WSL 1/2/4 stamp | Q / delta and reference |
+|---|---|---|
+| upstream_mis | DIGIT / PASS | source f32 overlap=0; dense uncovered-vertex count=0, exact bounds |
+| upstream_mis2 | DIGIT / PASS | stored-entry counts >1.1 and <.9 both 0; source checker, not a stronger graph property |
+| sparse_sample | DIGIT / PASS | norms (0,0,0) at every rank count; both differences=0, nonincreasing bounds |
+| upstream_checkpoint_sparse | DIGIT / HANDOFF | Q=3.9769591334653147e-7 at 1, 3.4024306287098844e-7 at 2; 4-rank world bound passes without a printed Q but parity Q=3.4024306287098844e-7 fails; strict bound 2.7e-7 |
+
+The one permitted checkpoint **dense twin** at 1 rank preserved the generated
+sparse fixture and used dense text I/O/subtraction. Q was identically
+3.9769591334653147e-7, above 2.7e-7. This separates selected sparse key/sum
+storage from the source six-decimal format expectation. Diagnostic budget
+used 1/3; no precision change, fixture enlargement or further diagnostic.
+The known bounded source-format discrepancy is recorded in
+`upstream-known-failures.md` and remains unaccepted.
+
+The required **whole native S1 set** ran once per target at 1/2/4:
+39 invocations, 30 exits 0 and 9 exits 101, no timeout or skipped target.
+
+| Native target | Stamp at 1/2/4 | Q / reference / bound |
+|---|---|---|
+| upstream_apsp | DIGIT / PASS | differing weights=0 / dense tropical / exact 0 |
+| upstream_algebraic_multigrid | DIGIT / PASS | source V-cycle rnorm < twice-smoothed Jacobi; values below |
+| upstream_block_sparse | DIGIT / PASS | residual norm=0 / flattened source product / <=1e-4 |
+| upstream_force_integration_sparse | DIGIT / PASS | Boolean criterion=1 / original particles / initial any >1e-6, all restored within1e-6; no maximum delta printed |
+| upstream_btwn_central | DIGIT / PASS | residual norm=0 / source naive / <=6e-6 |
+| upstream_checkpoint_sparse | DIGIT / HANDOFF | same Q=3.9769591334653147e-7 (1), 3.4024306287098844e-7 (2 and 4-rank parity) / roundtrip / <2.7e-7 |
+| upstream_mis | DIGIT / PASS | overlap=0, uncovered=0 / source graph / exact0 |
+| upstream_mis2 | DIGIT / PASS | both stored-entry violation counts=0 / source graph / exact0 |
+| sparse_einsum_hadamard | DIGIT / HANDOFF | selected=None; Q/delta uncomputed / source expression / <1e-14 unchanged |
+| sparse_scaled_expression | DIGIT / HANDOFF | selected=None; Q/delta uncomputed / source expression / <1e-14 unchanged |
+| sparse_complex | DIGIT / PASS | sum-absolute delta=0 / same dense expression / <1e-14 |
+| sparse_sy | DIGIT / PASS | six source shapes, every comparison passes / dense packed expression / <1e-14 |
+| sparse_sample | DIGIT / PASS | norms (0,0,0) / source zero fixture / nonincreasing |
+
+Native AMG (one timing per invocation; informational):
+
+| ranks | rnorm | rnorm_alt | rnorm-rnorm_alt | V-cycle seconds |
+|---|---|---|---|---|
+| 1 | 0.004937970528833717 | 0.005547611182988828 | -0.000609640654155111 | 0.142621 |
+| 2 | 0.005085930671471991 | 0.005837246582193954 | -0.000751315910721963 | 0.108778 |
+| 4 | 0.005189487439309569 | 0.005878901083452919 | -0.000689413644143350 | 0.046671 |
+
+These native passes close the native AMG gate; they do not retroactively
+replace S1a's original WSL 2/4 failures. That repaired distributed WSL gate
+remains unaccepted under the brief's once-only rule. No passing driver was
+repeated for confidence. Across S1: all 39 prescribed WSL invocations and all
+39 prescribed native invocations occurred; only two extra diagnostics total
+(AMG rank-count split in S1a and checkpoint dense twin in S1c).
+
+Exact commands and evidence are under `D:/projects/runs/ctf-rs-s1/S1c/`:
+
+```powershell
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-s1/S1c/acceptance.sh
+cmd.exe /d /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\projects\runs\ctf-rs-s1\S1c\native-build.ps1 > D:\projects\runs\ctf-rs-s1\S1c\native-build.log 2>&1"
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-s1/S1c/checkpoint-dense-twin.sh
+cmd.exe /d /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\projects\runs\ctf-rs-s1\S1c\native-runtime.ps1 > D:\projects\runs\ctf-rs-s1\S1c\native-runtime.log 2>&1"
+```
+
+Logs: `wsl.log`, `build.json`, `<driver>-<ranks>.log`, `native-build.log`,
+`native-build.json`, `native-runtime.log`, `native-<driver>-<ranks>.{log,err}`,
+and `checkpoint-dense-twin.log`; scripts and `commands.md` preserve nested
+commands. No ctf-rs push; no libmuffintin/fftw code edit; existing WSL
+keepalive reused. All four milestone commit series and records are delivered,
+but **G-CTF-S1 remains HANDOFF**, not a full numerical close.
+HANDOFF question: should a future plan change the two source-forbidden ABC
+expressions or checkpoint's source precision contract, and authorize repaired
+AMG WSL2/4 acceptance? No later batch remains pending on these items.
+
 ## rsmpi binding
 
 ### CTF-R1-4 direct replica restoration (2026-09-09)

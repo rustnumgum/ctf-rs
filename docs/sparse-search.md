@@ -8,7 +8,9 @@ leaf models and A/B/C pin layers. Selected execution performs redistribution,
 folding, replication, nested panels, virtual traversal and output depinning;
 it does not substitute a GridPlan. APIs cover SDD, SSD, SSS and SDS storage.
 Sparse ABC weigh labels remain source-ineligible. Compressed-symmetry and
-custom mixed-type selected execution remain S1b; summation remains S1c.
+custom mixed-type selected execution were delivered in S1b; explicit raw
+summation search/cache and mapped execution were delivered in S1c. See the
+per-platform stamps and remaining HANDOFF cases in validation.md.
 
 `sparse_search::search_unfolded` selects raw mappings for NS sparse A / dense
 B / dense C. It reuses the existing source normal and exhaustive enumerators,
