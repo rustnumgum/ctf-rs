@@ -218,7 +218,7 @@ fn sparse_path_doubling<'c, 'r>(
         let old_paths = paths.clone();
         let paths_i = old_paths
             .clone()
-            .into_sparse(|path| path.hops == hops);
+            .into_sparse(|path| path.hops == hops as i32);
         let global_nnz = canonical_nnz(&paths_i);
         let selected = cache
             .prepare(
