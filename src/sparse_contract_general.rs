@@ -267,6 +267,73 @@ where
     expanded
 }
 
+/// Hadamard-index elimination step (commit d5861de), A side: expand the
+/// diagonal `weigh` selected on `a` and relabel the matching axis on B's
+/// index string. Shared by every `contract_sparse*` recursion below.
+fn hadamard_expand_a<'c, 'r, A>(
+    a: &SparseTensor<'c, 'r, A>,
+    indices_a: &str,
+    indices_b: &str,
+    weigh: &WeighIndex,
+) -> (SparseTensor<'c, 'r, A>, String, String)
+where
+    A: Monoid + Clone,
+    A::Element: Wire,
+{
+    let expanded = expand_sparse_diagonal(a, weigh.axis_a);
+    let expanded_indices = insert_label(indices_a, weigh.axis_a, weigh.fresh_label);
+    let relabeled_b = replace_label(indices_b, weigh.axis_b, weigh.fresh_label);
+    (expanded, expanded_indices, relabeled_b)
+}
+
+/// Hadamard-index elimination step, B side: the mirror of
+/// [`hadamard_expand_a`], expanding `b` and relabeling A's index string.
+fn hadamard_expand_b<'c, 'r, B>(
+    indices_a: &str,
+    b: &SparseTensor<'c, 'r, B>,
+    indices_b: &str,
+    weigh: &WeighIndex,
+) -> (String, SparseTensor<'c, 'r, B>, String)
+where
+    B: Monoid + Clone,
+    B::Element: Wire,
+{
+    let expanded = expand_sparse_diagonal(b, weigh.axis_b);
+    let relabeled_a = replace_label(indices_a, weigh.axis_a, weigh.fresh_label);
+    let expanded_indices = insert_label(indices_b, weigh.axis_b, weigh.fresh_label);
+    (relabeled_a, expanded, expanded_indices)
+}
+
+/// Hadamard-index elimination for two sparse operands (source contraction.cxx
+/// map_extra_indices): expand the diagonal on whichever side `weigh`
+/// selected, relabel the other side's matching axis, and recurse the
+/// contraction once through `recurse` with the (possibly expanded) operands
+/// and their (possibly relabeled) index strings. `contract_sparse` (both
+/// operands the same algebra) and `contract_sparse_function` (heterogeneous
+/// operands) both drive this with their own `recurse` closure.
+fn eliminate_hadamard_index<'c, 'r, A, B, T>(
+    a: &SparseTensor<'c, 'r, A>,
+    indices_a: &str,
+    b: &SparseTensor<'c, 'r, B>,
+    indices_b: &str,
+    weigh: WeighIndex,
+    recurse: impl FnOnce(&SparseTensor<'c, 'r, A>, &str, &SparseTensor<'c, 'r, B>, &str) -> T,
+) -> T
+where
+    A: Monoid + Clone,
+    A::Element: Wire,
+    B: Monoid + Clone,
+    B::Element: Wire,
+{
+    if weigh.expand_a {
+        let (expanded, expanded_indices, relabeled_b) = hadamard_expand_a(a, indices_a, indices_b, &weigh);
+        recurse(&expanded, &expanded_indices, b, &relabeled_b)
+    } else {
+        let (relabeled_a, expanded, expanded_indices) = hadamard_expand_b(indices_a, b, indices_b, &weigh);
+        recurse(a, &relabeled_a, &expanded, &expanded_indices)
+    }
+}
+
 fn mapping_uses_axis(mapping: &Mapping, axis: usize) -> bool {
     match mapping {
         Mapping::Unmapped => false,
@@ -1001,9 +1068,8 @@ where
         let indices = [indices_a, indices_b, indices_c];
         if let Some(weigh) = sparse_weigh_index(distributions, indices, [Some(nonzeros_a), None]) {
             assert!(weigh.expand_a, "dense Hadamard-index expansion is unsupported");
-            let expanded = expand_sparse_diagonal(a, weigh.axis_a);
-            let expanded_indices = insert_label(indices_a, weigh.axis_a, weigh.fresh_label);
-            let relabeled_b = replace_label(indices_b, weigh.axis_b, weigh.fresh_label);
+            let (expanded, expanded_indices, relabeled_b) =
+                hadamard_expand_a(a, indices_a, indices_b, &weigh);
             return self.contract_sparse(
                 indices_c,
                 &expanded,
@@ -1404,38 +1470,11 @@ where
             indices,
             nonzeros.map(Some),
         ) {
-            if weigh.expand_a {
-                let expanded = expand_sparse_diagonal(a, weigh.axis_a);
-                let expanded_indices = insert_label(indices_a, weigh.axis_a, weigh.fresh_label);
-                let relabeled_b = replace_label(indices_b, weigh.axis_b, weigh.fresh_label);
-                return self.contract_sparse(
-                    indices_c,
-                    &expanded,
-                    &expanded_indices,
-                    b,
-                    &relabeled_b,
-                    cache,
-                    alpha,
-                    beta,
-                    output_fraction,
-                    commutative,
-                );
-            }
-            let expanded = expand_sparse_diagonal(b, weigh.axis_b);
-            let relabeled_a = replace_label(indices_a, weigh.axis_a, weigh.fresh_label);
-            let expanded_indices = insert_label(indices_b, weigh.axis_b, weigh.fresh_label);
-            return self.contract_sparse(
-                indices_c,
-                a,
-                &relabeled_a,
-                &expanded,
-                &expanded_indices,
-                cache,
-                alpha,
-                beta,
-                output_fraction,
-                commutative,
-            );
+            return eliminate_hadamard_index(a, indices_a, b, indices_b, weigh,
+                |a, indices_a, b, indices_b| self.contract_sparse(
+                    indices_c, a, indices_a, b, indices_b,
+                    cache, alpha, beta, output_fraction, commutative,
+                ));
         }
         let selected = cache.prepare(
             distributions,
@@ -1569,36 +1608,11 @@ where
             indices,
             nonzeros.map(Some),
         ) {
-            if weigh.expand_a {
-                let expanded = expand_sparse_diagonal(a, weigh.axis_a);
-                let expanded_indices = insert_label(indices_a, weigh.axis_a, weigh.fresh_label);
-                let relabeled_b = replace_label(indices_b, weigh.axis_b, weigh.fresh_label);
-                return self.contract_sparse_function(
-                    indices_c,
-                    &expanded,
-                    &expanded_indices,
-                    b,
-                    &relabeled_b,
-                    cache,
-                    output_fraction,
-                    function,
-                    accumulate,
-                );
-            }
-            let expanded = expand_sparse_diagonal(b, weigh.axis_b);
-            let relabeled_a = replace_label(indices_a, weigh.axis_a, weigh.fresh_label);
-            let expanded_indices = insert_label(indices_b, weigh.axis_b, weigh.fresh_label);
-            return self.contract_sparse_function(
-                indices_c,
-                a,
-                &relabeled_a,
-                &expanded,
-                &expanded_indices,
-                cache,
-                output_fraction,
-                function,
-                accumulate,
-            );
+            return eliminate_hadamard_index(a, indices_a, b, indices_b, weigh,
+                |a, indices_a, b, indices_b| self.contract_sparse_function(
+                    indices_c, a, indices_a, b, indices_b,
+                    cache, output_fraction, function, accumulate,
+                ));
         }
         let selected = cache.prepare(
             distributions,
