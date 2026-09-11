@@ -193,7 +193,6 @@ tttp_blocking	lib	-
 sparse_text	lib	-		
 schedule	lib	-		
 cyclic_reshuffle	lib	-		
-symmetric_reshuffle	lib	-		
 sparse_virtual	lib	-		
 cost_models	local	-		
 fold_indices	local	-		
