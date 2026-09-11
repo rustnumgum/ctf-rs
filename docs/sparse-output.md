@@ -43,10 +43,13 @@ the process grid before using the sparse-first CCSR path; indexed execution
 swaps operand labels. Noncommutative elements consequently multiply as B*A,
 not A*B. This behavior is preserved and tested, not silently corrected.
 
-S1a/S1b now assemble raw folded sparse plans and consume their actual mappings,
+S1a/S1b assemble raw folded sparse plans and consume their actual mappings,
 including mixed storage and moving-output levels; heterogeneous custom SSS
-execution uses the source typed callbacks. Sparse ABC weigh expressions still
-have no legal pinned-source leaf and remain HANDOFF, not automatic fallback.
-Explicit CSR/CCSR recursive levels are in sparse-2d.md.
+execution uses the source typed callbacks. Sparse ABC weigh (Hadamard-index)
+expressions are not a static source restriction: `contraction.cxx:5417-5527`
+eliminates Hadamard indices before folding, and S1d ports that entry step, so
+these expressions run through the ordinary folded/selected path rather than
+falling back automatically. See `validation.md`, section
+"S1d and S1 close". Explicit CSR/CCSR recursive levels are in sparse-2d.md.
 Sparse virtual/replicated communication in the source wraps these
 inner CSR/CCSR leaves rather than supplying a new general scalar sparse output.

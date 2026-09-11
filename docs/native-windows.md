@@ -1,14 +1,15 @@
 # Native Windows GNU build and acceptance
 
-## C1/S1 delivery (2026-09-11)
+## C1/S1 delivery (2026-09-11), closed 2026-09-12
 
 C1 full native compile/link and both sparse I/O drivers at 1/2/4 passed.
-Each S1 batch compiled/linked; the final thirteen-target native set ran once
-at 1/2/4: ten targets passed all ranks, with checkpoint precision and the two
-source-ineligible sparse Python expressions marked HANDOFF. Repaired AMG
-passed native1/2/4; its original distributed WSL failures are not relabeled.
-No missing MS-MPI symbol or native timeout occurred. Exact commands, logs and
-per-target bounds are in validation.md and D:/projects/runs/ctf-rs-s1/.
+Each S1 batch compiled/linked; the S1 close under the fixed plan.v4 contract
+then ran all thirteen S1 targets and the three touched native targets once
+at 1/2/4: every target passed at every rank, and no HANDOFF question
+remains. Repaired AMG passed native 1/2/4; its original pre-repair
+distributed WSL failures are not relabeled. No missing MS-MPI symbol or
+native timeout occurred. Exact commands, logs and per-target bounds are in
+`validation.md`, section "S1d and S1 close", and D:/projects/runs/ctf-rs-s1/.
 Historical installation notes below do not describe this completed run.
 
 This route uses the installed x86_64-pc-windows-gnu Rust toolchain and MSYS2
