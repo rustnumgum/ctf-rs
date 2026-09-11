@@ -90,14 +90,7 @@ pub struct Folded {
 
 /// CPU contiguous-batch kernel from interface/semiring.cxx and sym_seq_ctr_inr.
 /// K is a compile-time local-kernel choice (initially native BLAS), not a plugin.
-pub fn folded<T, K>(
-    plan: Folded,
-    a: &[T],
-    b: &[T],
-    c: &mut [T],
-    alpha: T,
-    beta: T,
-)
+pub fn folded<T, K>(plan: Folded, a: &[T], b: &[T], c: &mut [T], alpha: T, beta: T)
 where
     T: Clone + PartialEq,
     Arithmetic<T>: Semiring<Element = T>,
@@ -153,6 +146,63 @@ where
             c,
             ldc: m.max(1),
         });
+    }
+}
+
+/// CPU `Bivar_Kernel::cgemm` specialization selected by
+/// `sym_seq_ctr_inr`. The source admits a custom inner kernel only for one
+/// folded batch and identity alpha; beta scaling remains outside `cgemm`.
+pub fn folded_function<A: Semiring>(
+    algebra: &A,
+    plan: Folded,
+    a: &[A::Element],
+    b: &[A::Element],
+    c: &mut [A::Element],
+    beta: &A::Element,
+    function: &impl Fn(&A::Element, &A::Element) -> A::Element,
+) {
+    use crate::linalg::Transpose;
+
+    assert_eq!(
+        plan.batches, 1,
+        "custom folded contraction requires one batch"
+    );
+    assert_eq!(a.len(), plan.m * plan.k);
+    assert_eq!(b.len(), plan.k * plan.n);
+    assert_eq!(c.len(), plan.m * plan.n);
+
+    if *beta == algebra.zero() {
+        c.fill(algebra.zero());
+    } else if *beta != algebra.one() {
+        for value in c.iter_mut() {
+            *value = algebra.multiply(beta, value);
+        }
+    }
+
+    let (m, n, trans_left, trans_right, left, right) = if plan.transposed_output {
+        (plan.n, plan.m, plan.trans_b, plan.trans_a, b, a)
+    } else {
+        (plan.m, plan.n, plan.trans_a, plan.trans_b, a, b)
+    };
+    let left_offset = |row: usize, inner: usize| match trans_left {
+        Transpose::No => row + inner * m,
+        Transpose::Yes => row * plan.k + inner,
+    };
+    let right_offset = |inner: usize, column: usize| match trans_right {
+        Transpose::No => inner + column * plan.k,
+        Transpose::Yes => inner * n + column,
+    };
+    for column in 0..n {
+        for row in 0..m {
+            let output = row + column * m;
+            for inner in 0..plan.k {
+                let value = function(
+                    &left[left_offset(row, inner)],
+                    &right[right_offset(inner, column)],
+                );
+                c[output] = algebra.add(&value, &c[output]);
+            }
+        }
     }
 }
 

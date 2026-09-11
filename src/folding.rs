@@ -111,8 +111,7 @@ impl Plan {
         for permutation in 0..count {
             let mut plan = Self::with_permutation(shapes, indices, permutation)?;
             let mut times = std::array::from_fn(|operand| {
-                virtual_copies[operand]
-                    as f64
+                virtual_copies[operand] as f64
                     * models.transpose(shapes[operand], plan.order(operand))
             });
             times[PERMUTATIONS[permutation][2]] *= 2.;
@@ -297,14 +296,7 @@ impl Plan {
     }
 
     /// Pack, execute the existing batched GEMM kernel, and restore C's layout.
-    pub fn execute<T, K>(
-        &self,
-        a: &[T],
-        b: &[T],
-        c: &mut [T],
-        alpha: T,
-        beta: T,
-    )
+    pub fn execute<T, K>(&self, a: &[T], b: &[T], c: &mut [T], alpha: T, beta: T)
     where
         T: Clone + PartialEq,
         crate::algebra::Arithmetic<T>: crate::algebra::Semiring<Element = T>,
@@ -334,6 +326,51 @@ impl Plan {
             beta,
         );
         unpack(&packed_c, c, &self.shape_c, &self.order_c);
+    }
+
+    /// Execute the source custom `sym_seq_ctr_inr` specialization when its
+    /// strict contract is met. Dense custom contractions are not generally
+    /// foldable: this path requires identity alpha and one batch. A transposed
+    /// output swaps operands, dimensions, and transpose flags as the source does.
+    pub fn execute_function<A: crate::algebra::Semiring>(
+        &self,
+        algebra: &A,
+        a: &[A::Element],
+        b: &[A::Element],
+        c: &mut [A::Element],
+        alpha: &A::Element,
+        beta: &A::Element,
+        function: &impl Fn(&A::Element, &A::Element) -> A::Element,
+    ) -> bool {
+        if *alpha != algebra.one() || self.batches != 1 {
+            return false;
+        }
+        assert_eq!(a.len(), self.size_a);
+        assert_eq!(b.len(), self.size_b);
+        assert_eq!(c.len(), self.size_c);
+
+        let packed_a = pack(a, &self.shape_a, &self.order_a);
+        let packed_b = pack(b, &self.shape_b, &self.order_b);
+        let mut packed_c = pack(c, &self.shape_c, &self.order_c);
+        crate::contraction::folded_function(
+            algebra,
+            Folded {
+                m: self.m,
+                n: self.n,
+                k: self.k,
+                batches: self.batches,
+                trans_a: self.trans_a,
+                trans_b: self.trans_b,
+                transposed_output: self.transposed_output,
+            },
+            &packed_a,
+            &packed_b,
+            &mut packed_c,
+            beta,
+            function,
+        );
+        unpack(&packed_c, c, &self.shape_c, &self.order_c);
+        true
     }
 }
 

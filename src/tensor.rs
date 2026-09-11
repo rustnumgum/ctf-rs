@@ -317,29 +317,174 @@ where
     where
         A: Clone,
     {
-        let mut transformed = Self {
+        use crate::mapping::Mapping;
+
+        assert!(std::ptr::eq(self.context, input.context));
+        assert_eq!(topology.size(), self.context.size());
+        let pa = crate::diagonal::Projection::new(&input.distribution.shape, indices_a);
+        let pb = crate::diagonal::Projection::new(&self.distribution.shape, indices_b);
+        if pa.repeated() || pb.repeated() {
+            let (a, ia) = input.extract_diagonal(indices_a);
+            let (mut b, ib) = self.extract_diagonal(indices_b);
+            b.sum_function_from(&ib, &a, &ia, topology, alpha, beta, function)?;
+            self.replace_diagonal(indices_b, &b);
+            return Ok(());
+        }
+
+        let mut labels = Vec::new();
+        let mut shape = Vec::new();
+        for (indices, distribution) in [
+            (indices_a, &input.distribution),
+            (indices_b, &self.distribution),
+        ] {
+            for (axis, label) in indices.bytes().enumerate() {
+                if let Some(union_axis) = labels.iter().position(|&old| old == label) {
+                    assert_eq!(shape[union_axis], distribution.shape[axis]);
+                } else {
+                    labels.push(label);
+                    shape.push(distribution.shape[axis]);
+                }
+            }
+        }
+        let mut maps = vec![Mapping::Unmapped; labels.len()];
+        if !labels.is_empty() {
+            crate::map_tensor::assign(
+                &shape,
+                &topology,
+                &(0..topology.dimensions.len()).collect::<Vec<_>>(),
+                &vec![false; labels.len() * labels.len()],
+                &mut vec![false; labels.len()],
+                &mut maps,
+                true,
+            )?;
+        }
+        let mapped = |indices: &str, shape: &[usize]| {
+            Distribution::new(
+                shape.to_vec(),
+                topology.clone(),
+                indices
+                    .bytes()
+                    .map(|label| maps[labels.iter().position(|&old| old == label).unwrap()].clone())
+                    .collect(),
+            )
+        };
+        let mut a = Self {
             context: input.context,
             algebra: input.algebra.clone(),
             distribution: input.distribution.clone(),
             data: input.data.clone(),
         };
-        for (offset, value) in transformed.data.iter_mut().enumerate() {
-            if transformed
-                .distribution
-                .global_key(transformed.context.rank(), offset)
-                .is_some()
-            {
-                *value = function(&input.algebra.multiply(value, &alpha));
+        let mut b = Self {
+            context: self.context,
+            algebra: self.algebra.clone(),
+            distribution: self.distribution.clone(),
+            data: self.data.clone(),
+        };
+        a.redistribute(mapped(indices_a, &a.distribution.shape));
+        b.redistribute(mapped(indices_b, &b.distribution.shape));
+
+        fn mark(map: &Mapping, label: u8, axes: &mut [Option<u8>]) {
+            match map {
+                Mapping::Unmapped => {}
+                Mapping::Physical { axis, child, .. } => {
+                    axes[*axis] = Some(label);
+                    mark(child, label, axes);
+                }
+                Mapping::Virtual { child, .. } => mark(child, label, axes),
             }
         }
-        self.sum_from(
-            indices_b,
-            &transformed,
+        let mut axes = [
+            vec![None; topology.dimensions.len()],
+            vec![None; topology.dimensions.len()],
+        ];
+        for (operand, (indices, distribution)) in
+            [(indices_a, &a.distribution), (indices_b, &b.distribution)]
+                .into_iter()
+                .enumerate()
+        {
+            for (map, label) in distribution.mappings.iter().zip(indices.bytes()) {
+                mark(map, label, &mut axes[operand]);
+            }
+        }
+        let mut comms: [Vec<Context<'_>>; 2] = std::array::from_fn(|_| Vec::new());
+        for axis in 0..topology.dimensions.len() {
+            match (axes[0][axis], axes[1][axis]) {
+                (None, Some(_)) => comms[0].push(topology.fiber(self.context, axis)),
+                (Some(_), None) => comms[1].push(topology.fiber(self.context, axis)),
+                (Some(left), Some(right)) => assert_eq!(left, right),
+                (None, None) => {}
+            }
+        }
+        let actual_shape = |distribution: &Distribution| {
+            let coordinates = distribution.topology.coordinates(self.context.rank());
+            distribution
+                .shape
+                .iter()
+                .zip(&distribution.mappings)
+                .map(|(&length, mapping)| {
+                    let phase = mapping.physical_phase();
+                    let residue = mapping.physical_rank(&coordinates);
+                    if residue < length {
+                        (length - 1 - residue) / phase + 1
+                    } else {
+                        0
+                    }
+                })
+                .collect::<Vec<_>>()
+        };
+        let shapes = [actual_shape(&a.distribution), actual_shape(&b.distribution)];
+        let mut adata: Vec<_> = a
+            .data
+            .into_iter()
+            .enumerate()
+            .filter_map(|(offset, value)| {
+                a.distribution
+                    .global_key(self.context.rank(), offset)
+                    .map(|_| value)
+            })
+            .collect();
+        let mut bdata: Vec<_> = b
+            .data
+            .iter()
+            .cloned()
+            .enumerate()
+            .filter_map(|(offset, value)| {
+                b.distribution
+                    .global_key(self.context.rank(), offset)
+                    .map(|_| value)
+            })
+            .collect();
+        crate::summation::replicated_function(
+            &self.algebra,
+            &comms[0].iter().collect::<Vec<_>>(),
+            &comms[1].iter().collect::<Vec<_>>(),
+            &shapes[0],
+            &vec![1; shapes[0].len()],
             indices_a,
-            topology,
-            self.algebra.one(),
-            beta,
-        )
+            &mut adata,
+            &shapes[1],
+            &vec![1; shapes[1].len()],
+            indices_b,
+            &mut bdata,
+            &alpha,
+            &beta,
+            false,
+            &function,
+        );
+        for group in comms {
+            for comm in group {
+                comm.close();
+            }
+        }
+        let rank = self.context.rank();
+        let pairs: Vec<_> = (0..b.distribution.local_len())
+            .filter_map(|offset| b.distribution.global_key(rank, offset))
+            .zip(bdata)
+            .filter(|(key, _)| b.distribution.owner(*key) == rank)
+            .collect();
+        self.data.fill(self.algebra.zero());
+        self.write_add(&pairs);
+        Ok(())
     }
     /// Dense slice insertion following extract/remap/rank-shift/scatter. Beta is
     /// applied only inside the destination slice, including empty local shards.
@@ -487,19 +632,23 @@ where
             for pair in bytes.chunks_exact(8 + A::Element::WIDTH) {
                 let key = u64::decode(&pair[..8]) as usize;
                 let value = A::Element::decode(&pair[8..]);
-                incoming.push((key,value));
+                incoming.push((key, value));
             }
         }
-        incoming.sort_by_key(|pair|pair.0);
+        incoming.sort_by_key(|pair| pair.0);
         let mut position = 0;
         while position < incoming.len() {
             let key = incoming[position].0;
             let offset = self.distribution.local_offset(self.context.rank(), key);
-            let mut value = self.algebra.add(&self.algebra.multiply(beta,&self.data[offset]),
-                &self.algebra.multiply(alpha,&incoming[position].1));
+            let mut value = self.algebra.add(
+                &self.algebra.multiply(beta, &self.data[offset]),
+                &self.algebra.multiply(alpha, &incoming[position].1),
+            );
             position += 1;
             while position < incoming.len() && incoming[position].0 == key {
-                value = self.algebra.add(&self.algebra.multiply(alpha,&incoming[position].1),&value);
+                value = self
+                    .algebra
+                    .add(&self.algebra.multiply(alpha, &incoming[position].1), &value);
                 position += 1;
             }
             self.data[offset] = value;
@@ -1038,8 +1187,7 @@ where
     /// local sub-block, then shift its owner by offsets modulo physical phases,
     /// as in upstream redistribution/slice.cxx. No global tensor is gathered.
     pub fn slice(&self, ranges: &[std::ops::Range<usize>]) -> Self {
-        let plan =
-            crate::slice::SlicePlan::new(&self.distribution, self.context.rank(), ranges);
+        let plan = crate::slice::SlicePlan::new(&self.distribution, self.context.rank(), ranges);
         let data = plan.execute(self.context, &self.algebra, &self.data);
         Self {
             context: self.context,
@@ -1182,12 +1330,20 @@ where
     pub fn redistribute(&mut self, distribution: Distribution) {
         assert_eq!(distribution.shape, self.distribution.shape);
         assert_eq!(distribution.topology.size(), self.context.size());
-        if self.distribution.mappings.iter().zip(&distribution.mappings)
-            .all(|(old,new)|old.phase()==new.phase()) {
-            let plan=crate::redist::BlockReshufflePlan::new(
-                &self.distribution,&distribution,self.context.rank());
-            self.data=plan.execute(self.context,&self.algebra,&self.data);
-            self.distribution=distribution;
+        if self
+            .distribution
+            .mappings
+            .iter()
+            .zip(&distribution.mappings)
+            .all(|(old, new)| old.phase() == new.phase())
+        {
+            let plan = crate::redist::BlockReshufflePlan::new(
+                &self.distribution,
+                &distribution,
+                self.context.rank(),
+            );
+            self.data = plan.execute(self.context, &self.algebra, &self.data);
+            self.distribution = distribution;
             self.restore_replicas();
             return;
         }
@@ -1205,7 +1361,11 @@ where
             self.restore_replicas();
             return;
         }
-        let plan = crate::cyclic_reshuffle::Plan::new(&self.distribution, &distribution, self.context.rank());
+        let plan = crate::cyclic_reshuffle::Plan::new(
+            &self.distribution,
+            &distribution,
+            self.context.rank(),
+        );
         let mut buckets = vec![Vec::new(); self.context.size()];
         for (offsets, bucket) in plan.send.iter().zip(&mut buckets) {
             bucket.reserve(offsets.len() * A::Element::WIDTH);
@@ -1235,10 +1395,13 @@ where
         if physical_size < self.context.size() {
             // Equal physical residues identify copies of the same local block.
             // Original-rank ordering puts its canonical owner at subgroup rank 0.
-            let replicas = self.context.split(
-                Some(color.try_into().unwrap()),
-                self.context.rank().try_into().unwrap(),
-            ).unwrap();
+            let replicas = self
+                .context
+                .split(
+                    Some(color.try_into().unwrap()),
+                    self.context.rank().try_into().unwrap(),
+                )
+                .unwrap();
             replicas.broadcast(0, &mut self.data);
             replicas.close();
         }

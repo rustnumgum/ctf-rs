@@ -31,8 +31,14 @@ fn validate_physical(topology: &Topology, physical_labels: &str, indices: [&str;
     assert!(physical_labels.is_ascii());
     assert_eq!(physical_labels.len(), topology.dimensions.len());
     for label in physical_labels.bytes() {
-        let operands = indices.iter().filter(|labels| labels.as_bytes().contains(&label)).count();
-        assert!(operands >= 2, "single-operand labels cannot be physically mapped");
+        let operands = indices
+            .iter()
+            .filter(|labels| labels.as_bytes().contains(&label))
+            .count();
+        assert!(
+            operands >= 2,
+            "single-operand labels cannot be physically mapped"
+        );
     }
 }
 
@@ -61,23 +67,41 @@ fn mapped_distribution(
 
 fn actual_shape(distribution: &Distribution, rank: usize) -> Vec<usize> {
     let coordinates = distribution.topology.coordinates(rank);
-    distribution.shape.iter().zip(&distribution.mappings).map(|(&length, mapping)| {
-        let phase = mapping.physical_phase();
-        let residue = mapping.physical_rank(&coordinates);
-        if residue < length { (length - 1 - residue) / phase + 1 } else { 0 }
-    }).collect()
+    distribution
+        .shape
+        .iter()
+        .zip(&distribution.mappings)
+        .map(|(&length, mapping)| {
+            let phase = mapping.physical_phase();
+            let residue = mapping.physical_rank(&coordinates);
+            if residue < length {
+                (length - 1 - residue) / phase + 1
+            } else {
+                0
+            }
+        })
+        .collect()
 }
 
-fn packed_roots<A: Semiring>(tensor: &Tensor<'_, '_, A>, target: &Distribution)
-    -> Vec<A::Element> where A::Element: Wire {
+fn packed_roots<A: Semiring>(tensor: &Tensor<'_, '_, A>, target: &Distribution) -> Vec<A::Element>
+where
+    A::Element: Wire,
+{
     let rank = tensor.context().rank();
     let keys: Vec<_> = (0..target.local_len())
-        .filter_map(|offset| target.global_key(rank,offset)).collect();
-    let requests: Vec<_> = keys.iter().enumerate()
-        .filter(|(_,key)|target.owner(**key)==rank).map(|(offset,&key)|(offset,key)).collect();
-    let read = tensor.read(&requests.iter().map(|&(_,key)|key).collect::<Vec<_>>());
-    let mut values = vec![tensor.algebra().zero();keys.len()];
-    for ((offset,_),value) in requests.into_iter().zip(read) {values[offset]=value;}
+        .filter_map(|offset| target.global_key(rank, offset))
+        .collect();
+    let requests: Vec<_> = keys
+        .iter()
+        .enumerate()
+        .filter(|(_, key)| target.owner(**key) == rank)
+        .map(|(offset, &key)| (offset, key))
+        .collect();
+    let read = tensor.read(&requests.iter().map(|&(_, key)| key).collect::<Vec<_>>());
+    let mut values = vec![tensor.algebra().zero(); keys.len()];
+    for ((offset, _), value) in requests.into_iter().zip(read) {
+        values[offset] = value;
+    }
     values
 }
 
@@ -89,7 +113,9 @@ where
     /// explicit physical-label mapping. Labels absent from an operand create
     /// source-style broadcast or reduction fibers. Local buffers are repacked
     /// to their true rank extents before evaluating the function, so cyclic
-    /// padding is never presented as an input value.
+    /// padding is never presented as an input value. This explicitly mapped
+    /// entry may use the strict custom inner specialization; automatic dense
+    /// search continues to exclude custom folds.
     pub fn contract_function_on(
         &mut self,
         indices_c: &str,
@@ -103,35 +129,75 @@ where
         beta: A::Element,
         function: impl Fn(&A::Element, &A::Element) -> A::Element,
     ) {
-        assert!(std::ptr::eq(self.context(), a.context())
-            && std::ptr::eq(self.context(), b.context()));
+        assert!(
+            std::ptr::eq(self.context(), a.context()) && std::ptr::eq(self.context(), b.context())
+        );
         assert_eq!(topology.size(), self.context().size());
         let projections = projections(
-            [&a.distribution().shape, &b.distribution().shape, &self.distribution().shape],
+            [
+                &a.distribution().shape,
+                &b.distribution().shape,
+                &self.distribution().shape,
+            ],
             [indices_a, indices_b, indices_c],
         );
-        validate_physical(&topology, physical_labels,
-            [&projections[0].labels, &projections[1].labels, &projections[2].labels]);
+        validate_physical(
+            &topology,
+            physical_labels,
+            [
+                &projections[0].labels,
+                &projections[1].labels,
+                &projections[2].labels,
+            ],
+        );
         if projections.iter().any(Projection::repeated) {
             let output_repeated = projections[2].repeated();
             let (aa, ia) = a.extract_diagonal(indices_a);
             let (bb, ib) = b.extract_diagonal(indices_b);
             let (mut cc, ic) = self.extract_diagonal(indices_c);
-            cc.contract_function_on(&ic, &aa, &ia, &bb, &ib, topology,
-                physical_labels, alpha, beta, function);
-            if output_repeated { self.replace_diagonal(indices_c, &cc); }
-            else { *self = cc; }
+            cc.contract_function_on(
+                &ic,
+                &aa,
+                &ia,
+                &bb,
+                &ib,
+                topology,
+                physical_labels,
+                alpha,
+                beta,
+                function,
+            );
+            if output_repeated {
+                self.replace_diagonal(indices_c, &cc);
+            } else {
+                *self = cc;
+            }
             return;
         }
 
         let distributions = [
-            mapped_distribution(&a.distribution().shape, indices_a, &topology, physical_labels),
-            mapped_distribution(&b.distribution().shape, indices_b, &topology, physical_labels),
-            mapped_distribution(&self.distribution().shape, indices_c, &topology, physical_labels),
+            mapped_distribution(
+                &a.distribution().shape,
+                indices_a,
+                &topology,
+                physical_labels,
+            ),
+            mapped_distribution(
+                &b.distribution().shape,
+                indices_b,
+                &topology,
+                physical_labels,
+            ),
+            mapped_distribution(
+                &self.distribution().shape,
+                indices_c,
+                &topology,
+                physical_labels,
+            ),
         ];
-        let mut adata = packed_roots(a,&distributions[0]);
-        let mut bdata = packed_roots(b,&distributions[1]);
-        let mut cdata = packed_roots(self,&distributions[2]);
+        let mut adata = packed_roots(a, &distributions[0]);
+        let mut bdata = packed_roots(b, &distributions[1]);
+        let mut cdata = packed_roots(self, &distributions[2]);
         let shapes = [
             actual_shape(&distributions[0], self.context().rank()),
             actual_shape(&distributions[1], self.context().rank()),
@@ -150,30 +216,63 @@ where
                 }
             }
         }
-        for comm in &comms[0] { comm.broadcast(0, &mut adata); }
-        for comm in &comms[1] { comm.broadcast(0, &mut bdata); }
+        for comm in &comms[0] {
+            comm.broadcast(0, &mut adata);
+        }
+        for comm in &comms[1] {
+            comm.broadcast(0, &mut bdata);
+        }
         let root = comms[2].iter().all(|comm| comm.rank() == 0);
         let child_beta = if root { beta } else { self.algebra().zero() };
-        crate::contraction::sequential_function(
-            self.algebra(),
-            &shapes[0], indices_a, &adata,
-            &shapes[1], indices_b, &bdata,
-            &shapes[2], indices_c, &mut cdata,
-            &alpha, &child_beta, &function,
-        );
+        let folded = crate::folding::Plan::new(
+            [&shapes[0], &shapes[1], &shapes[2]],
+            [indices_a, indices_b, indices_c],
+        )
+        .is_ok_and(|plan| {
+            plan.execute_function(
+                self.algebra(),
+                &adata,
+                &bdata,
+                &mut cdata,
+                &alpha,
+                &child_beta,
+                &function,
+            )
+        });
+        if !folded {
+            crate::contraction::sequential_function(
+                self.algebra(),
+                &shapes[0],
+                indices_a,
+                &adata,
+                &shapes[1],
+                indices_b,
+                &bdata,
+                &shapes[2],
+                indices_c,
+                &mut cdata,
+                &alpha,
+                &child_beta,
+                &function,
+            );
+        }
         for comm in &comms[2] {
             comm.reduce_monoid(self.algebra(), &mut cdata, false, 0);
         }
         for group in comms {
-            for comm in group { comm.close(); }
+            for comm in group {
+                comm.close();
+            }
         }
 
         let rank = self.context().rank();
         let pairs: Vec<_> = (0..distributions[2].local_len())
-            .filter_map(|offset|distributions[2].global_key(rank,offset)).zip(cdata)
-            .filter(|(key,_)|distributions[2].owner(*key)==rank).collect();
+            .filter_map(|offset| distributions[2].global_key(rank, offset))
+            .zip(cdata)
+            .filter(|(key, _)| distributions[2].owner(*key) == rank)
+            .collect();
         let zero = self.algebra().zero();
-        self.transform(|_,value|*value=zero.clone());
+        self.transform(|_, value| *value = zero.clone());
         self.write_add(&pairs);
     }
 }
