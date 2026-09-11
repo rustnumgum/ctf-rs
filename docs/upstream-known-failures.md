@@ -1,37 +1,5 @@
 # Reproduced pinned-source failures
 
-## Bounded S1c sparse checkpoint precision (dense-twin finding)
-
-The source writes f64 sparse coordinates with six decimal places, but the
-bounded n=3 checkpoint criterion is `norm2(v-u) < 1e-7*n*n*.1*n`, or 2.7e-7.
-One prescribed WSL run each gave 3.9769591334653147e-7 at one rank and
-3.4024306287098844e-7 at two ranks. Four ranks passed the world assertion
-(its numerical value was not printed) and failed the parity assertion with
-3.4024306287098844e-7. No value, fixture, threshold or text precision changed.
-
-One permitted dense-twin diagnostic at one rank generated the same sparse
-fixture, converted it to dense storage, and ran the same text write/read and
-subtraction through dense APIs. It gave the identical 3.9769591334653147e-7
-failure. This separates sparse selected-sum/key storage from the source-format
-loss in this bounded expectation; it is not a new C++ runtime reproduction.
-The driver remains unaccepted. Diagnostic budget: 1/3, no further study.
-Evidence: `D:/projects/runs/ctf-rs-s1/S1c/upstream_checkpoint_sparse-<ranks>.log`
-and `checkpoint-dense-twin.{rs,sh,log}`. The final native results are recorded
-in `validation.md`; the source file format and acceptance rule remain fixed.
-
-## S1a sparse Python ABC expressions (static source restriction)
-
-Pinned `test_sparse.py` expects sparse `ijk,jkl->ijkl` and `ijl,kjl->ijk`
-expressions to execute. Their shared ABC labels violate sparse `can_fold`
-(`contraction.cxx:537-584`); non-inner construction asserts dense B and C
-at `contraction.cxx:4313-4335`. The Rust raw search preserves these rules.
-S1a WSL 1/2/4 once each returned no eligible plan and stopped before Q could
-be computed in both semantic drivers. This is a static source contradiction,
-not a reproduced C++ runtime failure or numerical PASS. The strict source
-sum(abs(diff)) < 1e-14 rule is unchanged; neither test is accepted.
-Logs: `D:/projects/runs/ctf-rs-s1/S1a/sparse_{einsum_hadamard,scaled_expression}-<ranks>.log`.
-Later GEMM-shaped S1b/S1c work does not require these source-forbidden labels.
-
 ## Related sparse_permuted_slice expectation (static finding only)
 
 The callback-copy expectation in `examples/sparse_permuted_slice.cxx` has the

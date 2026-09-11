@@ -108,6 +108,126 @@ or assertion changed; no numerical failure, diagnostic, or rerun occurred.
 One accidental broad formatter invocation was removed outside the owned C1
 files before acceptance. C1 is closed; S1a follows. ctf-rs is not pushed.
 
+## S1d and S1 close
+
+### Fixed plan.v4 contract (2026-09-12)
+
+Accepted immutable harness `plans/ctf-rs/plan.v4.md`, class R, reference
+cc4s/ctf `f69cbb46e23bc2f39cda5722ce096f56301dab4f`. Each of the thirteen
+targets runs once at WSL 1/2/4 on the final code tree. That same set supplies
+S1d, CK7, AMG and the other ten targets' regression evidence. The unchanged
+full `scripts/acceptance-wsl.sh` runs once; native `-BuildOnly` runs once,
+then the two S1d drivers and CK7 run once at native 1/2/4. At most the three
+named plan.v4 diagnostics per failing driver; a pass is closed.
+
+| Gate | Fixture / work | Q and reference | Fixed bound |
+|---|---|---|---|
+| G-CTF-S1d | n=11 density .1 `ijk,jkl->ijkl`, sparse/sparse and sparse/dense; n=5 density .1 `ijl,kjl->ijk` in the unchanged scaled expression | sum(abs(diff)) against the same dense Rust expression | <1e-14, source Python allclose |
+| G-CTF-S1-CK7 | source default n=7, density .1, rank-seeded fill, six-decimal text round trip | norm2(v-u) against original values | <1e-7*n*n*.1*n = 3.43e-6 |
+| G-CTF-S1-AMG | n=4, nlvl=2, ndiv=2, nsmooth=3, repaired layout | V-cycle rnorm against twice-smoothed Jacobi rnorm_alt | rnorm < rnorm_alt |
+| G-CTF-S1 | all thirteen targets below, unchanged fixtures and driver criteria | each driver's source quantity/reference; full WSL script without failure | every target PASS at WSL 1/2/4 |
+
+The earlier S1a/S1c description of sparse ABC expressions as a static source
+restriction is withdrawn: `contraction.cxx:5417-5527` eliminates Hadamard
+indices before folding. Missing that entry step was a Rust port gap, not a
+source contradiction. Historical outcome tables below retain their original
+run evidence, superseded by this section's final-tree results.
+
+### Final-tree target outcomes
+
+Code revision `d5861de92977809ee0a09a41ba6c5dbe1de904ed`, following CK7
+`5a5edaaff004c0148135c8dbe8569988505ecfdf`. Every row below carries
+**DIGIT / PASS** at WSL 1/2/4. Each target/rank ran once (39 invocations),
+including its unchanged world and parity checks. All nine prescribed native
+invocations also passed once. Native compile/link succeeded once. No numerical
+diagnostics, changed criteria, repeated checks or additional studies occurred.
+
+| Target | Stamp | Q / reference / bound | Delta or result at WSL ranks 1; 2; 4 |
+|---|---|---|---|
+| upstream_apsp | DIGIT / PASS | differing path weights / dense tropical result / exact 0 | 0; 0; 0 |
+| upstream_algebraic_multigrid | DIGIT / PASS | V-cycle residual / twice-smoothed Jacobi / Q < ref | Q-ref = -0.000609640654155111; -0.000751315910721963; -0.000689413644143350 |
+| upstream_block_sparse | DIGIT / PASS | residual norm / source flattened product / <=1e-4 | 0; 0; 0 |
+| upstream_force_integration_sparse | DIGIT / PASS | source Boolean displacement/restore criterion / original particles / any initial displacement >1e-6 and all restored within1e-6 | criterion true at all ranks; numerical maxima not printed |
+| upstream_btwn_central | DIGIT / PASS | norm2 difference / dense naive result / <=6e-6 | 0; 0; 0 |
+| upstream_checkpoint_sparse | DIGIT / PASS | norm2(v-u) / original pre-round-trip values / <3.43e-6 | 1.659570583342333e-6; 1.730313117560421e-6; 1.6343449060870917e-6 |
+| upstream_mis | DIGIT / PASS | overlap and uncovered count / source SH graph / both exactly 0 | both zero by passing assertions; counts not separately printed |
+| upstream_mis2 | DIGIT / PASS | stored-entry counts >1.1 and <.9 / source sparse checker / both exactly 0 | (0,0); (0,0); (0,0) |
+| sparse_einsum_hadamard | DIGIT / PASS | sum(abs(diff)) / same dense expressions / <1e-14 | maximum printed over d1/d2 and world/parity: 0; 0; 0 |
+| sparse_scaled_expression | DIGIT / PASS | sum(abs(diff)) / grouped dense source expression / <1e-14 | maximum printed over dense/sparse and world/parity: 2.220446049250313e-16; 2.220446049250313e-16; 5.551115123125783e-16 |
+| sparse_complex | DIGIT / PASS | sum(abs(diff)) / real arange indexed coefficient expression / <1e-14 | 0; 0; 0 |
+| sparse_sy | DIGIT / PASS | three source comparisons, six shapes/symmetries / dense packed expressions / <1e-14 | every printed delta 0 at all ranks |
+| sparse_sample | DIGIT / PASS | norm2 sequence / source zero fixture / nonincreasing | norms (0,0,0), both differences 0 at all ranks |
+
+Every row uses the pinned source reference above. Reported maxima only
+summarize already printed comparisons; each original assertion remains the
+gate. APSP, block, CK7 and AMG print world Q only; their parity assertions
+passed but parity Q is not reconstructed or claimed as measured.
+
+| AMG WSL ranks | Q: rnorm | ref: rnorm_alt |
+|---|---|---|
+| 1 | 0.004937970528833717 | 0.005547611182988828 |
+| 2 | 0.005085930671471991 | 0.005837246582193954 |
+| 4 | 0.005189487439309569 | 0.005878901083452919 |
+
+| Native target | Stamp at 1/2/4 | Q / delta at ranks 1; 2; 4 | Reference / bound |
+|---|---|---|---|
+| sparse_einsum_hadamard | DIGIT / PASS | 0; 0; 0 | same dense expressions / <1e-14 |
+| sparse_scaled_expression | DIGIT / PASS | 2.220446049250313e-16; 2.220446049250313e-16; 5.551115123125783e-16 | grouped dense source expression / <1e-14 |
+| upstream_checkpoint_sparse | DIGIT / PASS | 1.659570583342333e-6; 1.730313117560421e-6; 1.6343449060870917e-6 | original round-trip values / <3.43e-6 |
+
+CK7's printed computed floating-point bound is 3.4299999999999998e-6,
+the unchanged source expression at n=7. The other ten targets' native S1c
+passes were not repeated. All prescribed native stderr files are empty.
+
+### S1 close verdict
+
+**DIGIT / PASS — G-CTF-S1d, G-CTF-S1-CK7, G-CTF-S1-AMG and G-CTF-S1.**
+The unchanged full WSL script completed once with exit 0, 542
+`DIGIT / PASS` lines and no failure line, including its prescribed rank
+1/2/4 and local checks. Log: `D:/projects/runs/ctf-rs-s1/S1d/full-wsl.log`.
+Native BuildOnly completed once with exit 0 and no missing MS-MPI symbol.
+All thirteen targets and the three native targets passed as tabulated above;
+diagnostic budget used 0/3 for every driver. No HANDOFF question remains.
+Numerical verification is closed; only records/publication follow.
+
+### Commands and run provenance
+
+All paths below are under `D:/projects/runs/ctf-rs-s1/S1d/`. Per target,
+`<target>-<ranks>.log` contains its exact WSL command, output, PASS and exit;
+`native-<target>-<ranks>.command.txt` accompanies native `.log` and `.err`.
+`wsl.log` and `native-runtime.log` preserve run order and all exit statuses;
+`build.json` and `native-build.json` resolve the executed artifact paths.
+Run count for **each target row**: one invocation per WSL rank count; for
+the three native rows, one invocation per native rank count. These scripts
+and `commands.md` preserve the exact nested commands and environment.
+
+```powershell
+$env:CARGO_BUILD_JOBS='2'
+cmd.exe /d /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\projects\ctf-rs\scripts\acceptance-native.ps1 -BuildOnly > D:\projects\runs\ctf-rs-s1\S1d\native-build.log 2>&1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\projects\runs\ctf-rs-s1\S1d\native-executables.ps1
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-s1/S1d/acceptance.sh
+wsl -d Ubuntu-26.04 -- bash /mnt/d/projects/runs/ctf-rs-s1/S1d/full-wsl.sh
+cmd.exe /d /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\projects\runs\ctf-rs-s1\S1d\native-runtime.ps1 > D:\projects\runs\ctf-rs-s1\S1d\native-runtime.log 2>&1"
+```
+
+The existing `libmuffintin-wsl-keepalive` pid322 was reused; no second
+keepalive was started. MPI initialization/finalization remains host-owned.
+No planner or kernel redesign, dense X path, gather-based replacement,
+collective Drop, libmuffintin/fftw source change or ctf-rs push occurred.
+
+### Checkpoint n=3 history (not a source failure)
+
+The previous six-decimal n=3 fixture had bound 2.7e-7. WSL one rank gave
+3.9769591334653147e-7; two ranks and four-rank parity gave
+3.4024306287098844e-7. Four-rank world passed without printing Q. The native
+results agreed. One prescribed rank-one dense twin gave the identical
+3.9769591334653147e-7, separating format rounding from sparse storage.
+Diagnostic budget then used 1/3. No precision or tolerance changed.
+Evidence remains under `D:/projects/runs/ctf-rs-s1/S1c/` in
+`upstream_checkpoint_sparse-<ranks>.log`, native counterparts and
+`checkpoint-dense-twin.{rs,sh,log}`. Plan.v4 replaces that undersized fixture
+gate with the source default n=7, not a relaxed source criterion.
+
 ## S1a sparse contraction planning
 
 ### Fixed acceptance contract
