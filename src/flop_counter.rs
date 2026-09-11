@@ -39,7 +39,7 @@ impl FlopCounter {
         self.start_count = get_computed_flops();
     }
 
-    /// Return this rank's count since construction or the last [`zero`].
+    /// Return this rank's count since construction or the last \[`zero`\].
     pub fn local(&self) -> i64 {
         get_computed_flops() - self.start_count
     }

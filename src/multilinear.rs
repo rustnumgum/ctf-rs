@@ -35,7 +35,7 @@ where
     /// Matricized tensor times Khatri-Rao product, replacing the output factor.
     /// Supply all factors except `output_mode`, in ascending tensor-mode order.
     /// Factors are vectors or auxiliary-first matrices [k, mode_length], as in
-    /// the pinned native MTTKRP kernel. Output shape is [mode_length] or [k, mode_length].
+    /// the pinned native MTTKRP kernel. Output shape is \[mode_length\] or [k, mode_length].
     pub fn mttkrp(&self, output_mode: usize, factors: &[&Self],
         output_distribution: Distribution) -> Self {
         let dist = self.distribution();
@@ -142,8 +142,8 @@ where
         });
     }
 
-    /// Multiply entries by sum_k product_mode M_mode[coordinate,k].
-    /// `aux_mode_first` selects [k,coordinate] factor storage. Blocking either
+    /// Multiply entries by sum_k product_mode M_mode\[coordinate,k\].
+    /// `aux_mode_first` selects \[k,coordinate\] factor storage. Blocking either
     /// supplies the source's balanced k-block count or a per-rank available-byte
     /// fact; the latter doubles locally and collectively selects the maximum.
     /// No operating-system memory probe is performed.

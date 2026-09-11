@@ -121,8 +121,8 @@ where
     A: Group + Semiring + Clone + CastFromF64,
     A::Element: Wire,
 {
-    /// Symmetry-aware indexed sum `B[indices_b] = alpha*A[indices_a]
-    /// + beta*B[indices_b]` for NS/SY/AS/SH tensors.
+    /// Symmetry-aware indexed sum `B\[indices_b\] = alpha*A\[indices_a\]
+    /// + beta*B\[indices_b\]` for NS/SY/AS/SH tensors.
     ///
     /// Repeated labels are extracted one pair at a time through this same
     /// symmetry-aware path with `run_diag` enabled, then output diagonals are

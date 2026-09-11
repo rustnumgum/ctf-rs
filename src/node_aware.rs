@@ -45,7 +45,7 @@ struct Tree {
 }
 
 /// Return all valid inter-node grids in the pinned source's branch order.
-/// Dimension i divides process_grid[i], and each grid's product equals nodes.
+/// Dimension i divides process_grid\[i\], and each grid's product equals nodes.
 pub fn inter_node_grids(process_grid: &[usize], nodes: usize) -> Vec<Vec<usize>> {
     assert!(nodes > 0 && process_grid.iter().all(|&n| n > 0));
     let ranks: usize = process_grid.iter().product();
