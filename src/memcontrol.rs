@@ -270,7 +270,125 @@ mod platform {
     }
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+// Pinned upstream (src/shared/memcontrol.cxx proc_bytes_total, __MACH__
+// branch, lines 370-374) reads total physical memory through
+// `sysctl(CTL_HW, HW_MEMSIZE)`; this uses the equivalent named
+// `sysctlbyname("hw.memsize")` form. Upstream's used-memory figure
+// (proc_bytes_used) is mallinfo()-based allocator bookkeeping, which the
+// Linux and Windows branches above already replace with the OS-reported
+// current resident set size (VmRSS, WorkingSetSize); this branch keeps
+// that same "current RSS" semantics via `task_info`'s
+// `MACH_TASK_BASIC_INFO.resident_size`, rather than reproducing
+// mallinfo() or getrusage's peak-based `ru_maxrss`.
+#[cfg(target_os = "macos")]
+mod platform {
+    use super::*;
+    use std::ffi::{CString, c_char, c_void};
+
+    const MACH_TASK_BASIC_INFO: i32 = 20;
+    const KERN_SUCCESS: i32 = 0;
+
+    // time_value_t: two 32-bit fields, seconds and microseconds.
+    #[repr(C)]
+    struct TimeValue {
+        seconds: i32,
+        microseconds: i32,
+    }
+    // mach_task_basic_info_data_t (<mach/task_info.h>); 12
+    // natural_t-sized (4-byte) words, matched field-for-field so the
+    // struct's size and layout equal what the kernel writes.
+    #[repr(C)]
+    struct MachTaskBasicInfo {
+        virtual_size: u64,
+        resident_size: u64,
+        resident_size_max: u64,
+        user_time: TimeValue,
+        system_time: TimeValue,
+        policy: i32,
+        suspend_count: i32,
+    }
+
+    // SAFETY: signatures mirror the documented Darwin libSystem ABI
+    // (`<sys/sysctl.h>`, `<mach/mach_init.h>`, `<mach/task.h>`); no
+    // `#[link(...)]` is needed because every macOS binary links against
+    // libSystem, which provides all three. `mach_task_self_` is a plain
+    // extern global (not a callable function); the real `mach_task_self()`
+    // is a header-only macro that just reads it, so it is declared and
+    // read here rather than called.
+    unsafe extern "C" {
+        fn sysctlbyname(
+            name: *const c_char,
+            oldp: *mut c_void,
+            oldlenp: *mut usize,
+            newp: *mut c_void,
+            newlen: usize,
+        ) -> i32;
+        static mach_task_self_: u32;
+        fn task_info(
+            target_task: u32,
+            flavor: i32,
+            task_info_out: *mut i32,
+            task_info_out_count: *mut u32,
+        ) -> i32;
+    }
+
+    pub(super) fn discover() -> Result<MemorySnapshot, Error> {
+        let name = CString::new("hw.memsize").unwrap();
+        let mut total: u64 = 0;
+        let mut total_len = std::mem::size_of::<u64>();
+        // SAFETY: `name` is a valid, NUL-terminated, live CString for the
+        // call; `oldp` points to a live, uniquely-owned `u64` and
+        // `oldlenp` to its exact byte length, both of which
+        // sysctlbyname is told and required to respect; `newp`/`newlen`
+        // are null/0, the documented "read only" form.
+        let code = unsafe {
+            sysctlbyname(
+                name.as_ptr(),
+                (&mut total as *mut u64).cast(),
+                &mut total_len,
+                std::ptr::null_mut(),
+                0,
+            )
+        };
+        if code != 0 {
+            return Err(Error::Io(io::Error::last_os_error()));
+        }
+        if total == 0 || total_len != std::mem::size_of::<u64>() {
+            return Err(Error::InvalidData("sysctlbyname hw.memsize"));
+        }
+
+        // SAFETY: MachTaskBasicInfo is #[repr(C)] with only u64/i32
+        // fields, so the all-zero bit pattern is a valid value.
+        let mut info: MachTaskBasicInfo = unsafe { std::mem::zeroed() };
+        let mut count =
+            (std::mem::size_of::<MachTaskBasicInfo>() / std::mem::size_of::<i32>()) as u32;
+        // SAFETY: `mach_task_self_` is the current task's own port,
+        // valid for the process's whole lifetime and needing no
+        // deallocation; `info` is a live, uniquely-owned buffer whose
+        // size in 4-byte words was just placed in `count`, matching what
+        // `task_info_out`/`task_info_out_count` require; `task_info`
+        // only reads the current task's accounting and writes into
+        // `info` for the duration of this synchronous call.
+        let result = unsafe {
+            task_info(
+                mach_task_self_,
+                MACH_TASK_BASIC_INFO,
+                (&mut info as *mut MachTaskBasicInfo).cast(),
+                &mut count,
+            )
+        };
+        if result != KERN_SUCCESS {
+            return Err(Error::InvalidData("mach task_info"));
+        }
+
+        Ok(MemorySnapshot {
+            total_bytes: total,
+            used_bytes: info.resident_size,
+        })
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 mod platform {
     use super::*;
     pub(super) fn discover() -> Result<MemorySnapshot, Error> {
