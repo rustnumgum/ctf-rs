@@ -4,12 +4,15 @@
 //! rectangular tensor domain is never expanded or filtered after the fact.
 
 use crate::{
-    cyclic_reshuffle::Plan,
     mapping::Distribution,
     symmetry::Symmetry,
     symmetric_distribution::SymmetricDistribution,
 };
 
+#[cfg(test)]
+use crate::cyclic_reshuffle::Plan;
+
+#[cfg(test)]
 pub(crate) fn plan(
     old: &SymmetricDistribution,
     new: &SymmetricDistribution,
@@ -139,7 +142,7 @@ mod tests {
     use super::plan;
     use crate::{
         mapping::{Distribution, Mapping, Topology},
-        symmetry::Symmetry::{self, AS, NS, SH, SY},
+        symmetry::Symmetry::{AS, NS, SH, SY},
         symmetric_distribution::SymmetricDistribution,
     };
 
