@@ -1086,3 +1086,23 @@ harness = false
 name = "sparse_sy"
 path = "tests/upstream/python/sparse_sy.rs"
 harness = false
+
+[[test]]
+name = "upstream_checkpoint_sparse"
+path = "tests/upstream/examples/checkpoint_sparse.rs"
+harness = false
+
+[[test]]
+name = "upstream_mis"
+path = "tests/upstream/examples/mis.rs"
+harness = false
+
+[[test]]
+name = "upstream_mis2"
+path = "tests/upstream/examples/mis2.rs"
+harness = false
+
+[[test]]
+name = "sparse_sample"
+path = "tests/upstream/python/sparse_sample.rs"
+harness = false

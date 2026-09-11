@@ -221,6 +221,30 @@ HANDOFF: none for S1b; S1a's three open drivers retain their recorded status.
 The source block flattening quirk is retained without opening an extra study.
 Continue S1c; the final native set still includes all thirteen S1 targets.
 
+## S1c sparse summation, communication, persistence
+
+### Fixed acceptance contract
+
+Class R, pinned f69cbb46. The four S1c drivers run once at WSL 1/2/4;
+native compile/link once, followed by the explicitly required full thirteen
+S1 targets once each at native 1/2/4. This cross-platform gate is prescribed,
+not an added comparison after earlier WSL passes. No earlier WSL pass reruns.
+
+| Driver | Source fixture/reference | Q / unchanged bound |
+|---|---|---|
+| upstream_checkpoint_sparse | bounded n=3, sparse 3D density .1, rank-seeded CTF MT, original six-decimal sparse text write/read | norm2(v-u) < 1e-8*n^3 = 2.7e-7 |
+| upstream_mis | n=16, density .1, SH sparse graph, canonical lower-triangle NS copy for directed algorithm | exact s^T A s=0 and number of zero entries in dense s+A*s=0 |
+| upstream_mis2 | same source graph, max-monoid two-hop algorithm; source sparse t=s+A*s | count of stored t values >1.1 is 0; count of stored t values <.9 is 0 |
+| sparse_sample | exact zero-initialized (4,3,5), sample .5 then .3 | norm_after1 <= norm_before; norm_after2 <= norm_after1 |
+
+MIS2's source sparse unary sum visits stored entries only: its lower-bound
+check does not count absent vertices. This is preserved rather than replaced
+by a stronger graph-theoretic maximality assertion. MIS's target t is dense
+and does count all vertices. The sample fixture is also intentionally the
+source's zero tensor; neither fixture is strengthened or tuned after a run.
+The checkpoint source uses fixed six-decimal text; no precision change may
+be made to force its bounded residual gate to pass.
+
 ## rsmpi binding
 
 ### CTF-R1-4 direct replica restoration (2026-09-09)
