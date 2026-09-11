@@ -817,56 +817,6 @@ fn reduce_csr<A: Semiring>(communicators: &[Context<'_>], algebra: &A,
     }
 }
 
-fn custom_schedule(edge: usize, layers: crate::sparse_2d::Layers)
-    -> (usize, usize, crate::sparse_2d::Layers) {
-    assert!(edge > 0 && layers.count > 0 && layers.index < layers.count);
-    if edge >= layers.count && edge % layers.count == 0 {
-        (layers.count, layers.index, crate::sparse_2d::Layers { count: 1, index: 0 })
-    } else if edge < layers.count && layers.count % edge == 0 {
-        (edge, layers.index % edge, crate::sparse_2d::Layers {
-            count: layers.count / edge, index: layers.index / edge,
-        })
-    } else {
-        (1, 0, layers)
-    }
-}
-
-fn custom_positions(plan: crate::sparse_2d::Panel<'_, '_>, length: usize,
-    step: usize, edge: usize) -> Vec<usize> {
-    if let Some(context) = plan.comm {
-        assert_eq!(edge % context.size(), 0);
-        let panels = edge / context.size();
-        let panel_step = step / context.size();
-        (0..plan.outer).flat_map(|strip| {
-            let start = (strip * panels + panel_step) * plan.inner;
-            start..start + plan.inner
-        }).collect()
-    } else if plan.inner == 0 {
-        (0..length).collect()
-    } else {
-        assert_eq!(length, plan.outer * plan.inner * edge);
-        (0..plan.outer).flat_map(|strip| {
-            let start = (strip * edge + step) * plan.inner;
-            start..start + plan.inner
-        }).collect()
-    }
-}
-
-fn custom_csr_operand<E: Wire + Clone>(plan: crate::sparse_2d::Panel<'_, '_>,
-    data: &[Csr<E>], step: usize, edge: usize) -> Vec<Csr<E>> {
-    let positions = custom_positions(plan, data.len(), step, edge);
-    let mut blocks: Vec<_> = positions.iter().map(|&position| data[position].to_coo()).collect();
-    if let Some(context) = plan.comm {
-        broadcast_coo(context, step % context.size(), &mut blocks);
-    }
-    blocks.into_iter().map(|block| block.to_csr()).collect()
-}
-
-fn empty_csr<E: Clone>(block: &Csr<E>) -> Csr<E> {
-    let shape = block.shape();
-    Coo::new(shape.0, shape.1, Vec::new()).to_csr()
-}
-
 #[allow(clippy::too_many_arguments)]
 fn execute_custom_csr_panels<C, EA, EB, F, G>(
     contexts: &[[Option<Context<'_>>; 3]],
@@ -921,19 +871,20 @@ where
     let plans = panel_plans(contexts, execution, level);
     assert!(!(plans[0].comm.is_some() && plans[1].comm.is_some() && plans[2].comm.is_some()));
     let edge = execution.panels[level].edge;
-    let (count, index, next) = custom_schedule(edge, layers);
+    let (count, index, next) = crate::sparse_2d::schedule(edge, layers);
     let moving_output = plans[2].comm.is_some();
     let mut contributions: Vec<_> = if moving_output {
-        c.iter().map(empty_csr).collect()
+        c.iter().map(crate::sparse_2d::csr_empty).collect()
     } else {
         Vec::new()
     };
     for step in (index..edge).step_by(count) {
-        let aa = custom_csr_operand(plans[0], a, step, edge);
-        let bb = custom_csr_operand(plans[1], b, step, edge);
+        let aa = crate::sparse_2d::csr_operand(plans[0], a, step, edge);
+        let bb = crate::sparse_2d::csr_operand(plans[1], b, step, edge);
         if let Some(context) = plans[2].comm {
-            let positions = custom_positions(plans[2], c.len(), step, edge);
-            let work: Vec<_> = positions.iter().map(|&position| empty_csr(&c[position])).collect();
+            let positions = plans[2].operand_positions(c.len(), step, edge);
+            let work: Vec<_> = positions.iter()
+                .map(|&position| crate::sparse_2d::csr_empty(&c[position])).collect();
             let work = execute_custom_csr_panels(contexts, execution, level + 1, next,
                 descriptor, algebra, &aa, &bb, work, function, accumulate);
             let owner = step % context.size();
@@ -946,11 +897,11 @@ where
             c = execute_custom_csr_panels(contexts, execution, level + 1, next,
                 descriptor, algebra, &aa, &bb, c, function, accumulate);
         } else {
-            let positions = custom_positions(plans[2], c.len(), step, edge);
+            let positions = plans[2].operand_positions(c.len(), step, edge);
             let work: Vec<_> = if plans[2].outer == 1 {
                 positions.iter().map(|&position| c[position].clone()).collect()
             } else {
-                positions.iter().map(|&position| empty_csr(&c[position])).collect()
+                positions.iter().map(|&position| crate::sparse_2d::csr_empty(&c[position])).collect()
             };
             let work = execute_custom_csr_panels(contexts, execution, level + 1, next,
                 descriptor, algebra, &aa, &bb, work, function, accumulate);
@@ -1727,7 +1678,7 @@ where
         replicate_coo(&replication[1], &mut bb);
         let aa: Vec<_> = aa.iter().map(Coo::to_csr).collect();
         let bb: Vec<_> = bb.iter().map(Coo::to_csr).collect();
-        let mut product: Vec<_> = old.iter().map(empty_csr).collect();
+        let mut product: Vec<_> = old.iter().map(crate::sparse_2d::csr_empty).collect();
         let panel_contexts = panels(self.context(), &mapped[0].topology, &plan.execution);
         product = execute_custom_csr_panels(
             &panel_contexts,

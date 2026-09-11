@@ -6,7 +6,7 @@
 //! contraction layout.
 
 use crate::{
-    algebra::{Semiring, Wire},
+    algebra::{Monoid, Semiring, Wire},
     context::Context,
     sparse_formats::{Ccsr, Coo, Csr},
 };
@@ -40,7 +40,10 @@ impl Panel<'_, '_> {
         positions
     }
 
-    fn operand_positions(&self, length: usize, step: usize, edge: usize) -> Vec<usize> {
+    /// Positions of one panel's blocks within the operand's flat block list,
+    /// shared by every sparse and dense 2D executor in this module and by
+    /// the custom-reduce panel executor in `sparse_contract_general`.
+    pub(crate) fn operand_positions(&self, length: usize, step: usize, edge: usize) -> Vec<usize> {
         if let Some(comm) = self.comm {
             assert_eq!(edge % comm.size(), 0);
             let panels = edge / comm.size();
@@ -152,7 +155,10 @@ fn broadcast_dense<T: Wire + Clone>(
     }
 }
 
-fn schedule(edge: usize, layers: Layers) -> (usize, usize, Layers) {
+/// Cyclic step/layer decomposition for one panel level (source ctr_lda
+/// scheduling), shared by every 2D executor in this module and by the
+/// custom-reduce panel executor in `sparse_contract_general`.
+pub(crate) fn schedule(edge: usize, layers: Layers) -> (usize, usize, Layers) {
     assert!(edge > 0 && layers.count > 0 && layers.index < layers.count);
     if edge >= layers.count && edge % layers.count == 0 {
         (layers.count, layers.index, Layers { count: 1, index: 0 })
@@ -170,7 +176,10 @@ fn schedule(edge: usize, layers: Layers) -> (usize, usize, Layers) {
     }
 }
 
-fn csr_empty<T: Clone>(block: &Csr<T>) -> Csr<T> {
+/// Additive identity matching `block`'s shape, shared by every sparse
+/// executor in this module and by the custom-reduce panel executor in
+/// `sparse_contract_general`.
+pub(crate) fn csr_empty<T: Clone>(block: &Csr<T>) -> Csr<T> {
     let (rows, columns) = block.shape();
     Coo::new(rows, columns, Vec::new()).to_csr()
 }
@@ -180,7 +189,23 @@ fn ccsr_empty<T: Clone>(block: &Ccsr<T>) -> Ccsr<T> {
     Coo::new(rows, columns, Vec::new()).to_ccsr()
 }
 
-fn csr_operand<T: Wire + Clone>(
+fn coo_operand<T: Wire + Clone>(
+    plan: Panel<'_, '_>,
+    data: &[Coo<T>],
+    step: usize,
+    edge: usize,
+) -> Vec<Coo<T>> {
+    let positions = plan.operand_positions(data.len(), step, edge);
+    let mut blocks: Vec<_> = positions.iter().map(|&position| data[position].clone()).collect();
+    if let Some(context) = plan.comm {
+        broadcast_sparse(context, step % context.size(), &mut blocks);
+    }
+    blocks
+}
+
+/// One step's CSR operand panel, shared by every sparse 2D executor in this
+/// module and by the custom-reduce panel executor in `sparse_contract_general`.
+pub(crate) fn csr_operand<T: Wire + Clone>(
     plan: Panel<'_, '_>,
     data: &[Csr<T>],
     step: usize,
@@ -287,6 +312,116 @@ fn pairs_operand<T: Wire + Clone>(
     blocks
 }
 
+/// Output blocks whose moving-output combination is a partitioned reduce to
+/// the cyclic owner followed by an unscaled structural add, deferred to one
+/// pass after the whole step loop (source spctr_2d_general.cxx; top-level
+/// beta scaling for these formats lives outside this layer). Implemented for
+/// [`Csr`] and [`Ccsr`]. Dense output blocks (`Vec<A::Element>`) instead
+/// apply beta immediately through [`dense_output_scatter`], inside
+/// [`execute_dense`].
+trait SparseCombine<A: Monoid>: Sized {
+    fn reduce_to(&self, context: &Context<'_>, owner: usize, algebra: &A) -> Option<Self>;
+    fn combine(&self, contribution: &Self, algebra: &A) -> Self;
+}
+
+impl<T: Wire + Clone, A: Monoid<Element = T>> SparseCombine<A> for Csr<T> {
+    fn reduce_to(&self, context: &Context<'_>, owner: usize, algebra: &A) -> Option<Self> {
+        self.reduce(context, owner, algebra)
+    }
+    fn combine(&self, contribution: &Self, algebra: &A) -> Self {
+        self.add(contribution, algebra)
+    }
+}
+
+impl<T: Wire + Clone, A: Monoid<Element = T>> SparseCombine<A> for Ccsr<T> {
+    fn reduce_to(&self, context: &Context<'_>, owner: usize, algebra: &A) -> Option<Self> {
+        self.reduce(context, owner, algebra)
+    }
+    fn combine(&self, contribution: &Self, algebra: &A) -> Self {
+        self.add(contribution, algebra)
+    }
+}
+
+/// Shared comm / inner==0 / outer==1 / else panel state machine for sparse
+/// (`Csr`/`Ccsr`) moving output (audit finding C1). `fetch_a`/`fetch_b`
+/// retrieve one step's operand panel; `empty` builds the additive identity
+/// matching one existing output block's shape. [`execute_csr`] and
+/// [`execute_ccsr_dense`] are thin wrappers over this executor.
+#[allow(clippy::too_many_arguments)]
+fn execute_sparse<A, T, U, C>(
+    algebra: &A,
+    edge: usize,
+    layers: Layers,
+    a_plan: Panel<'_, '_>,
+    b_plan: Panel<'_, '_>,
+    c_plan: Panel<'_, '_>,
+    a: &[T],
+    b: &[U],
+    mut c: Vec<C>,
+    beta: A::Element,
+    fetch_a: impl Fn(Panel<'_, '_>, &[T], usize, usize) -> Vec<T>,
+    fetch_b: impl Fn(Panel<'_, '_>, &[U], usize, usize) -> Vec<U>,
+    empty: impl Fn(&C) -> C,
+    mut child: impl FnMut(&[T], &[U], Vec<C>, A::Element, Layers) -> Vec<C>,
+) -> Vec<C>
+where
+    A: Semiring,
+    A::Element: Wire,
+    C: SparseCombine<A> + Clone,
+{
+    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
+    let (count, index, next) = schedule(edge, layers);
+    let mut child_beta = beta.clone();
+    let moving_output = c_plan.comm.is_some();
+    let mut contributions: Vec<C> = if moving_output {
+        c.iter().map(|block| empty(block)).collect()
+    } else {
+        Vec::new()
+    };
+
+    for step in (index..edge).step_by(count) {
+        let op_a = fetch_a(a_plan, a, step, edge);
+        let op_b = fetch_b(b_plan, b, step, edge);
+        if let Some(context) = c_plan.comm {
+            assert_eq!(edge % context.size(), 0);
+            let positions = c_plan.operand_positions(c.len(), step, edge);
+            let work: Vec<_> = positions.iter().map(|&position| empty(&c[position])).collect();
+            let work = child(&op_a, &op_b, work, algebra.zero(), next);
+            assert_eq!(work.len(), positions.len());
+            let owner = step % context.size();
+            for (position, block) in positions.into_iter().zip(work) {
+                if let Some(reduced) = block.reduce_to(context, owner, algebra) {
+                    contributions[position] = reduced;
+                }
+            }
+        } else if c_plan.inner == 0 {
+            c = child(&op_a, &op_b, c, child_beta, next);
+            child_beta = algebra.one();
+        } else {
+            let positions = c_plan.operand_positions(c.len(), step, edge);
+            let (work, step_beta) = if c_plan.outer == 1 {
+                let work: Vec<_> = positions.iter().map(|&position| c[position].clone()).collect();
+                (work, beta.clone())
+            } else {
+                let work: Vec<_> = positions.iter().map(|&position| empty(&c[position])).collect();
+                (work, algebra.zero())
+            };
+            let work = child(&op_a, &op_b, work, step_beta, next);
+            assert_eq!(work.len(), positions.len());
+            for (position, block) in positions.into_iter().zip(work) {
+                c[position] = block;
+            }
+        }
+    }
+
+    if moving_output {
+        for (old, contribution) in c.iter_mut().zip(contributions) {
+            *old = old.combine(&contribution, algebra);
+        }
+    }
+    c
+}
+
 /// Execute a CSR/CSR -> CSR 2D level. The callback is the next contraction
 /// level (or the native sparse leaf) and returns its possibly resized sparse
 /// output blocks. Sparse moving output follows source ownership: each panel is
@@ -302,9 +437,9 @@ pub fn execute_csr<A: Semiring>(
     c_plan: Panel<'_, '_>,
     a: &[Csr<A::Element>],
     b: &[Csr<A::Element>],
-    mut c: Vec<Csr<A::Element>>,
+    c: Vec<Csr<A::Element>>,
     beta: A::Element,
-    mut child: impl FnMut(
+    child: impl FnMut(
         &[Csr<A::Element>],
         &[Csr<A::Element>],
         Vec<Csr<A::Element>>,
@@ -315,57 +450,8 @@ pub fn execute_csr<A: Semiring>(
 where
     A::Element: Wire,
 {
-    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
-    let (count, index, next) = schedule(edge, layers);
-    let mut child_beta = beta.clone();
-    let moving_output = c_plan.comm.is_some();
-    let mut contributions: Vec<_> = if moving_output { c.iter().map(csr_empty).collect() } else { Vec::new() };
-
-    for step in (index..edge).step_by(count) {
-        let op_a = csr_operand(a_plan, a, step, edge);
-        let op_b = csr_operand(b_plan, b, step, edge);
-        if let Some(context) = c_plan.comm {
-            assert_eq!(edge % context.size(), 0);
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            let work: Vec<_> = positions.iter().map(|&position| csr_empty(&c[position])).collect();
-            let work = child(&op_a, &op_b, work, algebra.zero(), next);
-            assert_eq!(work.len(), positions.len());
-            let owner = step % context.size();
-            for (position, block) in positions.into_iter().zip(work) {
-                let reduced = block.reduce(context, owner, algebra);
-                if context.rank() == owner {
-                    contributions[position] = reduced.unwrap();
-                }
-            }
-        } else if c_plan.inner == 0 {
-            c = child(&op_a, &op_b, c, child_beta, next);
-            child_beta = algebra.one();
-        } else {
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            if c_plan.outer == 1 {
-                let work: Vec<_> = positions.iter().map(|&position| c[position].clone()).collect();
-                let work = child(&op_a, &op_b, work, beta.clone(), next);
-                assert_eq!(work.len(), positions.len());
-                for (position, block) in positions.into_iter().zip(work) {
-                    c[position] = block;
-                }
-            } else {
-                let work: Vec<_> = positions.iter().map(|&position| csr_empty(&c[position])).collect();
-                let work = child(&op_a, &op_b, work, algebra.zero(), next);
-                assert_eq!(work.len(), positions.len());
-                for (position, block) in positions.into_iter().zip(work) {
-                    c[position] = block;
-                }
-            }
-        }
-    }
-
-    if moving_output {
-        for (old, contribution) in c.iter_mut().zip(contributions) {
-            *old = old.add(&contribution, algebra);
-        }
-    }
-    c
+    execute_sparse(algebra, edge, layers, a_plan, b_plan, c_plan, a, b, c, beta,
+        csr_operand, csr_operand, csr_empty, child)
 }
 
 /// Execute the native CCSR/dense -> CCSR 2D level. Dense input blocks retain
@@ -381,9 +467,9 @@ pub fn execute_ccsr_dense<A: Semiring>(
     c_plan: Panel<'_, '_>,
     a: &[Ccsr<A::Element>],
     b: &[Vec<A::Element>],
-    mut c: Vec<Ccsr<A::Element>>,
+    c: Vec<Ccsr<A::Element>>,
     beta: A::Element,
-    mut child: impl FnMut(
+    child: impl FnMut(
         &[Ccsr<A::Element>],
         &[Vec<A::Element>],
         Vec<Ccsr<A::Element>>,
@@ -394,57 +480,8 @@ pub fn execute_ccsr_dense<A: Semiring>(
 where
     A::Element: Wire,
 {
-    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
-    let (count, index, next) = schedule(edge, layers);
-    let mut child_beta = beta.clone();
-    let moving_output = c_plan.comm.is_some();
-    let mut contributions: Vec<_> = if moving_output { c.iter().map(ccsr_empty).collect() } else { Vec::new() };
-
-    for step in (index..edge).step_by(count) {
-        let op_a = ccsr_operand(a_plan, a, step, edge);
-        let op_b = dense_operand(b_plan, b, step, edge);
-        if let Some(context) = c_plan.comm {
-            assert_eq!(edge % context.size(), 0);
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            let work: Vec<_> = positions.iter().map(|&position| ccsr_empty(&c[position])).collect();
-            let work = child(&op_a, &op_b, work, algebra.zero(), next);
-            assert_eq!(work.len(), positions.len());
-            let owner = step % context.size();
-            for (position, block) in positions.into_iter().zip(work) {
-                let reduced = block.reduce(context, owner, algebra);
-                if context.rank() == owner {
-                    contributions[position] = reduced.unwrap();
-                }
-            }
-        } else if c_plan.inner == 0 {
-            c = child(&op_a, &op_b, c, child_beta, next);
-            child_beta = algebra.one();
-        } else {
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            if c_plan.outer == 1 {
-                let work: Vec<_> = positions.iter().map(|&position| c[position].clone()).collect();
-                let work = child(&op_a, &op_b, work, beta.clone(), next);
-                assert_eq!(work.len(), positions.len());
-                for (position, block) in positions.into_iter().zip(work) {
-                    c[position] = block;
-                }
-            } else {
-                let work: Vec<_> = positions.iter().map(|&position| ccsr_empty(&c[position])).collect();
-                let work = child(&op_a, &op_b, work, algebra.zero(), next);
-                assert_eq!(work.len(), positions.len());
-                for (position, block) in positions.into_iter().zip(work) {
-                    c[position] = block;
-                }
-            }
-        }
-    }
-
-    if moving_output {
-        for (old, contribution) in c.iter_mut().zip(contributions) {
-            *old = old.add(&contribution, algebra);
-        }
-    }
-    c
+    execute_sparse(algebra, edge, layers, a_plan, b_plan, c_plan, a, b, c, beta,
+        ccsr_operand, dense_operand, ccsr_empty, child)
 }
 
 fn dense_output_scatter<A: Semiring>(
@@ -463,52 +500,94 @@ fn dense_output_scatter<A: Semiring>(
     }
 }
 
+/// Shared comm / inner==0 / outer==1 / else panel state machine for dense
+/// (`Vec<A::Element>`) moving output (audit finding C1). Moving output is
+/// reduced to its cyclic owner and scattered into C with `beta` immediately,
+/// through [`dense_output_scatter`]; contrast [`execute_sparse`], whose
+/// sparse output formats defer an unscaled add instead. `fetch_a`/`fetch_b`
+/// retrieve one step's operand panel. [`execute_coo_dense`],
+/// [`execute_csr_dense`], [`execute_csr_sparse_dense`] and
+/// [`execute_pairs_dense`] are thin wrappers over this executor.
+#[allow(clippy::too_many_arguments)]
+fn execute_dense<A: Semiring, T, U>(
+    algebra: &A,
+    edge: usize,
+    layers: Layers,
+    a_plan: Panel<'_, '_>,
+    b_plan: Panel<'_, '_>,
+    c_plan: Panel<'_, '_>,
+    a: &[T],
+    b: &[U],
+    mut c: Vec<Vec<A::Element>>,
+    beta: A::Element,
+    fetch_a: impl Fn(Panel<'_, '_>, &[T], usize, usize) -> Vec<T>,
+    fetch_b: impl Fn(Panel<'_, '_>, &[U], usize, usize) -> Vec<U>,
+    mut child: impl FnMut(&[T], &[U], Vec<Vec<A::Element>>, A::Element, Layers) -> Vec<Vec<A::Element>>,
+) -> Vec<Vec<A::Element>>
+where
+    A::Element: Wire,
+{
+    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
+    let (count, index, next) = schedule(edge, layers);
+    let mut child_beta = beta.clone();
+
+    for step in (index..edge).step_by(count) {
+        let op_a = fetch_a(a_plan, a, step, edge);
+        let op_b = fetch_b(b_plan, b, step, edge);
+        if let Some(context) = c_plan.comm {
+            assert_eq!(edge % context.size(), 0);
+            let positions = c_plan.operand_positions(c.len(), step, edge);
+            let work: Vec<_> = positions
+                .iter()
+                .map(|&position| vec![algebra.zero(); c[position].len()])
+                .collect();
+            let mut work = child(&op_a, &op_b, work, algebra.zero(), next);
+            assert_eq!(work.len(), positions.len());
+            let owner = step % context.size();
+            for block in &mut work {
+                context.reduce_monoid(algebra, block, false, owner);
+            }
+            if context.rank() == owner {
+                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
+            }
+        } else if c_plan.inner == 0 {
+            c = child(&op_a, &op_b, c, child_beta, next);
+            child_beta = algebra.one();
+        } else {
+            let positions = c_plan.operand_positions(c.len(), step, edge);
+            if c_plan.outer == 1 {
+                let work: Vec<_> = positions.iter().map(|&position| c[position].clone()).collect();
+                let work = child(&op_a, &op_b, work, beta.clone(), next);
+                assert_eq!(work.len(), positions.len());
+                for (position, block) in positions.into_iter().zip(work) {
+                    assert_eq!(block.len(), c[position].len());
+                    c[position] = block;
+                }
+            } else {
+                let work: Vec<_> = positions
+                    .iter()
+                    .map(|&position| vec![algebra.zero(); c[position].len()])
+                    .collect();
+                let work = child(&op_a, &op_b, work, algebra.zero(), next);
+                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
+            }
+        }
+    }
+    c
+}
+
 /// Folded COO/dense/dense source 2D level. COO entry order, duplicates and
 /// stored zeros survive communication unchanged; no CSR conversion is used.
 pub fn execute_coo_dense<A: Semiring, T: Wire + Clone, U: Wire + Clone>(
     algebra: &A, edge: usize, layers: Layers,
     a_plan: Panel<'_, '_>, b_plan: Panel<'_, '_>, c_plan: Panel<'_, '_>,
-    a: &[Coo<T>], b: &[Vec<U>], mut c: Vec<Vec<A::Element>>,
+    a: &[Coo<T>], b: &[Vec<U>], c: Vec<Vec<A::Element>>,
     beta: A::Element,
-    mut child: impl FnMut(&[Coo<T>], &[Vec<U>], Vec<Vec<A::Element>>,
+    child: impl FnMut(&[Coo<T>], &[Vec<U>], Vec<Vec<A::Element>>,
         A::Element, Layers) -> Vec<Vec<A::Element>>,
 ) -> Vec<Vec<A::Element>> where A::Element: Wire {
-    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
-    let (count,index,next)=schedule(edge,layers);
-    let mut child_beta=beta.clone();
-    for step in (index..edge).step_by(count) {
-        let positions=a_plan.operand_positions(a.len(),step,edge);
-        let mut op_a:Vec<_>=positions.iter().map(|&position|a[position].clone()).collect();
-        if let Some(context)=a_plan.comm { broadcast_sparse(context,step%context.size(),&mut op_a); }
-        let op_b=dense_operand(b_plan,b,step,edge);
-        if let Some(context)=c_plan.comm {
-            let positions=c_plan.operand_positions(c.len(),step,edge);
-            let work=positions.iter().map(|&position|vec![algebra.zero();c[position].len()]).collect();
-            let mut work=child(&op_a,&op_b,work,algebra.zero(),next);
-            assert_eq!(work.len(),positions.len());
-            let owner=step%context.size();
-            for block in &mut work { context.reduce_monoid(algebra,block,false,owner); }
-            if context.rank()==owner { dense_output_scatter(algebra,&positions,work,&mut c,&beta); }
-        } else if c_plan.inner==0 {
-            c=child(&op_a,&op_b,c,child_beta,next);
-            child_beta=algebra.one();
-        } else {
-            let positions=c_plan.operand_positions(c.len(),step,edge);
-            if c_plan.outer==1 {
-                let work=positions.iter().map(|&position|c[position].clone()).collect();
-                let work=child(&op_a,&op_b,work,beta.clone(),next);
-                assert_eq!(work.len(),positions.len());
-                for (position,block) in positions.into_iter().zip(work) {
-                    assert_eq!(block.len(),c[position].len()); c[position]=block;
-                }
-            } else {
-                let work=positions.iter().map(|&position|vec![algebra.zero();c[position].len()]).collect();
-                let work=child(&op_a,&op_b,work,algebra.zero(),next);
-                dense_output_scatter(algebra,&positions,work,&mut c,&beta);
-            }
-        }
-    }
-    c
+    execute_dense(algebra, edge, layers, a_plan, b_plan, c_plan, a, b, c, beta,
+        coo_operand, dense_operand, child)
 }
 
 /// Execute the source sparse-A/dense-B/dense-C 2D level. Dense output panels
@@ -524,9 +603,9 @@ pub fn execute_csr_dense<A: Semiring>(
     c_plan: Panel<'_, '_>,
     a: &[Csr<A::Element>],
     b: &[Vec<A::Element>],
-    mut c: Vec<Vec<A::Element>>,
+    c: Vec<Vec<A::Element>>,
     beta: A::Element,
-    mut child: impl FnMut(
+    child: impl FnMut(
         &[Csr<A::Element>],
         &[Vec<A::Element>],
         Vec<Vec<A::Element>>,
@@ -537,53 +616,8 @@ pub fn execute_csr_dense<A: Semiring>(
 where
     A::Element: Wire,
 {
-    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
-    let (count, index, next) = schedule(edge, layers);
-    let mut child_beta = beta.clone();
-
-    for step in (index..edge).step_by(count) {
-        let op_a = csr_operand(a_plan, a, step, edge);
-        let op_b = dense_operand(b_plan, b, step, edge);
-        if let Some(context) = c_plan.comm {
-            assert_eq!(edge % context.size(), 0);
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            let work: Vec<_> = positions
-                .iter()
-                .map(|&position| vec![algebra.zero(); c[position].len()])
-                .collect();
-            let mut work = child(&op_a, &op_b, work, algebra.zero(), next);
-            assert_eq!(work.len(), positions.len());
-            let owner = step % context.size();
-            for block in &mut work {
-                context.reduce_monoid(algebra, block, false, owner);
-            }
-            if context.rank() == owner {
-                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
-            }
-        } else if c_plan.inner == 0 {
-            c = child(&op_a, &op_b, c, child_beta, next);
-            child_beta = algebra.one();
-        } else {
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            if c_plan.outer == 1 {
-                let work: Vec<_> = positions.iter().map(|&position| c[position].clone()).collect();
-                let work = child(&op_a, &op_b, work, beta.clone(), next);
-                assert_eq!(work.len(), positions.len());
-                for (position, block) in positions.into_iter().zip(work) {
-                    assert_eq!(block.len(), c[position].len());
-                    c[position] = block;
-                }
-            } else {
-                let work: Vec<_> = positions
-                    .iter()
-                    .map(|&position| vec![algebra.zero(); c[position].len()])
-                    .collect();
-                let work = child(&op_a, &op_b, work, algebra.zero(), next);
-                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
-            }
-        }
-    }
-    c
+    execute_dense(algebra, edge, layers, a_plan, b_plan, c_plan, a, b, c, beta,
+        csr_operand, dense_operand, child)
 }
 
 /// Execute the source sparse-A/sparse-B/dense-C 2D level. Both inputs remain
@@ -598,9 +632,9 @@ pub fn execute_csr_sparse_dense<A: Semiring>(
     c_plan: Panel<'_, '_>,
     a: &[Csr<A::Element>],
     b: &[Csr<A::Element>],
-    mut c: Vec<Vec<A::Element>>,
+    c: Vec<Vec<A::Element>>,
     beta: A::Element,
-    mut child: impl FnMut(
+    child: impl FnMut(
         &[Csr<A::Element>],
         &[Csr<A::Element>],
         Vec<Vec<A::Element>>,
@@ -611,53 +645,8 @@ pub fn execute_csr_sparse_dense<A: Semiring>(
 where
     A::Element: Wire,
 {
-    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
-    let (count, index, next) = schedule(edge, layers);
-    let mut child_beta = beta.clone();
-
-    for step in (index..edge).step_by(count) {
-        let op_a = csr_operand(a_plan, a, step, edge);
-        let op_b = csr_operand(b_plan, b, step, edge);
-        if let Some(context) = c_plan.comm {
-            assert_eq!(edge % context.size(), 0);
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            let work: Vec<_> = positions
-                .iter()
-                .map(|&position| vec![algebra.zero(); c[position].len()])
-                .collect();
-            let mut work = child(&op_a, &op_b, work, algebra.zero(), next);
-            assert_eq!(work.len(), positions.len());
-            let owner = step % context.size();
-            for block in &mut work {
-                context.reduce_monoid(algebra, block, false, owner);
-            }
-            if context.rank() == owner {
-                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
-            }
-        } else if c_plan.inner == 0 {
-            c = child(&op_a, &op_b, c, child_beta, next);
-            child_beta = algebra.one();
-        } else {
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            if c_plan.outer == 1 {
-                let work: Vec<_> = positions.iter().map(|&position| c[position].clone()).collect();
-                let work = child(&op_a, &op_b, work, beta.clone(), next);
-                assert_eq!(work.len(), positions.len());
-                for (position, block) in positions.into_iter().zip(work) {
-                    assert_eq!(block.len(), c[position].len());
-                    c[position] = block;
-                }
-            } else {
-                let work: Vec<_> = positions
-                    .iter()
-                    .map(|&position| vec![algebra.zero(); c[position].len()])
-                    .collect();
-                let work = child(&op_a, &op_b, work, algebra.zero(), next);
-                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
-            }
-        }
-    }
-    c
+    execute_dense(algebra, edge, layers, a_plan, b_plan, c_plan, a, b, c, beta,
+        csr_operand, csr_operand, child)
 }
 
 /// Execute the source nonfolded sparse-pair-A/dense-B/dense-C 2D level.
@@ -674,9 +663,9 @@ pub fn execute_pairs_dense<A: Semiring>(
     c_plan: Panel<'_, '_>,
     a: &[Vec<(usize, A::Element)>],
     b: &[Vec<A::Element>],
-    mut c: Vec<Vec<A::Element>>,
+    c: Vec<Vec<A::Element>>,
     beta: A::Element,
-    mut child: impl FnMut(
+    child: impl FnMut(
         &[Vec<(usize, A::Element)>],
         &[Vec<A::Element>],
         Vec<Vec<A::Element>>,
@@ -687,51 +676,6 @@ pub fn execute_pairs_dense<A: Semiring>(
 where
     A::Element: Wire,
 {
-    assert!(!(a_plan.comm.is_some() && b_plan.comm.is_some() && c_plan.comm.is_some()));
-    let (count, index, next) = schedule(edge, layers);
-    let mut child_beta = beta.clone();
-
-    for step in (index..edge).step_by(count) {
-        let op_a = pairs_operand(a_plan, a, step, edge);
-        let op_b = dense_operand(b_plan, b, step, edge);
-        if let Some(context) = c_plan.comm {
-            assert_eq!(edge % context.size(), 0);
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            let work: Vec<_> = positions
-                .iter()
-                .map(|&position| vec![algebra.zero(); c[position].len()])
-                .collect();
-            let mut work = child(&op_a, &op_b, work, algebra.zero(), next);
-            assert_eq!(work.len(), positions.len());
-            let owner = step % context.size();
-            for block in &mut work {
-                context.reduce_monoid(algebra, block, false, owner);
-            }
-            if context.rank() == owner {
-                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
-            }
-        } else if c_plan.inner == 0 {
-            c = child(&op_a, &op_b, c, child_beta, next);
-            child_beta = algebra.one();
-        } else {
-            let positions = c_plan.operand_positions(c.len(), step, edge);
-            if c_plan.outer == 1 {
-                let work: Vec<_> = positions.iter().map(|&position| c[position].clone()).collect();
-                let work = child(&op_a, &op_b, work, beta.clone(), next);
-                assert_eq!(work.len(), positions.len());
-                for (position, block) in positions.into_iter().zip(work) {
-                    assert_eq!(block.len(), c[position].len());
-                    c[position] = block;
-                }
-            } else {
-                let work: Vec<_> = positions
-                    .iter()
-                    .map(|&position| vec![algebra.zero(); c[position].len()])
-                    .collect();
-                let work = child(&op_a, &op_b, work, algebra.zero(), next);
-                dense_output_scatter(algebra, &positions, work, &mut c, &beta);
-            }
-        }
-    }
-    c
+    execute_dense(algebra, edge, layers, a_plan, b_plan, c_plan, a, b, c, beta,
+        pairs_operand, dense_operand, child)
 }
