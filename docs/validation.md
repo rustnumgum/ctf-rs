@@ -1,5 +1,45 @@
 # Validation evidence
 
+## Index
+
+One row per acceptance driver or gate family, naming by exact heading text
+the section that carries its current, authoritative result. Later sections
+supersede earlier ones for the same driver: the S1d/S1 close row below
+supersedes the S1a/S1b/S1c outcomes for the same thirteen S1 targets, and
+each `Dn`/R1/C1 "close" section is the final record for its scope. Nothing
+in this document is edited, moved, or removed to build this index; every
+row below only points into the existing chronological record.
+
+| Driver / gate family | Authoritative section | Status |
+|---|---|---|
+| C1 (model I/O, contraction-path symmetrization, dense custom folded kernels, selector agreement, graph I/O native runtime) | "C1 acceptance (2026-09-11)" | CLOSED, DIGIT / PASS |
+| R1 (rsmpi Universe/Context ownership, splits, parity worlds) | "Initial R1 acceptance" | CLOSED, DIGIT / PASS |
+| D1 dense scaling and strip | "D1 dense scaling and strip close (2026-09-08)" | CLOSED |
+| D2 optimized dense redistribution | "D2 optimized dense redistribution close (2026-09-08)" | CLOSED |
+| D3 dense contraction | "D3 dense contraction close (2026-09-08)" | CLOSED |
+| D4 shared infrastructure | "D4 shared infrastructure close (2026-09-08)" | CLOSED |
+| D5 native interface and FFT | "D5 native interface and FFT close (2026-09-08)" | CLOSED |
+| D6 dense drivers and native runtime | "D6 dense drivers and native runtime close (2026-09-08)" | CLOSED |
+| S1a sparse contraction planning (historical) | "S1a sparse contraction planning" | superseded, see "S1d and S1 close" |
+| S1b compressed-symmetry and custom sparse kernels (historical) | "S1b compressed-symmetry and custom sparse kernels" | superseded, see "S1d and S1 close" |
+| S1c sparse summation, communication, persistence (historical) | "S1c sparse summation, communication, persistence" | superseded, see "S1d and S1 close" |
+| S1d and S1 close (final contract for all thirteen S1 targets) | "S1d and S1 close" | CLOSED, DIGIT / PASS at WSL 1/2/4; three targets also native 1/2/4 |
+| upstream_apsp | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| upstream_algebraic_multigrid | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| upstream_block_sparse | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| upstream_force_integration_sparse | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| upstream_btwn_central | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| upstream_checkpoint_sparse | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 and native 1/2/4 |
+| upstream_mis | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| upstream_mis2 | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| sparse_einsum_hadamard | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 and native 1/2/4 |
+| sparse_scaled_expression | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 and native 1/2/4 |
+| sparse_complex | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| sparse_sy | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| sparse_sample | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
+| Checkpoint n=3 fixture (historical, not a source failure) | "Checkpoint n=3 history (not a source failure)" | superseded by the n=7 default fixture under "S1d and S1 close" |
+| All other dated per-feature milestones (2026-09-06 through 2026-09-08, roughly 140 sections interleaved with the batches above) | not individually indexed here; each is unedited chronological history that the C1/R1/D1-D6/S1 close sections above summarize | see `docs/coverage.md` for the current phase-level status of that work |
+
 ## C1 close
 
 ### C1.2 contraction-path symmetrization correspondence
