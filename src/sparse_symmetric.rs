@@ -14,6 +14,9 @@ use crate::{
     symmetry::Symmetry,
 };
 
+#[path = "sparse_symmetric_random.rs"]
+mod random;
+
 #[derive(Clone)]
 pub struct SparseSymmetricTensor<'c, 'r, A: Group> {
     distribution: SymmetricDistribution,
@@ -207,6 +210,18 @@ where
         let mut result = SparseTensor::new(self.context(), target, self.algebra().clone());
         result.write_add(&self.local_orbit_pairs());
         result
+    }
+
+    /// Drop the symmetry metadata while retaining only canonical stored keys.
+    /// This is the source tensor-conversion behavior used to orient an SH
+    /// graph; unlike `unpack_orbits`, it does not insert the reverse edges.
+    pub fn into_canonical_nonsymmetric(
+        mut self,
+        target: Distribution,
+    ) -> SparseTensor<'c, 'r, A> {
+        assert_eq!(target.shape, self.distribution.distribution().shape);
+        self.storage.redistribute(target);
+        self.storage
     }
 
     pub(crate) fn local_orbit_pairs(&self) -> Vec<(usize, A::Element)> {
