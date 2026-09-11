@@ -415,12 +415,14 @@ fn exhaustive_pass(
         baseline.seconds
     };
     let mut local = None;
+    let mut valid_mappings = 0i64;
     mapping_variants::visit_local_exhaustive(
         context,
         shapes,
         indices,
         catalog,
         |candidate| {
+            valid_mappings += 1;
             let nodes = facts
                 .get(&candidate.variant.distributions[0].topology)
                 .unwrap();
@@ -448,6 +450,13 @@ fn exhaustive_pass(
             }
         },
     )?;
+    // Source agreement counts mappings after mapping preflight, before the
+    // cost/memory filters. An empty global search cannot improve the baseline.
+    let total_valid_mappings =
+        context.all_reduce(&crate::algebra::Arithmetic::<i64>::new(), &valid_mappings);
+    if total_valid_mappings == 0 {
+        return Ok(None);
+    }
     Ok(select_global(context, local, objective))
 }
 

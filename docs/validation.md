@@ -23,6 +23,26 @@ NS/SY/AS/SH branches at WSL 1, 2, and 4 ranks. The C1 full script also includes
 implementation already exists, so C1.2 closes by correspondence documentation.
 The C1 acceptance result is recorded below only after execution.
 
+### C1.4 working selector agreement
+
+The unconditional `ContractionSelector::allgather` stub is not the working
+source protocol. `contraction::evaluate_mappings` uses rank-local cost gathers,
+winner-rank broadcast and topology/time/memory broadcasts in its normal and
+exhaustive branches. `dense_search::select_global` implements that protocol:
+its source mapping ID reconstructs the winning topology and distributions.
+`Selector::select_best` likewise broadcasts the complete winning plan payload.
+The existing `dense_search`, `selector`, and `selection_objective` drivers
+exercise this agreement at WSL 1, 2, and 4 ranks in the full C1 script.
+
+C1.4 adds the missing valid-mapping count in `dense_search::exhaustive_pass`:
+count after mapping preflight and before memory/cost filtering, then perform
+an i64 Allreduce before winner selection. A globally empty enumeration returns
+no refinement. This implements the quantity behind the source DEBUG count
+without introducing a logging subsystem or the source's undeclared variable.
+The prescribed `upstream_gemm4d`, `upstream_ccsdt_map`, `upstream_subworld_gemm`,
+and NS `upstream_permute_multiworld` remain unchanged in the full C1 run;
+explicit-mapping drivers are not mislabeled as standalone selector tests.
+
 ## rsmpi binding
 
 ### CTF-R1-4 direct replica restoration (2026-09-09)
