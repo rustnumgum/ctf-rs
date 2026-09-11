@@ -404,10 +404,15 @@ fn folded_matricization(
     let layout = &descriptor.layouts[operand];
     assert_eq!(layout.folded_shape.len(), layout.inner_ordering.len(),
         "selected sparse fold must matricize every local tensor group");
+    // Source nrow_idx counts row labels in the tensor's original dimension
+    // order. inner_ordering, rather than folded_indices, places those groups
+    // at the matricized prefix selected by permutation 1 (A,C,B).
     let row_dimensions = layout.folded_indices.iter()
-        .take_while(|&&label| masks[label] == row_mask).count();
-    assert!(layout.folded_indices[row_dimensions..].iter()
-        .all(|&label| masks[label] != row_mask));
+        .filter(|&&label| masks[label] == row_mask).count();
+    assert!(layout.inner_ordering[..row_dimensions].iter()
+        .all(|&group| masks[layout.folded_indices[group]] == row_mask));
+    assert!(layout.inner_ordering[row_dimensions..].iter()
+        .all(|&group| masks[layout.folded_indices[group]] != row_mask));
     let shape = execution.block_shapes[operand].clone();
     crate::sparse_matricize::Matricization {
         padded_shape: shape.clone(),
