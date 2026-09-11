@@ -215,11 +215,18 @@ mod platform {
         pagefile: usize,
         peak_pagefile: usize,
     }
+    // SAFETY: signatures mirror the documented Win32 ABI for
+    // kernel32!GlobalMemoryStatusEx and kernel32!GetCurrentProcess (fixed
+    // argument count and layout, no varargs); soundness of each call is
+    // argued at its call site below.
     #[link(name = "kernel32")]
     unsafe extern "system" {
         fn GlobalMemoryStatusEx(status: *mut MemoryStatusEx) -> i32;
         fn GetCurrentProcess() -> *mut c_void;
     }
+    // SAFETY: signature mirrors the documented Win32 ABI for
+    // psapi!GetProcessMemoryInfo; soundness of the call is argued at its
+    // call site below.
     #[link(name = "psapi")]
     unsafe extern "system" {
         fn GetProcessMemoryInfo(
@@ -230,13 +237,26 @@ mod platform {
     }
 
     pub(super) fn discover() -> Result<MemorySnapshot, Error> {
+        // SAFETY: MemoryStatusEx is #[repr(C)] with only u32/u64 fields, so
+        // the all-zero bit pattern is a valid value; `length` is set to the
+        // struct size (as the API requires) before it crosses the FFI
+        // boundary below.
         let mut host: MemoryStatusEx = unsafe { std::mem::zeroed() };
         host.length = size_of::<MemoryStatusEx>() as u32;
+        // SAFETY: `host` is a uniquely-owned, live MemoryStatusEx with
+        // `length` already set as GlobalMemoryStatusEx requires; the
+        // pointer stays valid for the duration of this synchronous call.
         if unsafe { GlobalMemoryStatusEx(&mut host) } == 0 {
             return Err(Error::Io(io::Error::last_os_error()));
         }
+        // SAFETY: same zero-is-valid argument as above; ProcessMemoryCounters
+        // is #[repr(C)] with only u32/usize fields.
         let mut process: ProcessMemoryCounters = unsafe { std::mem::zeroed() };
         process.size = size_of::<ProcessMemoryCounters>() as u32;
+        // SAFETY: GetCurrentProcess() returns the pseudo-handle -1, valid
+        // for the process lifetime and needing no close; `process` is a
+        // uniquely-owned, live buffer of exactly `process.size` bytes, the
+        // size GetProcessMemoryInfo is told to write into.
         if unsafe { GetProcessMemoryInfo(GetCurrentProcess(), &mut process, process.size) } == 0 {
             return Err(Error::Io(io::Error::last_os_error()));
         }

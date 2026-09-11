@@ -18,6 +18,17 @@ impl Comm<'_> {
         let count: i32 = bytes.len().try_into().unwrap();
         let empty = [0u8];
         let storage = if bytes.is_empty() { &empty[..] } else { bytes };
+        // SAFETY: `self.raw()` is a live communicator handle owned by
+        // `self`; `path` is a valid NUL-terminated CString kept alive for
+        // the whole block. `RSMPI_FILE_NULL` is a plain MPI_File handle
+        // value (not an aliasing pointer), immediately overwritten by
+        // MPI_File_open, whose out-pointer `&mut file` is valid and
+        // uniquely owned. `storage` (at least one live byte, `count`
+        // elements) is read only by MPI_File_write_at, matching `count`
+        // and `RSMPI_UINT8_T`, and stays valid until that call returns;
+        // `status`'s all-zero MPI_Status bit pattern is valid and is fully
+        // overwritten before any field is read. `file` is closed exactly
+        // once at the end of this block.
         unsafe {
             let mut file = sys::RSMPI_FILE_NULL;
             check(sys::MPI_File_open(
@@ -48,6 +59,15 @@ impl Comm<'_> {
         let count: i32 = length.try_into().unwrap();
         let mut bytes = vec![0u8; length.max(1)];
         let actual;
+        // SAFETY: `self.raw()` is a live communicator handle owned by
+        // `self`; `path` is a valid NUL-terminated CString kept alive for
+        // the whole block; `RSMPI_FILE_NULL` is a plain handle value,
+        // overwritten by MPI_File_open before use. `bytes` has at least
+        // `length.max(1)` elements and `count == length` was asserted by
+        // the `try_into` above, so MPI_File_read_at's write of up to
+        // `count` `RSMPI_UINT8_T` elements stays in bounds; `status` is a
+        // valid, fully-overwritten out-buffer read by MPI_Get_count only
+        // after MPI_File_read_at returns. `file` is closed exactly once.
         unsafe {
             let mut file = sys::RSMPI_FILE_NULL;
             check(sys::MPI_File_open(

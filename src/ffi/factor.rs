@@ -1,5 +1,9 @@
 use std::ffi::c_char;
 
+// SAFETY: signature mirrors the reference BLAS Fortran ABI (trailing
+// underscore, every scalar and array passed by pointer, column major
+// layout); the call site below argues buffer length and leading dimension
+// against the caller's asserted shape.
 #[cfg_attr(any(target_os = "windows", target_os = "macos"), link(name = "openblas"))]
 #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link(name = "blas"))]
 unsafe extern "C" {
@@ -14,6 +18,9 @@ unsafe extern "C" {
     );
 }
 
+// SAFETY: signature mirrors the reference LAPACK Fortran ABI; the call
+// site below argues buffer length and leading dimension against the
+// caller's asserted shape.
 #[cfg_attr(any(target_os = "windows", target_os = "macos"), link(name = "openblas"))]
 #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link(name = "lapack"))]
 unsafe extern "C" {
@@ -35,6 +42,9 @@ pub(crate) fn syr(n: usize, alpha: f64, x: &[f64], a: &mut [f64]) {
     let ni = i32::try_from(n).unwrap();
     let uplo = b'L' as c_char;
     let incx = 1;
+    // SAFETY: `x` has exactly `n` elements and `a` exactly `n * n`
+    // (asserted above), matching count/stride `incx = 1` and leading
+    // dimension `ni = n` for an `n`-by-`n` matrix.
     unsafe {
         dsyr_(
             &uplo,
@@ -55,6 +65,10 @@ pub(crate) fn posv(n: usize, a: &mut [f64], b: &mut [f64]) -> Result<(), i32> {
     let nrhs = 1;
     let uplo = b'L' as c_char;
     let mut info = 0;
+    // SAFETY: `a` has exactly `n * n` elements and `b` exactly `n`
+    // (asserted above), matching leading dimensions `ni = n` for the
+    // `n`-by-`n` system and one right-hand-side column (`nrhs = 1`);
+    // `info` is a valid, uniquely-owned out-pointer.
     unsafe {
         dposv_(
             &uplo,

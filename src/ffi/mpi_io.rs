@@ -17,6 +17,19 @@ impl Comm<'_> {
     /// this rank by the source's fixed 300-byte overlap partition.
     pub(crate) fn read_sparse_text(&self, path: &Path) -> Vec<u8> {
         let path = mpi_path(path);
+        // SAFETY: `self.raw()` is a live communicator handle owned by
+        // `self`; `path` is a valid NUL-terminated CString kept alive for
+        // the whole block; `RSMPI_FILE_NULL` is a plain handle value,
+        // overwritten by MPI_File_open before use. `file_size`/`status`'s
+        // zero-initialized bit patterns are valid for their all-integer
+        // #[repr(C)] layouts and are fully written before being read.
+        // `bytes` is allocated to exactly `requested` elements and that
+        // same `requested` count (cast with `try_into`, so it cannot
+        // silently truncate) is passed to MPI_File_read_at_all, so the
+        // write stays in bounds; `actual`, read back via MPI_Get_count
+        // only after that call returns, is asserted `>= 0` before being
+        // used to truncate `bytes`. `file` is closed exactly once, on
+        // every return path (empty file included).
         unsafe {
             let mut file = sys::RSMPI_FILE_NULL;
             check(sys::MPI_File_open(
@@ -95,6 +108,19 @@ impl Comm<'_> {
     /// already newline-terminated sparse text records, in communicator order.
     pub(crate) fn write_sparse_text(&self, path: &Path, bytes: &[u8]) {
         let path = mpi_path(path);
+        // SAFETY: `self.raw()` is a live communicator handle owned by
+        // `self`; `path` is a valid NUL-terminated CString kept alive for
+        // the whole block; `RSMPI_FILE_NULL` is a plain handle value,
+        // overwritten by each MPI_File_open before use, and `file` is
+        // reused (reopened) only after the first MPI_File_close returns,
+        // so no stale handle is ever passed to a collective call. `bytes`
+        // (`bytes.len()` elements, cast with `try_into`) is read only by
+        // MPI_File_write_at_all and stays valid for the whole block since
+        // it is borrowed for the function's duration. `status`'s
+        // zero-initialized bit pattern is valid and fully overwritten
+        // before any field would be read. `offset` comes from a collective
+        // `scan_into` so every rank writes a distinct, non-overlapping
+        // byte range. `file` is closed exactly once on the return path.
         unsafe {
             let mut file = sys::RSMPI_FILE_NULL;
             check(sys::MPI_File_open(

@@ -25,6 +25,13 @@ std::thread_local! {
 }
 
 // Callback state is borrowed only for the blocking collective call.
+// SAFETY: matches the MPI_User_function ABI required by
+// UnsafeUserOperation (void*, void*, int*, MPI_Datatype*: MPI standard
+// 5.9.5). MPI invokes this only synchronously from inside the collective
+// started in reduce_monoid, which sets ACTIVE_ALGEBRA to a live `&A`
+// immediately before that call and clears it immediately after, and
+// asserts against nesting, so no other thread or reentrant call observes
+// a stale or null pointer while this callback runs.
 unsafe extern "C" fn monoid_add<A: Monoid>(
     input: *mut std::ffi::c_void,
     output: *mut std::ffi::c_void,
@@ -34,8 +41,21 @@ unsafe extern "C" fn monoid_add<A: Monoid>(
     A::Element: Wire,
 {
     ACTIVE_ALGEBRA.with(|active| {
+        // SAFETY: reduce_monoid stores `algebra as *const A` into
+        // ACTIVE_ALGEBRA right before starting the collective that
+        // triggers this callback and clears it right after, so the
+        // pointer is non-null and points to a live `&A` of exactly this
+        // type parameter for the callback's extent.
         let algebra = unsafe { &*active.get().cast::<A>() };
+        // SAFETY: `count` is the MPI-supplied element-count out-parameter,
+        // non-null and initialized for the duration of the callback per
+        // the MPI standard's user-function contract.
         let count = unsafe { *count } as usize;
+        // SAFETY: `input`/`output` point to `count` elements of the
+        // datatype registered as UserDatatype::contiguous(WIDTH, u8) in
+        // reduce_monoid, i.e. `count * WIDTH` bytes; `input` is valid for
+        // reads and `output` valid for reads and writes for the duration
+        // of this callback, per the same MPI contract.
         let left =
             unsafe { std::slice::from_raw_parts(input.cast::<u8>(), count * A::Element::WIDTH) };
         let right = unsafe {
@@ -111,6 +131,28 @@ impl<'a> Comm<'a> {
 
     /// DGTOG root-to-root exchange: post every receive, post every send, then
     /// wait for all requests. Displacements and counts are measured in bytes.
+    ///
+    /// Kept on raw `MPI_Irecv`/`MPI_Isend`/`MPI_Waitall` rather than rsmpi's
+    /// safe `immediate_receive_into_with_tag`/`immediate_send_with_tag`/
+    /// `RequestCollection::wait_all` (audit D4; permitted by ADR-0007).
+    /// rsmpi's `Request<'a, D, S>` holds its buffer as `&'a D`/`&'a mut D`
+    /// for the request's whole lifetime, and `RequestCollection<'a, D>`
+    /// needs one shared `D` for every request it holds (see
+    /// `examples/immediate_multiple_requests.rs`, which gets its disjoint
+    /// per-request buffers from `Vec::iter_mut`, one fixed-size element
+    /// each). Here every outstanding receive borrows a distinct byte range
+    /// of the *same* `receive_buffer: &mut [u8]` at a runtime-computed,
+    /// unsorted `displacement`; safe Rust can only hand out several
+    /// simultaneous disjoint `&mut [u8]` sub-slices of one slice through
+    /// ordered `split_at_mut`, which would require sorting `receives` and
+    /// restructuring this function around `mpi::request::scope`, not a
+    /// drop-in substitution, and receives are never asserted disjoint from
+    /// each other today (only bounds-checked against `receive_buffer`), so
+    /// sorting and splitting would silently add an invariant this function
+    /// does not currently enforce. The raw calls below index
+    /// `receive_buffer` by an unchecked-by-the-type-system offset instead,
+    /// which is the same underlying hazard made explicit rather than hidden
+    /// behind a borrow that Rust cannot verify at this granularity.
     pub(crate) fn redistribute_ror(
         &self,
         send_buffer: &[u8],
@@ -135,7 +177,20 @@ impl<'a> Comm<'a> {
                 .count();
         let mut requests = Vec::with_capacity(request_count);
         for transfer in receives.iter().filter(|transfer| transfer.count != 0) {
+            // SAFETY: RSMPI_REQUEST_NULL is a plain MPI_Request bit pattern
+            // (an opaque handle value, not a pointer with aliasing
+            // invariants); reading the extern static is sound, and it is
+            // immediately overwritten by MPI_Irecv below.
             let mut request = unsafe { sys::RSMPI_REQUEST_NULL };
+            // SAFETY: the destination pointer is
+            // `receive_buffer.as_mut_ptr().add(transfer.displacement)`,
+            // in-bounds because `transfer.displacement + transfer.count <=
+            // receive_buffer.len()` was asserted above; it stays writable
+            // for `transfer.count` bytes (RSMPI_UINT8_T elements) until
+            // MPI_Waitall below observes completion, and `receive_buffer`
+            // is exclusively borrowed by this function for that whole
+            // span. `self.raw()` is a live communicator handle owned by
+            // `self`. `&mut request` is a valid, uniquely-owned out-pointer.
             unsafe {
                 check(sys::MPI_Irecv(
                     receive_buffer
@@ -153,7 +208,17 @@ impl<'a> Comm<'a> {
             requests.push(request);
         }
         for transfer in sends.iter().filter(|transfer| transfer.count != 0) {
+            // SAFETY: same opaque-handle argument as the receive branch
+            // above; overwritten by MPI_Isend below.
             let mut request = unsafe { sys::RSMPI_REQUEST_NULL };
+            // SAFETY: the source pointer is
+            // `send_buffer.as_ptr().add(transfer.displacement)`, in-bounds
+            // because `transfer.displacement + transfer.count <=
+            // send_buffer.len()` was asserted above; `send_buffer` is
+            // borrowed read-only for this whole call so the range stays
+            // valid for reads until MPI_Waitall observes completion.
+            // `self.raw()` is a live communicator handle and `&mut
+            // request` a valid, uniquely-owned out-pointer.
             unsafe {
                 check(sys::MPI_Isend(
                     send_buffer.as_ptr().add(transfer.displacement).cast(),
@@ -168,9 +233,18 @@ impl<'a> Comm<'a> {
             requests.push(request);
         }
         if !requests.is_empty() {
+            // SAFETY: MPI_Status is a #[repr(C)] POD struct of integer
+            // fields; the all-zero bit pattern is valid, and MPI_Waitall
+            // below fully overwrites each entry before it is read.
             let mut statuses: Vec<sys::MPI_Status> = (0..requests.len())
                 .map(|_| unsafe { std::mem::zeroed() })
                 .collect();
+            // SAFETY: `requests` holds exactly the outstanding handles
+            // pushed above, none completed or freed elsewhere; `statuses`
+            // has the same length; both pointers are valid and
+            // uniquely-owned buffers for the duration of this blocking
+            // call, which is the sole synchronization point that lets the
+            // receive/send buffer borrows above be released afterward.
             unsafe {
                 check(sys::MPI_Waitall(
                     requests.len().try_into().unwrap(),
@@ -222,9 +296,17 @@ impl<'a> Comm<'a> {
             A::Element::WIDTH.try_into().unwrap(),
             &u8::equivalent_datatype(),
         );
+        // SAFETY: `datatype` is UserDatatype::contiguous(WIDTH, u8), a
+        // padding-free view of WIDTH raw bytes per element; `input.len() ==
+        // values.len() * WIDTH` was asserted just above, so `count =
+        // values.len()` times the element extent never exceeds `input`'s
+        // bounds (rsmpi's `View` invariant).
         let input = unsafe {
             View::with_count_and_datatype(&input[..], values.len().try_into().unwrap(), &datatype)
         };
+        // SAFETY: same datatype/count as `input`; `output` was allocated as
+        // `vec![0u8; input.len().max(1)]`, i.e. at least `values.len() *
+        // WIDTH` bytes, covering every byte MPI will write.
         let mut output_view = unsafe {
             MutView::with_count_and_datatype(
                 &mut output[..],
@@ -238,6 +320,13 @@ impl<'a> Comm<'a> {
                 "nested MPI user reduction is not supported by MPI callbacks"
             );
             active.set((algebra as *const A).cast());
+            // SAFETY: `monoid_add::<A>` matches the UnsafeUserFunction ABI
+            // and only runs synchronously inside the collective started a
+            // few lines below, during which ACTIVE_ALGEBRA holds the `&A`
+            // set immediately above; `commutative` here is passed through
+            // unchanged from the caller-supplied flag, so this operation is
+            // registered as commutative only when the caller has asserted
+            // `algebra.add` actually is.
             let operation = unsafe {
                 if commutative {
                     UnsafeUserOperation::commutative(monoid_add::<A>)
@@ -290,6 +379,11 @@ impl<'a> Comm<'a> {
 
     pub(crate) fn close(mut self) {
         if let CommunicatorStorage::Split(communicator) = &mut self.communicator {
+            // SAFETY: `close` takes `self` by value and this is the only
+            // place `ManuallyDrop::drop` runs on this field, so the wrapped
+            // SimpleCommunicator is dropped (MPI_Comm_free'd) exactly once;
+            // `self` is discarded right after with nothing left that reads
+            // `communicator` again.
             unsafe {
                 ManuallyDrop::drop(communicator);
             }
@@ -308,9 +402,16 @@ impl<'a> Comm<'a> {
         }
         let mut output = vec![0.0; values.len().max(1)];
         let datatype = f64::equivalent_datatype();
+        // SAFETY: `datatype` is f64's own MPI-equivalent datatype, an exact
+        // padding-free mapping of the f64 layout; `input` was built by
+        // `values.to_vec()` (padded to at least one element above), so
+        // `count = values.len()` elements never exceed its bounds.
         let input = unsafe {
             View::with_count_and_datatype(&input[..], values.len().try_into().unwrap(), &datatype)
         };
+        // SAFETY: same datatype/count as `input`; `output` was allocated as
+        // `vec![0.0; values.len().max(1)]`, covering every element MPI will
+        // write.
         let mut output_view = unsafe {
             MutView::with_count_and_datatype(
                 &mut output[..],
@@ -336,7 +437,12 @@ impl<'a> Comm<'a> {
         if values.is_empty() {
             let mut output = [0.0];
             let datatype = f64::equivalent_datatype();
+            // SAFETY: `datatype` is f64's own MPI-equivalent datatype; count
+            // 0 trivially never exceeds the bounds of `input` (padded to one
+            // element above) or requires reading any of it.
             let input = unsafe { View::with_count_and_datatype(&input[..], 0, &datatype) };
+            // SAFETY: same zero-count argument; `output` holds one live
+            // f64, more than the zero elements described.
             let mut output =
                 unsafe { MutView::with_count_and_datatype(&mut output[..], 0, &datatype) };
             self.communicator()
@@ -356,7 +462,13 @@ impl<'a> Comm<'a> {
         let mut output = vec![0.0; output_len.max(1)];
         if values.is_empty() {
             let datatype = f64::equivalent_datatype();
+            // SAFETY: `datatype` is f64's own MPI-equivalent datatype;
+            // count 0 trivially never exceeds `input`'s bounds (padded to
+            // one element above).
             let input = unsafe { View::with_count_and_datatype(&input[..], 0, &datatype) };
+            // SAFETY: same zero-count argument; `output` holds
+            // `output_len.max(1)` live f64s, more than the zero elements
+            // described.
             let mut output_view =
                 unsafe { MutView::with_count_and_datatype(&mut output[..], 0, &datatype) };
             self.communicator()

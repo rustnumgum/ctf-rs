@@ -37,6 +37,10 @@ impl<'u> Context<'u> {
             "ctf requires at least MPI_THREAD_FUNNELED; provided {provided:?}"
         );
         let mut is_main = 0;
+        // SAFETY: MPI_Is_thread_main takes one out-parameter pointer to a
+        // live, uniquely-owned `int`; MPI is required to be initialized by
+        // the time a Context is built (it borrows an existing Universe), so
+        // the call is valid for the duration of this synchronous FFI call.
         let code = unsafe { ::mpi::ffi::MPI_Is_thread_main(&mut is_main) };
         assert_eq!(
             code, 0,

@@ -6,6 +6,10 @@ use crate::{
 };
 use std::ffi::c_char;
 
+// SAFETY: these signatures mirror the reference LAPACK/BLAS Fortran ABI
+// (trailing underscore, every scalar and array passed by pointer, column
+// major layout, no varargs); each call site below argues pointer validity
+// and buffer length against the caller's asserted matrix shape.
 #[cfg_attr(any(target_os = "windows", target_os = "macos"), link(name = "openblas"))]
 #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link(name = "blas"))]
 unsafe extern "C" {
@@ -137,6 +141,8 @@ unsafe extern "C" {
         lda: *const i32,
     );
 }
+// SAFETY: same Fortran-ABI argument as the BLAS block above; call sites
+// below argue buffer length and leading dimension per call.
 #[cfg_attr(any(target_os = "windows", target_os = "macos"), link(name = "openblas"))]
 #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link(name = "lapack"))]
 unsafe extern "C" {
@@ -211,6 +217,12 @@ pub(crate) fn qr_reduce(
     let mut tau = vec![0.; n];
     let mut query = [0.];
     let mut info = 0;
+    // SAFETY: `a` has exactly `m * n` elements (asserted above) matching
+    // leading dimension `mi = m` and `ni = n` columns; `tau` has `n`
+    // elements as dgeqrf_ requires. `lwork = -1` is LAPACK's workspace
+    // query mode: it only writes the optimal size into `query` (length 1)
+    // and does not otherwise read or write `work`. `info` is a valid,
+    // uniquely-owned out-pointer.
     unsafe {
         dgeqrf_(
             &mi,
@@ -225,6 +237,9 @@ pub(crate) fn qr_reduce(
     }
     result(info)?;
     let mut work = vec![0.; query[0] as usize];
+    // SAFETY: same `a`/`tau`/leading-dimension argument as the query call
+    // above; `work` was just allocated with `query[0]` elements, the size
+    // dgeqrf_ itself reported as sufficient for `lwork`.
     unsafe {
         dgeqrf_(
             &mi,
@@ -244,6 +259,11 @@ pub(crate) fn qr_reduce(
             r[i + j * n] = a[i + j * m];
         }
     }
+    // SAFETY: `a`/`tau` describe the Householder reflectors dgeqrf_ just
+    // produced above, with the same leading dimension; `b` has `m`
+    // elements (asserted above), matching the single right-hand-side
+    // column (`&1`) with leading dimension `mi`. `lwork = -1` is again a
+    // workspace query that only writes into `query` (length 1).
     unsafe {
         dormqr_(
             &(b'L' as c_char),
@@ -263,6 +283,9 @@ pub(crate) fn qr_reduce(
     }
     result(info)?;
     work.resize(query[0] as usize, 0.);
+    // SAFETY: same `a`/`tau`/`b` argument as the query call above; `work`
+    // was just resized to `query[0]` elements, the size dormqr_ reported
+    // as sufficient for `lwork`.
     unsafe {
         dormqr_(
             &(b'L' as c_char),
@@ -296,6 +319,12 @@ pub(crate) fn least_squares(m: usize, n: usize, a: &[f64], b: &[f64]) -> Result<
     let mut iquery = [0];
     let mut rank = 0;
     let mut info = 0;
+    // SAFETY: `a` has exactly `m * n` elements and `b` exactly `m`
+    // (asserted above), matching leading dimension `mi = m`, `ni = n`
+    // columns, and one right-hand-side column (`&1`); `s` has `n` elements
+    // as dgelsd_ requires. `lwork = -1` is LAPACK's workspace query mode:
+    // it only writes the optimal real and integer workspace sizes into
+    // `query`/`iquery` (each length 1) without otherwise touching them.
     unsafe {
         dgelsd_(
             &mi,
@@ -317,6 +346,9 @@ pub(crate) fn least_squares(m: usize, n: usize, a: &[f64], b: &[f64]) -> Result<
     result(info)?;
     let mut work = vec![0.; query[0] as usize];
     let mut iwork = vec![0; iquery[0] as usize];
+    // SAFETY: same `a`/`b`/`s` argument as the query call above; `work`
+    // and `iwork` were just allocated with `query[0]`/`iquery[0]`
+    // elements, the sizes dgelsd_ itself reported as sufficient.
     unsafe {
         dgelsd_(
             &mi,
@@ -372,6 +404,11 @@ fn validate_gemm<T>(g: &Gemm<'_, T>) {
 pub(crate) fn gemm(g: Gemm<'_, f64>) {
     validate_gemm(&g);
     crate::flop_counter::add_computed_flops(gemm_flops(g.m,g.n,g.k));
+    // SAFETY: validate_gemm asserted `g.a`/`g.b`/`g.c` each have at least
+    // `matrix_len(rows, cols, ld)` elements for the transpose-adjusted
+    // shape and leading dimension passed below, so dgemm_ never reads or
+    // writes past their bounds; `g` (and its borrowed slices) outlives
+    // this synchronous call.
     unsafe {
         dgemm_(
             &trans(g.trans_a),
@@ -395,6 +432,9 @@ macro_rules! gemm {
         pub(crate) fn $function(g: Gemm<'_, $scalar>) {
             validate_gemm(&g);
             crate::flop_counter::add_computed_flops(gemm_flops(g.m,g.n,g.k));
+            // SAFETY: same argument as the f64 `gemm` above: validate_gemm
+            // asserted every buffer is at least as long as its
+            // transpose-adjusted shape and leading dimension require.
             unsafe {
                 $native(
                     &trans(g.trans_a),
@@ -420,11 +460,18 @@ gemm!(gemm_c32, cgemm_, Complex<f32>);
 gemm!(gemm_c64, zgemm_, Complex<f64>);
 fn validate_syr<T>(s:&Syr<'_,T>){assert!(s.incx>0);let x=if s.n==0{0}else{1+(s.n-1)*s.incx as usize};assert!(s.x.len()>=x);assert!(s.a.len()>=matrix_len(s.n,s.n,s.lda));}
 fn uplo(value:Uplo)->c_char{match value{Uplo::Lower=>b'L' as c_char,Uplo::Upper=>b'U' as c_char}}
+// SAFETY: applies to the call inside the expansion below; validate_syr
+// asserted `s.x` has at least `1 + (n-1)*incx` elements and `s.a` at
+// least `matrix_len(n, n, lda)`, matching the count/stride/leading-
+// dimension arguments passed to the native `*syr_` call.
 macro_rules! syr {($function:ident,$native:ident,$scalar:ty)=>{pub(crate) fn $function(s:Syr<'_,$scalar>){validate_syr(&s);unsafe{$native(&uplo(s.uplo),&int(s.n),&s.alpha,s.x.as_ptr(),&s.incx,s.a.as_mut_ptr(),&int(s.lda));}}};}
 syr!(syr_f32,ssyr_,f32);syr!(syr,dsyr_,f64);syr!(syr_c32,csyr_,Complex<f32>);syr!(syr_c64,zsyr_,Complex<f64>);
 pub(crate) fn cholesky(n: usize, a: &mut [f64], lower: bool) -> Result<(), i32> {
     assert_eq!(a.len(), n * n);
     let mut info = 0;
+    // SAFETY: `a` has exactly `n * n` elements (asserted above), matching
+    // leading dimension `n.max(1)` for an `n`-by-`n` matrix; `info` is a
+    // valid, uniquely-owned out-pointer.
     unsafe {
         dpotrf_(
             &(if lower { b'L' } else { b'U' } as c_char),
@@ -447,6 +494,10 @@ pub(crate) fn qr(m: usize, n: usize, a: &[f64]) -> Result<(Vec<f64>, Vec<f64>), 
     let mut tau = vec![0.; k];
     let mut query = [0.];
     let mut info = 0;
+    // SAFETY: `q` was cloned from `a`, `m * n` elements (asserted above),
+    // matching leading dimension `lda = m.max(1)`; `tau` has `k = min(m,
+    // n)` elements as dgeqrf_ requires. `lwork = -1` is LAPACK's workspace
+    // query mode: it only writes the optimal size into `query` (length 1).
     unsafe {
         dgeqrf_(
             &mi,
@@ -462,6 +513,9 @@ pub(crate) fn qr(m: usize, n: usize, a: &[f64]) -> Result<(Vec<f64>, Vec<f64>), 
     result(info)?;
     let lwork = query[0] as i32;
     let mut work = vec![0.; lwork as usize];
+    // SAFETY: same `q`/`tau` argument as the query call above; `work` was
+    // just allocated with `lwork` elements, the size dgeqrf_ itself
+    // reported as sufficient.
     unsafe {
         dgeqrf_(
             &mi,
@@ -482,6 +536,10 @@ pub(crate) fn qr(m: usize, n: usize, a: &[f64]) -> Result<(Vec<f64>, Vec<f64>), 
         }
     }
     q.truncate(m * k);
+    // SAFETY: `q` still has `m * k` elements after the truncate above,
+    // matching leading dimension `lda` and `ki = k` reflectors/columns;
+    // `tau` has the `k` elements dgeqrf_ wrote above. `lwork = -1` is
+    // again a workspace query, writing only into `query` (length 1).
     unsafe {
         dorgqr_(
             &mi,
@@ -498,6 +556,9 @@ pub(crate) fn qr(m: usize, n: usize, a: &[f64]) -> Result<(Vec<f64>, Vec<f64>), 
     result(info)?;
     let lwork = query[0] as i32;
     work.resize(lwork as usize, 0.);
+    // SAFETY: same `q`/`tau` argument as the query call above; `work` was
+    // just resized to `lwork` elements, the size dorgqr_ reported as
+    // sufficient.
     unsafe {
         dorgqr_(
             &mi,
@@ -528,6 +589,13 @@ pub(crate) fn svd(m: usize, n: usize, a: &[f64]) -> Result<Svd, i32> {
     let mut query = [0.];
     let mut info = 0;
     let job = b'S' as c_char;
+    // SAFETY: `a` has `m * n` elements (asserted above) with leading
+    // dimension `lda = m.max(1)`; `u` has `m * k` and `vt` has `k * n`
+    // elements (`job = 'S'` writes the reduced `k = min(m, n)` singular
+    // vectors), with leading dimensions `lda`/`ldvt` matching their
+    // allocated row counts; `values` has the `k` elements dgesvd_ needs
+    // for the singular values. `lwork = -1` is a workspace query, writing
+    // only into `query` (length 1).
     unsafe {
         dgesvd_(
             &job,
@@ -549,6 +617,9 @@ pub(crate) fn svd(m: usize, n: usize, a: &[f64]) -> Result<Svd, i32> {
     result(info)?;
     let lwork = query[0] as i32;
     let mut work = vec![0.; lwork as usize];
+    // SAFETY: same argument as the query call above; `work` was just
+    // allocated with `lwork` elements, the size dgesvd_ reported as
+    // sufficient.
     unsafe {
         dgesvd_(
             &job,
@@ -580,6 +651,10 @@ pub(crate) fn eigh(n: usize, a: &[f64]) -> Result<(Vec<f64>, Vec<f64>), i32> {
     let lda = int(n.max(1));
     let job = b'V' as c_char;
     let uplo = b'U' as c_char;
+    // SAFETY: `vectors` was cloned from `a`, `n * n` elements (asserted
+    // above), matching leading dimension `lda = n.max(1)`; `values` has
+    // the `n` elements dsyev_ needs for the eigenvalues. `lwork = -1` is
+    // a workspace query, writing only into `query` (length 1).
     unsafe {
         dsyev_(
             &job,
@@ -596,6 +671,9 @@ pub(crate) fn eigh(n: usize, a: &[f64]) -> Result<(Vec<f64>, Vec<f64>), i32> {
     result(info)?;
     let lwork = query[0] as i32;
     let mut work = vec![0.; lwork as usize];
+    // SAFETY: same `vectors`/`values` argument as the query call above;
+    // `work` was just allocated with `lwork` elements, the size dsyev_
+    // reported as sufficient.
     unsafe {
         dsyev_(
             &job,

@@ -7,6 +7,12 @@ use crate::algebra::Complex;
 use ::mpi::{ffi as sys, topology::Communicator};
 use std::{ffi::c_char, marker::PhantomData, rc::Rc};
 
+// SAFETY: these signatures mirror the reference BLACS/ScaLAPACK Fortran
+// ABI (trailing underscore for the ScaLAPACK routines, every scalar and
+// array passed by pointer, column-major local blocks addressed through
+// the array descriptor DESC); call sites below argue buffer length
+// through validate_matrix/numroc against DESC and workspace sizes
+// through the standard LWORK=-1 query pattern.
 #[cfg_attr(any(target_os = "windows", target_os = "macos"), link(name = "scalapack"))]
 #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link(name = "scalapack-openmpi"))]
 unsafe extern "C" {
@@ -169,6 +175,9 @@ macro_rules! typed_spd_family {
         $solve_tri:ident,
         $one:expr
     ) => {
+        // SAFETY: same Fortran-ABI argument as the top extern block;
+        // declares the $potrf/$posv/$trsm entry points for this
+        // instantiation's scalar type.
         unsafe extern "C" {
             fn $potrf(
                 uplo: *const c_char,
@@ -226,6 +235,13 @@ macro_rules! typed_spd_family {
                 let uplo = if lower { b'L' } else { b'U' } as c_char;
                 let one = 1;
                 let mut info = 0;
+                // SAFETY: validate_matrix (above) asserted `a` holds at
+                // least the local block-cyclic elements `desc` describes
+                // for this Grid (via numroc), and `n <= desc[2..=3]`
+                // keeps the requested n-by-n submatrix within the
+                // described global matrix; `ia = ja = 1` (`one`)
+                // addresses it from the top-left corner. `desc` has the
+                // required 9 entries; `info` is a valid out-pointer.
                 unsafe {
                     $potrf(
                         &uplo,
@@ -257,6 +273,11 @@ macro_rules! typed_spd_family {
                 let uplo = b'L' as c_char;
                 let one = 1;
                 let mut info = 0;
+                // SAFETY: validate_matrix asserted `a`/`b` each hold at
+                // least the local elements `desc_a`/`desc_b` describe;
+                // `n <= desc_a[2..=3]`, `n <= desc_b[2]`, `nrhs <=
+                // desc_b[3]` keep the requested shapes within the
+                // described matrices; `one` addresses both from (1, 1).
                 unsafe {
                     $posv(
                         &uplo,
@@ -301,6 +322,12 @@ macro_rules! typed_spd_family {
                 let (m, n) = (int(m), int(n));
                 let one = 1;
                 let alpha: $scalar = $one;
+                // SAFETY: validate_matrix asserted `factor`/`b` each hold
+                // at least the local elements `desc_factor`/`desc_b`
+                // describe; the asserts above keep the operand order
+                // (`factor_order`) and the `m`-by-`n` right-hand side
+                // within those descriptors; `one` addresses both from
+                // (1, 1).
                 unsafe {
                     $trsm(
                         &side,
@@ -365,6 +392,9 @@ macro_rules! typed_qr_family {
         $zero:expr,
         $query_len:expr
     ) => {
+        // SAFETY: same Fortran-ABI argument as the top extern block;
+        // declares the $geqrf/$generate_q entry points for this
+        // instantiation's scalar type.
         unsafe extern "C" {
             fn $geqrf(
                 m: *const i32,
@@ -419,6 +449,13 @@ macro_rules! typed_qr_family {
                 let query = -1;
                 let mut work_query = [$zero];
                 let mut info = 0;
+                // SAFETY: validate_matrix asserted `q` (cloned from `a`)
+                // holds at least the local elements `desc` describes, and
+                // `m <= desc[2]`, `n <= desc[3]` keep the requested shape
+                // within it; `tau` was sized by `numroc` to the local
+                // reflector count `desc` implies. `query = -1` is the
+                // ScaLAPACK workspace query: it only writes the optimal
+                // size into `work_query` (length 1).
                 unsafe {
                     $geqrf(
                         &m,
@@ -437,6 +474,9 @@ macro_rules! typed_qr_family {
 
                 let lwork = int(($query_len)(work_query[0]));
                 let mut work = vec![$zero; lwork as usize];
+                // SAFETY: same `q`/`tau`/`desc` argument as the query
+                // call above; `work` was just allocated with `lwork`
+                // elements, the size $geqrf reported as sufficient.
                 unsafe {
                     $geqrf(
                         &m,
@@ -455,6 +495,10 @@ macro_rules! typed_qr_family {
 
                 let r = q.clone();
                 work_query[0] = $zero;
+                // SAFETY: `q` still holds the reflectors $geqrf produced
+                // above with the same `desc`; `tau` holds the same
+                // reflector scalars. `query = -1` is again a workspace
+                // query, writing only into `work_query` (length 1).
                 unsafe {
                     $generate_q(
                         &m,
@@ -474,6 +518,9 @@ macro_rules! typed_qr_family {
 
                 let lwork = int(($query_len)(work_query[0]));
                 let mut work = vec![$zero; lwork as usize];
+                // SAFETY: same `q`/`tau`/`desc` argument as the query
+                // call above; `work` was just allocated with `lwork`
+                // elements, the size $generate_q reported as sufficient.
                 unsafe {
                     $generate_q(
                         &m,
@@ -516,6 +563,9 @@ typed_qr_family!(
 
 macro_rules! real_svd_family {
     ($scalar:ty, $gesvd:ident, $svd:ident, $zero:expr, $query_len:expr) => {
+        // SAFETY: same Fortran-ABI argument as the top extern block;
+        // declares the $gesvd entry point for this instantiation's real
+        // scalar type.
         unsafe extern "C" {
             fn $gesvd(
                 job_u: *const c_char,
@@ -570,6 +620,13 @@ macro_rules! real_svd_family {
                 let query = -1;
                 let mut work_query = [$zero];
                 let mut info = 0;
+                // SAFETY: validate_matrix asserted `a`/`u`/`vt` each hold
+                // at least the local elements their descriptors describe,
+                // and the asserts above keep `m`/`n`/`k = min(m, n)`
+                // within `desc_a`/`desc_u`/`desc_vt`; `s` has the `k`
+                // elements $gesvd needs for the singular values. `query =
+                // -1` is a workspace query, writing only into
+                // `work_query` (length 1).
                 unsafe {
                     $gesvd(
                         &vectors,
@@ -598,6 +655,9 @@ macro_rules! real_svd_family {
 
                 let lwork = int(($query_len)(work_query[0]));
                 let mut work = vec![$zero; lwork as usize];
+                // SAFETY: same argument as the query call above; `work`
+                // was just allocated with `lwork` elements, the size
+                // $gesvd reported as sufficient.
                 unsafe {
                     $gesvd(
                         &vectors,
@@ -637,6 +697,9 @@ macro_rules! complex_svd_family {
         $scalar_zero:expr,
         $real_zero:expr
     ) => {
+        // SAFETY: same Fortran-ABI argument as the top extern block;
+        // declares the $gesvd entry point for this instantiation's
+        // complex scalar type, with its extra real RWORK argument.
         unsafe extern "C" {
             fn $gesvd(
                 job_u: *const c_char,
@@ -693,6 +756,14 @@ macro_rules! complex_svd_family {
                 let query = -1;
                 let mut work_query = [$scalar_zero];
                 let mut info = 0;
+                // SAFETY: validate_matrix asserted `a`/`u`/`vt` each hold
+                // at least the local elements their descriptors describe,
+                // and the asserts above keep `m`/`n`/`k = min(m, n)`
+                // within `desc_a`/`desc_u`/`desc_vt`; `s` has `k`
+                // elements and `rwork` has `4 * max(m, n) + 1`, the sizes
+                // $gesvd needs for the singular values and real
+                // workspace. `query = -1` is a workspace query, writing
+                // only into `work_query` (length 1).
                 unsafe {
                     $gesvd(
                         &vectors,
@@ -722,6 +793,11 @@ macro_rules! complex_svd_family {
 
                 let lwork = int(work_query[0].re as usize);
                 let mut work = vec![$scalar_zero; lwork as usize];
+                // SAFETY: same argument as the query call above; `work`
+                // was just allocated with `lwork` elements, the complex
+                // workspace size $gesvd reported as sufficient (`rwork`
+                // was already sized fully above, LWORK=-1 queries only
+                // the complex workspace here).
                 unsafe {
                     $gesvd(
                         &vectors,
@@ -777,6 +853,9 @@ complex_svd_family!(
 
 macro_rules! real_eigh_family {
     ($scalar:ty, $syevx:ident, $eigh:ident, $zero:expr, $query_len:expr) => {
+        // SAFETY: same Fortran-ABI argument as the top extern block;
+        // declares the $syevx entry point for this instantiation's real
+        // scalar type.
         unsafe extern "C" {
             fn $syevx(
                 job_z: *const c_char,
@@ -835,6 +914,15 @@ macro_rules! real_eigh_family {
                 let mut work_query = [$zero];
                 let mut iwork_query = [0];
                 let mut info = 0;
+                // SAFETY: `range = 'A'` (all eigenvalues) with `job_z =
+                // 'V'` makes this call ScaLAPACK's documented workspace
+                // query; the `a`/`z` null pointers are not dereferenced
+                // in that mode (only `M`/`NZ`/`WORK`/`IWORK` are written),
+                // and `desc` (validated for `a` and `vectors` by
+                // validate_matrix above, with `n <= desc[2..=3]`) is only
+                // read for its dimensions. `work_query`/`iwork_query`
+                // (length 1 each) receive the optimal sizes; `info` is a
+                // valid out-pointer.
                 unsafe {
                     $syevx(
                         &job_z,
@@ -880,6 +968,13 @@ macro_rules! real_eigh_family {
                 let mut gap = vec![$zero; processes];
                 let mut matrix = a.to_vec();
                 let mut eigenvalues = vec![$zero; n as usize];
+                // SAFETY: `matrix` (cloned from `a`) and `vectors` each
+                // hold at least the local elements `desc` describes
+                // (validate_matrix above); `eigenvalues`/`ifail` have `n`
+                // elements, `iclustr` has `2 * processes`, `gap` has
+                // `processes`, all sized as $syevx's documented ranges
+                // over eigenvalues/clusters/process grid entries; `work`/
+                // `iwork` were sized from the query above.
                 unsafe {
                     $syevx(
                         &job_z,
@@ -931,6 +1026,9 @@ macro_rules! complex_eigh_family {
         $scalar_zero:expr,
         $real_zero:expr
     ) => {
+        // SAFETY: same Fortran-ABI argument as the top extern block;
+        // declares the $heevx entry point for this instantiation's
+        // complex scalar type, with its extra real RWORK argument.
         unsafe extern "C" {
             fn $heevx(
                 job_z: *const c_char,
@@ -992,6 +1090,14 @@ macro_rules! complex_eigh_family {
                 let mut rwork_query = [$real_zero];
                 let mut iwork_query = [0];
                 let mut info = 0;
+                // SAFETY: `range = 'A'` with `job_z = 'V'` makes this
+                // call ScaLAPACK's documented workspace query; the `a`/
+                // `z` null pointers are not dereferenced in that mode,
+                // and `desc` (validated for `a` and `vectors` by
+                // validate_matrix above, with `n <= desc[2..=3]`) is only
+                // read for its dimensions. `work_query`/`rwork_query`/
+                // `iwork_query` (length 1 each) receive the optimal
+                // sizes; `info` is a valid out-pointer.
                 unsafe {
                     $heevx(
                         &job_z,
@@ -1043,6 +1149,14 @@ macro_rules! complex_eigh_family {
                 let mut gap = vec![$real_zero; processes];
                 let mut matrix = a.to_vec();
                 let mut eigenvalues = vec![$real_zero; n as usize];
+                // SAFETY: `matrix` (cloned from `a`) and `vectors` each
+                // hold at least the local elements `desc` describes
+                // (validate_matrix above); `eigenvalues`/`ifail` have `n`
+                // elements, `iclustr` has `2 * processes`, `gap` has
+                // `processes`, all sized as $heevx's documented ranges;
+                // `work`/`rwork`/`iwork` were sized from the query above
+                // (note the comment above `lrwork` on the real workspace
+                // size differing from the complex LWORK).
                 unsafe {
                     $heevx(
                         &job_z,
@@ -1132,14 +1246,24 @@ impl Grid {
         let rank = comm.rank();
         assert_eq!(processes, usize::try_from(size).unwrap());
 
+        // SAFETY: `comm.as_raw()` is a live MPI_Comm handle for the
+        // duration of this call, owned by the caller's `comm`;
+        // Csys2blacs_handle only reads it and returns an opaque BLACS
+        // system-context integer.
         let system_context = unsafe { Csys2blacs_handle(comm.as_raw()) };
         let mut context = system_context;
         let order = b'C' as c_char;
+        // SAFETY: `system_context` (now `context`) is the live handle
+        // just obtained above; `&mut context` is a valid, uniquely-owned
+        // out-pointer BLACS overwrites with the new grid context.
         unsafe {
             Cblacs_gridinit(&mut context, &order, int(rows), int(cols));
         }
 
         let (mut actual_rows, mut actual_cols, mut row, mut col) = (0, 0, 0, 0);
+        // SAFETY: `context` is the live grid context Cblacs_gridinit just
+        // produced above; the four out-pointers are valid and
+        // uniquely-owned local `i32`s.
         unsafe {
             Cblacs_gridinfo(
                 context,
@@ -1178,6 +1302,10 @@ impl Grid {
         let source = 0;
         let mut desc = [0; 9];
         let mut info = 0;
+        // SAFETY: `desc.as_mut_ptr()` points to the 9-element array
+        // descinit_ writes, exactly the length ScaLAPACK's DESC layout
+        // requires; `self.context` is this Grid's live BLACS context;
+        // `info` is a valid out-pointer.
         unsafe {
             descinit_(
                 desc.as_mut_ptr(),
@@ -1208,6 +1336,10 @@ impl Grid {
         let uplo = if lower { b'L' } else { b'U' } as c_char;
         let one = 1;
         let mut info = 0;
+        // SAFETY: validate_matrix (above) asserted `a` holds at least
+        // the local elements `desc` describes for this Grid, and `n <=
+        // desc[2..=3]` keeps the requested n-by-n submatrix within it;
+        // `one` addresses it from (1, 1). `info` is a valid out-pointer.
         unsafe {
             pdpotrf_(
                 &uplo,
@@ -1240,6 +1372,10 @@ impl Grid {
         let uplo = b'L' as c_char;
         let one = 1;
         let mut info = 0;
+        // SAFETY: validate_matrix asserted `a`/`b` each hold at least the
+        // local elements `desc_a`/`desc_b` describe; the asserts above
+        // keep the requested `n`/`nrhs` within those descriptors; `one`
+        // addresses both from (1, 1).
         unsafe {
             pdposv_(
                 &uplo,
@@ -1282,6 +1418,13 @@ impl Grid {
         let mut work_query = [0.0];
         let mut iwork_query = [0];
         let mut info = 0;
+        // SAFETY: `range = 'A'` with `job_z = 'V'` makes this call
+        // ScaLAPACK's documented workspace query; the `a`/`z` null
+        // pointers are not dereferenced in that mode, and `desc`
+        // (validated for `a` and `vectors` by validate_matrix above,
+        // with `n <= desc[2..=3]`) is only read for its dimensions.
+        // `work_query`/`iwork_query` (length 1 each) receive the optimal
+        // sizes; `info` is a valid out-pointer.
         unsafe {
             pdsyevx_(
                 &job_z,
@@ -1327,6 +1470,12 @@ impl Grid {
         let mut gap = vec![0.0; processes];
         let mut matrix = a.to_vec();
         let mut eigenvalues = vec![0.0; n as usize];
+        // SAFETY: `matrix` (cloned from `a`) and `vectors` each hold at
+        // least the local elements `desc` describes (validate_matrix
+        // above); `eigenvalues`/`ifail` have `n` elements, `iclustr` has
+        // `2 * processes`, `gap` has `processes`, all sized as
+        // pdsyevx_'s documented ranges; `work`/`iwork` were sized from
+        // the query above.
         unsafe {
             pdsyevx_(
                 &job_z,
@@ -1391,6 +1540,12 @@ impl Grid {
         let query = -1;
         let mut work_query = [0.0];
         let mut info = 0;
+        // SAFETY: validate_matrix asserted `q` (cloned from `a`) holds
+        // at least the local elements `desc` describes, and `m <=
+        // desc[2]`, `n <= desc[3]` keep the requested shape within it;
+        // `tau` was sized by `numroc` to the local reflector count
+        // `desc` implies. `query = -1` is the ScaLAPACK workspace query:
+        // it only writes the optimal size into `work_query` (length 1).
         unsafe {
             pdgeqrf_(
                 &m,
@@ -1409,6 +1564,9 @@ impl Grid {
 
         let lwork = int(work_query[0] as usize);
         let mut work = vec![0.0; lwork as usize];
+        // SAFETY: same `q`/`tau`/`desc` argument as the query call
+        // above; `work` was just allocated with `lwork` elements, the
+        // size pdgeqrf_ reported as sufficient.
         unsafe {
             pdgeqrf_(
                 &m,
@@ -1427,6 +1585,10 @@ impl Grid {
 
         let r = q.clone();
         work_query[0] = 0.0;
+        // SAFETY: `q` still holds the reflectors pdgeqrf_ produced above
+        // with the same `desc`; `tau` holds the same reflector scalars.
+        // `query = -1` is again a workspace query, writing only into
+        // `work_query` (length 1).
         unsafe {
             pdorgqr_(
                 &m,
@@ -1446,6 +1608,9 @@ impl Grid {
 
         let lwork = int(work_query[0] as usize);
         let mut work = vec![0.0; lwork as usize];
+        // SAFETY: same `q`/`tau`/`desc` argument as the query call
+        // above; `work` was just allocated with `lwork` elements, the
+        // size pdorgqr_ reported as sufficient.
         unsafe {
             pdorgqr_(
                 &m,
@@ -1492,6 +1657,12 @@ impl Grid {
         let query = -1;
         let mut work_query = [0.0];
         let mut info = 0;
+        // SAFETY: validate_matrix asserted `a`/`u`/`vt` each hold at
+        // least the local elements their descriptors describe, and the
+        // asserts above keep `m`/`n`/`k = min(m, n)` within
+        // `desc_a`/`desc_u`/`desc_vt`; `s` has the `k` elements pdgesvd_
+        // needs for the singular values. `query = -1` is a workspace
+        // query, writing only into `work_query` (length 1).
         unsafe {
             pdgesvd_(
                 &vectors,
@@ -1520,6 +1691,9 @@ impl Grid {
 
         let lwork = int(work_query[0] as usize);
         let mut work = vec![0.0; lwork as usize];
+        // SAFETY: same argument as the query call above; `work` was
+        // just allocated with `lwork` elements, the size pdgesvd_
+        // reported as sufficient.
         unsafe {
             pdgesvd_(
                 &vectors,
@@ -1573,6 +1747,11 @@ impl Grid {
         let (m, n) = (int(m), int(n));
         let one = 1;
         let alpha = 1.0;
+        // SAFETY: validate_matrix asserted `factor`/`b` each hold at
+        // least the local elements `desc_factor`/`desc_b` describe; the
+        // asserts above keep the operand order (`factor_order`) and the
+        // `m`-by-`n` right-hand side within those descriptors; `one`
+        // addresses both from (1, 1).
         unsafe {
             pdtrsm_(
                 &side,
@@ -1595,6 +1774,11 @@ impl Grid {
     }
 
     pub(crate) fn close(self) {
+        // SAFETY: `self` is consumed by value, so `self.context` and
+        // `self.system_context` are freed exactly once here and nothing
+        // in this Grid observes them afterward; both are the live
+        // handles this Grid obtained in `new`, freed in the reverse
+        // order they were acquired.
         unsafe {
             Cblacs_gridexit(self.context);
             Cfree_blacs_system_handle(self.system_context);
