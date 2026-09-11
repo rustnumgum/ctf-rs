@@ -10,7 +10,9 @@ hardware, and node-aware grid selection receives an explicit node count.
 Rust's explicit ranks_per_node selection input preserves this boundary.
 Context::split_shared is available for callers that want MPI shared-memory
 groups, but automatic hardware discovery is not a missing pinned CPU routine
-to invent as part of this port. Sparse node-aware integration remains pending.
+to invent as part of this port. Sparse node-aware execution is not a working
+capability of the pinned source revision, not a pending Rust port item; see
+`docs/source-node-aware-boundary.md`.
 
 Reference: cc4s CTF f69cbb46e23bc2f39cda5722ce096f56301dab4f.
 
@@ -276,7 +278,8 @@ Drivers explicitly own catalogs, Models and memory options; old direct-key
 sum APIs do not silently construct defaults. Cache signatures omit values and
 nonzero counts; a miss is collective and a structural hit reuses the plan.
 Sparse folding and sparse-output replication rejection remain source rules.
-Acceptance and the source-restricted HANDOFF cases are in `validation.md`.
+Acceptance is in `validation.md`, section "S1d and S1 close"; no HANDOFF
+case remains open in this area.
 
 ## Typed native BLAS boundary
 
