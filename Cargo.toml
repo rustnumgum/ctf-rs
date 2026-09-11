@@ -1066,3 +1066,23 @@ harness = false
 name = "distributed_sparse_search"
 path = "tests/distributed_sparse_search.rs"
 harness = false
+
+[[test]]
+name = "upstream_block_sparse"
+path = "tests/upstream/examples/block_sparse.rs"
+harness = false
+
+[[test]]
+name = "upstream_force_integration_sparse"
+path = "tests/upstream/examples/force_integration_sparse.rs"
+harness = false
+
+[[test]]
+name = "upstream_btwn_central"
+path = "tests/upstream/examples/btwn_central.rs"
+harness = false
+
+[[test]]
+name = "sparse_sy"
+path = "tests/upstream/python/sparse_sy.rs"
+harness = false

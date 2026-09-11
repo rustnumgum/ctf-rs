@@ -178,6 +178,26 @@ S1b/S1c continue; their GEMM-shaped drivers do not require sparse ABC weigh
 support, but custom folded work uses the repaired layout metadata. Final
 native execution still includes all thirteen S1 drivers/semantics.
 
+## S1b compressed-symmetry and custom sparse kernels
+
+### Fixed acceptance contract
+
+Class R, pinned f69cbb46, WSL 1/2/4 once for each driver, then native
+compile/link once. Source fixture/metric rules below are fixed before runs.
+No S1a passing numerical check is repeated under this batch.
+
+| Driver | Fixture and reference | Q / unchanged bound |
+|---|---|---|
+| upstream_block_sparse | source n=7, r=10, matrix of distributed Tensor blocks, source flattening and dense flattened product | difference norm2 <= 1e-4 |
+| upstream_force_integration_sparse | bounded n=5, source Drand48 particles, AS forces, cutoff .708, F2=F+F and two inverse applications | some dx/dy changes >1e-6 initially; every dx/dy restored within 1e-6 |
+| upstream_btwn_central | n=6, sp=.2, bsize=2, test=1, sparse B/C, all three batches; fast Bellman/Brandes versus source naive dense closure | difference norm2 <= n*1e-6 = 6e-6 |
+| sparse_sy | six exact source shapes/symmetries, fill_random(1,1), sparsify(0), X/Y, X-Y/0, vecnorm(X)/vecnorm(Y) | each source sum(abs(diff)) < 1e-14 |
+
+`block_sparse` is the S1a-to-S1b move in evt-1006, not a dropped driver.
+The source force-key transpose and duplicate AS canonical additions are
+preserved. Sparse SY conversions keep canonical primary sparse entries;
+neither planned force accumulation nor custom contraction gathers an operand.
+
 ## rsmpi binding
 
 ### CTF-R1-4 direct replica restoration (2026-09-09)
