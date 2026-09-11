@@ -1,131 +1,199 @@
 #!/usr/bin/env bash
+# ctf-rs acceptance run (Linux/WSL, and macOS for local smoke runs).
+#
+# Reads scripts/acceptance-targets.tsv (checked by scripts/check-targets.sh)
+# for the set of gating cargo test targets, builds every needed test binary
+# once, then runs each one, recording a per-target RUN_EXIT line and log so
+# a failure partway through does not void the evidence of everything that
+# ran after it (audit findings E1, E2, E4, E5). mpi targets run the built
+# executable directly under `mpirun`, bypassing Cargo's per-host-triple
+# runner variable, so this script does not hard-code a target triple and
+# runs unchanged on Linux, WSL, and macOS. lib and local targets run through
+# `cargo test --no-fail-fast` instead, since Cargo already resolves those
+# for the host without a runner override.
+#
+# Env overrides:
+#   CTF_ACCEPTANCE_LOG_DIR   log directory (default: a timestamped dir under
+#                            $HOME/.cache/ctf-rs-acceptance)
+#   CTF_ACCEPTANCE_ONLY      space-separated target names to restrict to
+#                            (smoke runs); default is every manifest target
+#   CTF_ACCEPTANCE_RANKS     space-separated rank counts to use for every
+#                            mpi target, overriding the manifest's per-target
+#                            ranks column (default: the manifest's ranks)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export CARGO_TARGET_DIR="$HOME/.cache/ctf-rs-target"
+
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$HOME/.cache/ctf-rs-target}"
 export OPENBLAS_NUM_THREADS=1
 
-# Run in Linux, not as an interpolated PowerShell command string.
-# Each required rank configuration runs once; failed commands stop the set.
-mpi_tests=(foundation dense_views replicated_sum tensor_sum custom_reduce algebra_sum
-  complex_scalar sum_remap replicated_contraction ctr_2d tensor_gemm
-  algebra_contraction tensor_contract contract_remap dense_semantics upstream_dense subcomm_dense plan_cache model_training selector selection_objective tensor_blas_fold upstream_gemm4d distributed_matrix distributed_qr_svd distributed_svd_paths distributed_eigh distributed_spd distributed_tttp distributed_mttkrp distributed_tensor_svd distributed_solve_factor distributed_sparse_io distributed_sparse_sum distributed_sparse_gemm distributed_sparse_fold upstream_sparse_mp3 distributed_sparse_transform distributed_dense_sparse upstream_sparse_mp3_t distributed_sparse_diagonal)
-mpi_tests+=(upstream_fast_3mm upstream_fast_diagram upstream_fast_sym_4d upstream_fast_sym)
-mpi_tests+=(upstream_fast_as_as_sy_tensor_ctr upstream_fast_sy_as_as_tensor_ctr upstream_fast_tensor_ctr)
-mpi_tests+=(d4_memcontrol d4_timer_util d4_blas_flops)
-mpi_tests+=(d5_common d5_value_interfaces d5_algebra_interfaces)
-mpi_tests+=(upstream_fft_with_idx_partition upstream_fft upstream_dft_3d)
-mpi_tests+=(upstream_test_suite_dense upstream_matmul upstream_recursive_matmul)
-mpi_tests+=(upstream_ccsd upstream_ao_mo_transf upstream_neural_network)
-mpi_tests+=(upstream_bitonic_sort upstream_checkpoint upstream_force_integration)
-mpi_tests+=(upstream_particle_interaction upstream_qinformatics upstream_mttkrp)
-args=()
-mpi_tests+=(distributed_symmetric_io)
-mpi_tests+=(distributed_symmetric_operations)
-mpi_tests+=(distributed_symmetric_repack)
-mpi_tests+=(distributed_packed_sum)
-mpi_tests+=(distributed_packed_contraction)
-mpi_tests+=(distributed_canonical_sum)
-mpi_tests+=(distributed_hollow_sum)
-mpi_tests+=(distributed_symmetric_diagonal)
-mpi_tests+=(distributed_sy_sum)
-mpi_tests+=(distributed_sy_scalars)
-mpi_tests+=(distributed_canonical_contraction)
-mpi_tests+=(distributed_symmetric_contraction)
-mpi_tests+=(upstream_diag_sym)
-mpi_tests+=(distributed_cross_diagonal)
-mpi_tests+=(upstream_diag_ctr upstream_sy_times_ns upstream_multi_tsr_sym)
-mpi_tests+=(upstream_reduce_bcast)
-mpi_tests+=(distributed_sparse_multilinear)
-mpi_tests+=(distributed_sparse_solve_factor)
-mpi_tests+=(distributed_sparse_input_reduction)
-mpi_tests+=(distributed_sparse_general)
-mpi_tests+=(distributed_sparse_function)
-mpi_tests+=(distributed_sparse_gemm_function)
-mpi_tests+=(distributed_sparse_function_output)
-mpi_tests+=(distributed_sparse_fold_function)
-mpi_tests+=(upstream_bivar_function distributed_dense_function)
-mpi_tests+=(upstream_univar_function upstream_endomorphism upstream_bivar_transform)
-mpi_tests+=(upstream_endomorphism_cust upstream_endomorphism_cust_sp)
-mpi_tests+=(distributed_exhaustive_mapping)
-mpi_tests+=(distributed_normal_mapping)
-mpi_tests+=(selected_mapping)
-mpi_tests+=(dense_search)
-mpi_tests+=(dense_execution)
-mpi_tests+=(dense_execution_algebra)
-mpi_tests+=(dense_folded_execution)
-mpi_tests+=(distributed_node_fold)
-mpi_tests+=(dense_low_memory)
-mpi_tests+=(typed_folded_execution)
-mpi_tests+=(typed_matrix_factors)
-mpi_tests+=(typed_distributed_qr)
-mpi_tests+=(typed_distributed_svd)
-mpi_tests+=(typed_svd_truncation)
-mpi_tests+=(randomized_guess)
-mpi_tests+=(distributed_random_fill)
-mpi_tests+=(typed_grid_blas typed_randomized_svd)
-mpi_tests+=(typed_distributed_eigh typed_tensor_svd)
-mpi_tests+=(typed_multilinear)
-mpi_tests+=(tttp_memory)
-mpi_tests+=(tensor_norms)
-mpi_tests+=(storage_conversion sparse_random_fill)
-mpi_tests+=(subworld_transfer)
-mpi_tests+=(sparse_text_io)
-mpi_tests+=(symmetric_norms symmetric_text_io)
-mpi_tests+=(pair_read)
-mpi_tests+=(binary_io)
-mpi_tests+=(schedule)
-mpi_tests+=(cyclic_reshuffle)
-mpi_tests+=(bool_norm)
-mpi_tests+=(symmetric_reshuffle)
-mpi_tests+=(symmetric_subworld)
-mpi_tests+=(upstream_subworld_gemm upstream_readall upstream_readwrite upstream_sptensor_sum)
-mpi_tests+=(upstream_permute_multiworld)
-mpi_tests+=(indexed_write_order)
-mpi_tests+=(symmetric_permuted_io)
-mpi_tests+=(sparse_permuted_io)
-mpi_tests+=(upstream_scalar upstream_speye)
-mpi_tests+=(upstream_ccsdt_map upstream_ccsdt_t3_to_t2)
-mpi_tests+=(symmetric_random)
-mpi_tests+=(upstream_weigh4d upstream_dft distributed_symmetric_function)
-mpi_tests+=(integer_random)
-mpi_tests+=(distributed_sparse_dense_output)
-mpi_tests+=(distributed_sparse_storage_dispatch)
-mpi_tests+=(upstream_spmv)
-mpi_tests+=(distributed_sparse_reduce)
-mpi_tests+=(distributed_sparse_replicate)
-mpi_tests+=(upstream_scan)
-mpi_tests+=(distributed_sparse_2d upstream_trace)
-mpi_tests+=(distributed_sparse_2d_dense)
-mpi_tests+=(distributed_sparse_2d_pairs)
-mpi_tests+=(distributed_coo_2d)
-mpi_tests+=(upstream_sssp)
-mpi_tests+=(distributed_mixed_coo)
-mpi_tests+=(upstream_strassen)
-mpi_tests+=(distributed_sparse_plan upstream_spectral_element)
-mpi_tests+=(upstream_jacobi)
-mpi_tests+=(upstream_hosvd)
-mpi_tests+=(distributed_sparse_raw distributed_sparse_search)
-for test in "${mpi_tests[@]}"; do args+=(--test "$test"); done
-for ranks in 1 2 4; do
-  CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n $ranks" \
-    cargo test "${args[@]}"
+manifest="scripts/acceptance-targets.tsv"
+bash scripts/check-targets.sh
+
+mpirun_bin="$(command -v mpirun || true)"
+if [[ -z "$mpirun_bin" ]]; then
+  echo "acceptance-wsl: mpirun not found on PATH" >&2
+  exit 1
+fi
+
+timeout_bin="$(command -v timeout || command -v gtimeout || true)"
+if [[ -z "$timeout_bin" ]]; then
+  echo "acceptance-wsl: warning: no 'timeout'/'gtimeout' on PATH, running mpi targets without a wall-clock cap" >&2
+fi
+
+logdir="${CTF_ACCEPTANCE_LOG_DIR:-$HOME/.cache/ctf-rs-acceptance/$(date +%Y%m%d-%H%M%S)}"
+mkdir -p "$logdir"
+echo "acceptance-wsl: logs in $logdir"
+
+only_filter="${CTF_ACCEPTANCE_ONLY:-}"
+ranks_override="${CTF_ACCEPTANCE_RANKS:-}"
+
+is_selected() {
+  local target="$1"
+  [[ -z "$only_filter" ]] && return 0
+  local name
+  for name in $only_filter; do
+    [[ "$name" == "$target" ]] && return 0
+  done
+  return 1
+}
+
+# macOS ships bash 3.2, which raises "unbound variable" under `set -u` for
+# `"${array[@]}"` (but not `"${!array[@]}"`) when the array is empty; every
+# `[@]` expansion below of an array that CTF_ACCEPTANCE_ONLY can leave empty
+# uses the `${array[@]+"${array[@]}"}` guard so the script stays portable.
+mpi_targets=()
+mpi_ranks=()
+lib_filters=()
+local_targets=()
+
+while IFS=$'\t' read -r target class ranks sets note; do
+  [[ "$target" == "target" ]] && continue
+  [[ -z "$target" ]] && continue
+  is_selected "$target" || continue
+  case "$class" in
+    mpi) mpi_targets+=("$target"); mpi_ranks+=("$ranks") ;;
+    lib) lib_filters+=("$target") ;;
+    local) local_targets+=("$target") ;;
+    excluded) : ;;
+    *)
+      echo "acceptance-wsl: unknown class '$class' for target '$target' in $manifest" >&2
+      exit 1
+      ;;
+  esac
+done < "$manifest"
+
+if [[ -n "$only_filter" ]] && (( ${#mpi_targets[@]} + ${#lib_filters[@]} + ${#local_targets[@]} == 0 )); then
+  echo "acceptance-wsl: CTF_ACCEPTANCE_ONLY matched no gating target in $manifest: $only_filter" >&2
+  exit 1
+fi
+
+# Build every selected mpi/local test binary once, plus the lib test binary
+# if any lib filter is selected, and capture cargo's JSON build artifacts so
+# each mpi target's executable path can be resolved without a runner
+# env var. Building is still setup: a build failure aborts under set -e.
+build_args=()
+for t in "${mpi_targets[@]+"${mpi_targets[@]}"}" "${local_targets[@]+"${local_targets[@]}"}"; do
+  build_args+=(--test "$t")
 done
-cargo test --lib tttp_blocking
-cargo test --lib sparse_text
-cargo test --lib schedule
-cargo test --lib cyclic_reshuffle
-cargo test --lib symmetric_reshuffle
-cargo test --lib sparse_virtual
-cargo test --test narrow_algebra
-cargo test --test sparse_cost
-cargo test --test sparse_mapped_cost
-cargo test --test sparse_keys
-cargo test --test sparse_coo
-cargo test --test mixed_kernel
-cargo test --test sparse_matricize
-cargo test --test mixed_sparse_output
-cargo test --test self_mapping
-CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="mpirun --oversubscribe -n 7" cargo test --test upstream_strassen
-cargo test --test scaling --test random_generator --test scalar_blas --test node_peer_counts --test folded_cost --test partial_fold_kernel --test fold_storage --test partial_fold --test fold_indices --test fold_layout --test fold_selection --test mapped_cost --test local_linalg --test topology_candidates --test node_aware --test map_tensor \
-  --test sequential_sum --test virtual_sum --test sequential_contraction --test folded_contraction \
-  --test sparse_formats --test sparse_sequential --test sparse_function --test sparse_function_kernel --test cost_models --test plan_cost --test grid_plan_cost --test redist_cost --test mapping_preflight --test mapping_variants --test topology_canonicalization --test normal_mapping --test symmetry_layout --test sym_indices --test sym_triple --test sym_operations --test folding -- --nocapture
+if (( ${#lib_filters[@]} > 0 )); then
+  build_args+=(--lib)
+fi
+
+build_json="$logdir/build.json"
+build_log="$logdir/build.stderr.log"
+if (( ${#build_args[@]} > 0 )); then
+  cargo test --no-run --message-format=json "${build_args[@]}" \
+    >"$build_json" 2>"$build_log"
+fi
+
+# Portable stand-in for an associative array: macOS ships bash 3.2, which
+# has no `declare -A`, so the executable map is two parallel arrays plus a
+# linear-scan lookup function instead.
+exe_names=()
+exe_paths=()
+if [[ -s "$build_json" ]]; then
+  while IFS=$'\t' read -r name exe; do
+    exe_names+=("$name")
+    exe_paths+=("$exe")
+  done < <(jq -r 'select(.reason=="compiler-artifact" and .profile.test==true and .executable!=null) | [.target.name, .executable] | @tsv' "$build_json")
+fi
+
+exe_for() {
+  local want="$1" i
+  for i in "${!exe_names[@]}"; do
+    if [[ "${exe_names[$i]}" == "$want" ]]; then
+      printf '%s' "${exe_paths[$i]}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+for t in "${mpi_targets[@]+"${mpi_targets[@]}"}"; do
+  if ! exe_for "$t" >/dev/null; then
+    echo "acceptance-wsl: no built executable for mpi target '$t' (see $build_log)" >&2
+    exit 1
+  fi
+done
+
+# Setup is done; from here a failing target must not stop the run (E2).
+set +e
+
+pass_count=0
+fail_count=0
+failing=()
+
+record() {
+  local label="$1" code="$2"
+  if [[ "$code" -eq 0 ]]; then
+    pass_count=$((pass_count + 1))
+  else
+    fail_count=$((fail_count + 1))
+    failing+=("$label exit=$code")
+  fi
+}
+
+for idx in "${!mpi_targets[@]}"; do
+  target="${mpi_targets[$idx]}"
+  manifest_ranks="${mpi_ranks[$idx]}"
+  ranks_list="${ranks_override:-$manifest_ranks}"
+  exe="$(exe_for "$target")"
+  for ranks in $ranks_list; do
+    log="$logdir/${target}-${ranks}.log"
+    if [[ -n "$timeout_bin" ]]; then
+      "$timeout_bin" 600 "$mpirun_bin" --oversubscribe -n "$ranks" "$exe" >"$log" 2>&1
+    else
+      "$mpirun_bin" --oversubscribe -n "$ranks" "$exe" >"$log" 2>&1
+    fi
+    code=$?
+    echo "RUN_EXIT $target ranks=$ranks exit=$code"
+    record "$target ranks=$ranks" "$code"
+  done
+done
+
+for filter in "${lib_filters[@]+"${lib_filters[@]}"}"; do
+  log="$logdir/lib-${filter}.log"
+  cargo test --lib "$filter" --no-fail-fast -- --nocapture >"$log" 2>&1
+  code=$?
+  echo "RUN_EXIT $filter ranks=- exit=$code"
+  record "$filter" "$code"
+done
+
+for target in "${local_targets[@]+"${local_targets[@]}"}"; do
+  log="$logdir/${target}.log"
+  cargo test --test "$target" --no-fail-fast -- --nocapture >"$log" 2>&1
+  code=$?
+  echo "RUN_EXIT $target ranks=- exit=$code"
+  record "$target" "$code"
+done
+
+total=$((pass_count + fail_count))
+echo "acceptance-wsl: summary $pass_count/$total passed"
+if (( fail_count > 0 )); then
+  echo "acceptance-wsl: failing ($fail_count):"
+  for f in "${failing[@]+"${failing[@]}"}"; do
+    echo "  $f"
+  done
+  exit 1
+fi
+exit 0
