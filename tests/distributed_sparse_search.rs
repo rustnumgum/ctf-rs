@@ -4,7 +4,7 @@ use ctf::{
     cost::Models,
     mapping::{Distribution, Topology},
     sparse::SparseTensor,
-    sparse_search::{self, Options},
+    sparse_search::{self, Options, StorageSize},
     tensor::Tensor,
 };
 
@@ -51,8 +51,7 @@ fn run(context: &Context<'_>) {
             &catalog,
             &models,
             global.len() as u64,
-            8,
-            16,
+            [StorageSize { element_bytes: 8, pair_bytes: 16 }; 3],
             true,
             Options {
                 memory_limit: 1 << 30,
@@ -97,8 +96,7 @@ fn run(context: &Context<'_>) {
             &catalog,
             &models,
             10,
-            8,
-            16,
+            [StorageSize { element_bytes: 8, pair_bytes: 16 }; 3],
             true,
             Options {
                 memory_limit: 0,

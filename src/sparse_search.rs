@@ -51,6 +51,12 @@ pub struct Options {
     pub allow_exhaustive: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StorageSize {
+    pub element_bytes: usize,
+    pub pair_bytes: usize,
+}
+
 fn fold_descriptor(
     mapped: [&Distribution; 3],
     indices: [&str; 3],
@@ -153,8 +159,7 @@ fn inputs(
     indices: [&str; 3],
     nonzeros: [Option<u64>; 3],
     output_fraction: Option<f64>,
-    element_bytes: usize,
-    pair_bytes: usize,
+    sizes: [StorageSize; 3],
     custom_reduce: bool,
     pattern: Pattern,
 ) -> Inputs {
@@ -165,7 +170,9 @@ fn inputs(
     let fractions = Fractions::from_layouts(old, indices, nonzeros, output_fraction);
     let inputs = Inputs {
         storage: std::array::from_fn(|operand| Storage { sparse: sparse[operand],
-            element_size: element_bytes, pair_size: pair_bytes, dense_virtual_size: 0,
+            element_size: sizes[operand].element_bytes,
+            pair_size: sizes[operand].pair_bytes,
+            dense_virtual_size: 0,
             custom_addition: custom_reduce }),
         fractions, custom: false,
     };
@@ -230,8 +237,7 @@ pub fn search(
     models: &Models,
     nonzeros: [Option<u64>; 3],
     output_fraction: Option<f64>,
-    element_bytes: usize,
-    pair_bytes: usize,
+    sizes: [StorageSize; 3],
     custom_reduce: bool,
     pattern: Pattern,
     options: Options,
@@ -242,7 +248,7 @@ pub fn search(
         indices,
         catalog,
         models,
-        inputs(old, indices, nonzeros, output_fraction, element_bytes, pair_bytes,
+        inputs(old, indices, nonzeros, output_fraction, sizes,
             custom_reduce, pattern),
         pattern,
         true,
@@ -253,7 +259,7 @@ pub fn search(
 /// Fixed C1 unfolded sparse-A/dense-B/dense-C entry point.
 pub fn search_unfolded(context: &Context<'_>, old: [&Distribution; 3],
     indices: [&str; 3], catalog: &[Topology], models: &Models,
-    nonzeros_a: u64, element_bytes: usize, pair_bytes: usize,
+    nonzeros_a: u64, sizes: [StorageSize; 3],
     custom_reduce: bool, options: Options) -> Result<Option<Selected>, Error> {
     let pattern = Pattern::SparseDenseDense { coo_kernel: false };
     search_with(
@@ -262,8 +268,8 @@ pub fn search_unfolded(context: &Context<'_>, old: [&Distribution; 3],
         indices,
         catalog,
         models,
-        inputs(old, indices, [Some(nonzeros_a), None, None], None, element_bytes,
-            pair_bytes, custom_reduce, pattern),
+        inputs(old, indices, [Some(nonzeros_a), None, None], None, sizes,
+            custom_reduce, pattern),
         pattern,
         false,
         options,
@@ -277,8 +283,7 @@ pub struct SearchCache<'context, 'runtime> {
     context: &'context Context<'runtime>,
     catalog: &'context [Topology],
     models: &'context Models,
-    element_bytes: usize,
-    pair_bytes: usize,
+    sizes: [StorageSize; 3],
     custom_reduce: bool,
     pattern: Pattern,
     options: Options,
@@ -292,8 +297,7 @@ impl<'context, 'runtime> SearchCache<'context, 'runtime> {
         context: &'context Context<'runtime>,
         catalog: &'context [Topology],
         models: &'context Models,
-        element_bytes: usize,
-        pair_bytes: usize,
+        sizes: [StorageSize; 3],
         custom_reduce: bool,
         pattern: Pattern,
         options: Options,
@@ -303,8 +307,7 @@ impl<'context, 'runtime> SearchCache<'context, 'runtime> {
             context,
             catalog,
             models,
-            element_bytes,
-            pair_bytes,
+            sizes,
             custom_reduce,
             pattern,
             options,
@@ -332,8 +335,7 @@ impl<'context, 'runtime> SearchCache<'context, 'runtime> {
         let context = self.context;
         let catalog = self.catalog;
         let models = self.models;
-        let element_bytes = self.element_bytes;
-        let pair_bytes = self.pair_bytes;
+        let sizes = self.sizes;
         let custom_reduce = self.custom_reduce;
         let pattern = self.pattern;
         let options = self.options;
@@ -352,8 +354,7 @@ impl<'context, 'runtime> SearchCache<'context, 'runtime> {
                     models,
                     nonzeros,
                     output_fraction,
-                    element_bytes,
-                    pair_bytes,
+                    sizes,
                     custom_reduce,
                     pattern,
                     options,

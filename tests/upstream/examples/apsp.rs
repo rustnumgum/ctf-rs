@@ -12,7 +12,7 @@ use ctf::{
     mapping::{Distribution, Topology},
     random::Generator,
     sparse::SparseTensor,
-    sparse_search::{Options, Pattern, SearchCache},
+    sparse_search::{Options, Pattern, SearchCache, StorageSize},
     tensor::Tensor,
     topology_candidates,
 };
@@ -202,8 +202,10 @@ fn sparse_path_doubling<'c, 'r>(
         context,
         &candidate_catalog,
         &models,
-        Path::WIDTH,
-        8 + Path::WIDTH,
+        [StorageSize {
+            element_bytes: Path::WIDTH,
+            pair_bytes: 8 + Path::WIDTH,
+        }; 3],
         true,
         Pattern::SparseDenseDense { coo_kernel: false },
         Options {

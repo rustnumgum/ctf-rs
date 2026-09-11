@@ -8,7 +8,7 @@
 //! multiplication: absent sparse structure is never evaluated, while explicit
 //! stored zeros and dense zeros are passed to the function.
 
-use crate::{algebra::Semiring, sparse_formats::{Coo, Csr}};
+use crate::{algebra::{Monoid, Semiring}, sparse_formats::{Coo, Csr}};
 
 fn prescale<A: Semiring>(algebra: &A, c: &mut [A::Element], beta: &A::Element) {
     let one = algebra.one();
@@ -114,7 +114,7 @@ pub fn csr_sparse<
 /// the pinned high-level sparse-output path handles beta in a separate sparse
 /// summation.
 pub fn csr_sparse_output<
-    A: Semiring,
+    A: Monoid,
     F: Fn(&A::Element, &A::Element) -> A::Element,
 >(
     algebra: &A,

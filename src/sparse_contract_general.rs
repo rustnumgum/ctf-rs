@@ -3,7 +3,7 @@
 // Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Explicit-grid sparse-A/dense-B/dense-C contraction.
 use crate::{
-    algebra::{Semiring, Wire},
+    algebra::{Monoid, Semiring, Wire},
     context::Context,
     mapping::{Distribution, Mapping, Topology},
     sparse::SparseTensor,
@@ -44,7 +44,7 @@ fn broadcast_sparse<E: Wire>(context: &Context<'_>, blocks: &mut [Vec<(usize, E)
 
 // Move each stored entry once, from its original canonical owner to the mapped
 // canonical owner. Replication is performed only by the source fiber layer.
-fn sparse_on_roots<A: Semiring>(
+fn sparse_on_roots<A: Monoid>(
     source: &SparseTensor<'_, '_, A>,
     target: &Distribution,
 ) -> Vec<Vec<(usize, A::Element)>>
@@ -439,21 +439,22 @@ fn folded_dematricization(
     }
 }
 
-fn broadcast_coo<E: Wire + Clone>(context: &Context<'_>, blocks: &mut Vec<Coo<E>>) {
+fn broadcast_coo<E: Wire + Clone>(context: &Context<'_>, root: usize,
+    blocks: &mut Vec<Coo<E>>) {
     let width = 16 + E::WIDTH;
     let mut shapes = vec![0u64; 3 * blocks.len()];
-    if context.rank() == 0 {
+    if context.rank() == root {
         for (shape, block) in shapes.chunks_exact_mut(3).zip(blocks.iter()) {
             let (rows, columns) = block.shape();
             shape.copy_from_slice(&[rows.try_into().unwrap(), columns.try_into().unwrap(),
                 block.entries().len().try_into().unwrap()]);
         }
     }
-    context.broadcast(0, &mut shapes);
+    context.broadcast(root, &mut shapes);
     let entries: usize = shapes.chunks_exact(3)
         .map(|shape| usize::try_from(shape[2]).unwrap()).sum();
     let mut bytes = Vec::with_capacity(entries * width);
-    if context.rank() == 0 {
+    if context.rank() == root {
         for (row, column, value) in blocks.iter().flat_map(Coo::entries) {
             u64::try_from(*row).unwrap().encode(&mut bytes);
             u64::try_from(*column).unwrap().encode(&mut bytes);
@@ -462,8 +463,8 @@ fn broadcast_coo<E: Wire + Clone>(context: &Context<'_>, blocks: &mut Vec<Coo<E>
     } else {
         bytes.resize(entries * width, 0);
     }
-    context.inner.broadcast(0, &mut bytes);
-    if context.rank() != 0 {
+    context.inner.broadcast(root, &mut bytes);
+    if context.rank() != root {
         let mut encoded = bytes.chunks_exact(width);
         *blocks = shapes.chunks_exact(3).map(|shape| {
             let entries = (0..shape[2]).map(|_| {
@@ -696,13 +697,14 @@ fn execute_ccsr_dense_panels<A: Semiring>(
 fn selected_plan(
     selected: &crate::sparse_search::Selected,
     indices: [&str; 3],
-    element_size: usize,
+    element_sizes: [usize; 3],
+    custom: bool,
 ) -> crate::sparse_mapped_cost::Plan {
     let sparse = selected.pattern.sparse();
     let storage = std::array::from_fn(|operand| crate::sparse_cost::Storage {
         sparse: sparse[operand],
-        element_size,
-        pair_size: 8 + element_size,
+        element_size: element_sizes[operand],
+        pair_size: 8 + element_sizes[operand],
         dense_virtual_size: if sparse[operand] {
             selected.distributions[operand].block_shape().iter().product()
         } else { 0 },
@@ -714,7 +716,7 @@ fn selected_plan(
         crate::sparse_mapped_cost::Inputs {
             storage,
             fractions: crate::sparse_cost::Fractions { a: 1., b: 1., c: 1. },
-            custom: false,
+            custom,
         },
         selected.fold.as_ref(),
         selected.pattern.coo_kernel(),
@@ -722,7 +724,7 @@ fn selected_plan(
 }
 
 fn replicate_coo<E: Wire + Clone>(communicators: &[Context<'_>], blocks: &mut Vec<Coo<E>>) {
-    for communicator in communicators { broadcast_coo(communicator, blocks); }
+    for communicator in communicators { broadcast_coo(communicator, 0, blocks); }
 }
 
 fn reduce_csr<A: Semiring>(communicators: &[Context<'_>], algebra: &A,
@@ -747,6 +749,154 @@ fn reduce_ccsr<A: Semiring>(communicators: &[Context<'_>], algebra: &A,
             });
         }
     }
+}
+
+fn custom_schedule(edge: usize, layers: crate::sparse_2d::Layers)
+    -> (usize, usize, crate::sparse_2d::Layers) {
+    assert!(edge > 0 && layers.count > 0 && layers.index < layers.count);
+    if edge >= layers.count && edge % layers.count == 0 {
+        (layers.count, layers.index, crate::sparse_2d::Layers { count: 1, index: 0 })
+    } else if edge < layers.count && layers.count % edge == 0 {
+        (edge, layers.index % edge, crate::sparse_2d::Layers {
+            count: layers.count / edge, index: layers.index / edge,
+        })
+    } else {
+        (1, 0, layers)
+    }
+}
+
+fn custom_positions(plan: crate::sparse_2d::Panel<'_, '_>, length: usize,
+    step: usize, edge: usize) -> Vec<usize> {
+    if let Some(context) = plan.comm {
+        assert_eq!(edge % context.size(), 0);
+        let panels = edge / context.size();
+        let panel_step = step / context.size();
+        (0..plan.outer).flat_map(|strip| {
+            let start = (strip * panels + panel_step) * plan.inner;
+            start..start + plan.inner
+        }).collect()
+    } else if plan.inner == 0 {
+        (0..length).collect()
+    } else {
+        assert_eq!(length, plan.outer * plan.inner * edge);
+        (0..plan.outer).flat_map(|strip| {
+            let start = (strip * edge + step) * plan.inner;
+            start..start + plan.inner
+        }).collect()
+    }
+}
+
+fn custom_csr_operand<E: Wire + Clone>(plan: crate::sparse_2d::Panel<'_, '_>,
+    data: &[Csr<E>], step: usize, edge: usize) -> Vec<Csr<E>> {
+    let positions = custom_positions(plan, data.len(), step, edge);
+    let mut blocks: Vec<_> = positions.iter().map(|&position| data[position].to_coo()).collect();
+    if let Some(context) = plan.comm {
+        broadcast_coo(context, step % context.size(), &mut blocks);
+    }
+    blocks.into_iter().map(|block| block.to_csr()).collect()
+}
+
+fn empty_csr<E: Clone>(block: &Csr<E>) -> Csr<E> {
+    let shape = block.shape();
+    Coo::new(shape.0, shape.1, Vec::new()).to_csr()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute_custom_csr_panels<C, EA, EB, F, G>(
+    contexts: &[[Option<Context<'_>>; 3]],
+    execution: &crate::sparse_mapped_cost::Execution,
+    level: usize,
+    layers: crate::sparse_2d::Layers,
+    descriptor: &crate::partial_fold::Descriptor,
+    algebra: &C,
+    a: &[Csr<EA>],
+    b: &[Csr<EB>],
+    mut c: Vec<Csr<C::Element>>,
+    function: &F,
+    accumulate: &G,
+) -> Vec<Csr<C::Element>>
+where
+    C: Monoid,
+    C::Element: Wire,
+    EA: Wire + Clone,
+    EB: Wire + Clone,
+    F: Fn(&EA, &EB) -> C::Element,
+    G: Fn(C::Element, &mut C::Element),
+{
+    if level == execution.panels.len() {
+        crate::sparse_virtual::execute(
+            &execution.virtual_dimensions,
+            execution.indices.each_ref().map(Vec::as_slice),
+            &false,
+            &true,
+            |blocks, _| {
+                let mut batches = Vec::with_capacity(descriptor.batches);
+                for batch in 0..descriptor.batches {
+                    let aa = coo_batch(&a[blocks[0]].to_coo(), descriptor.m, descriptor.k,
+                        batch, descriptor.batches).to_csr();
+                    let bb = coo_batch(&b[blocks[1]].to_coo(), descriptor.k, descriptor.n,
+                        batch, descriptor.batches).to_csr();
+                    let old = coo_batch(&c[blocks[2]].to_coo(), descriptor.m, descriptor.n,
+                        batch, descriptor.batches).to_csr();
+                    batches.push(crate::kernel::csr_sparse(
+                        &aa,
+                        &bb,
+                        Some(&old),
+                        |left, right| function(left, right),
+                        |value, output| accumulate(value, output),
+                    ).to_coo());
+                }
+                c[blocks[2]] = join_batches(&batches, descriptor.m, descriptor.n).to_csr();
+            },
+        );
+        return c;
+    }
+
+    let plans = panel_plans(contexts, execution, level);
+    assert!(!(plans[0].comm.is_some() && plans[1].comm.is_some() && plans[2].comm.is_some()));
+    let edge = execution.panels[level].edge;
+    let (count, index, next) = custom_schedule(edge, layers);
+    let moving_output = plans[2].comm.is_some();
+    let mut contributions: Vec<_> = if moving_output {
+        c.iter().map(empty_csr).collect()
+    } else {
+        Vec::new()
+    };
+    for step in (index..edge).step_by(count) {
+        let aa = custom_csr_operand(plans[0], a, step, edge);
+        let bb = custom_csr_operand(plans[1], b, step, edge);
+        if let Some(context) = plans[2].comm {
+            let positions = custom_positions(plans[2], c.len(), step, edge);
+            let work: Vec<_> = positions.iter().map(|&position| empty_csr(&c[position])).collect();
+            let work = execute_custom_csr_panels(contexts, execution, level + 1, next,
+                descriptor, algebra, &aa, &bb, work, function, accumulate);
+            let owner = step % context.size();
+            for (position, block) in positions.into_iter().zip(work) {
+                if let Some(reduced) = block.reduce(context, owner, algebra) {
+                    contributions[position] = reduced;
+                }
+            }
+        } else if plans[2].inner == 0 {
+            c = execute_custom_csr_panels(contexts, execution, level + 1, next,
+                descriptor, algebra, &aa, &bb, c, function, accumulate);
+        } else {
+            let positions = custom_positions(plans[2], c.len(), step, edge);
+            let work: Vec<_> = if plans[2].outer == 1 {
+                positions.iter().map(|&position| c[position].clone()).collect()
+            } else {
+                positions.iter().map(|&position| empty_csr(&c[position])).collect()
+            };
+            let work = execute_custom_csr_panels(contexts, execution, level + 1, next,
+                descriptor, algebra, &aa, &bb, work, function, accumulate);
+            for (position, block) in positions.into_iter().zip(work) { c[position] = block; }
+        }
+    }
+    if moving_output {
+        for (old, contribution) in c.iter_mut().zip(contributions) {
+            *old = old.add(&contribution, algebra);
+        }
+    }
+    c
 }
 
 macro_rules! define_mapped_contraction {
@@ -955,7 +1105,7 @@ where
         assert_eq!(mapped[1].shape, b.distribution().shape);
         assert_eq!(mapped[2].shape, self.distribution().shape);
         let descriptor = selected.fold.as_ref().unwrap();
-        let plan = selected_plan(selected, [indices_a, indices_b, indices_c], A::Element::WIDTH);
+        let plan = selected_plan(selected, [indices_a, indices_b, indices_c], [A::Element::WIDTH; 3], false);
         let rank = self.context().rank();
         let mut a = sparse_on_roots(a, &mapped[0]);
         let a_layout = folded_matricization(&plan.execution, descriptor, 0);
@@ -1031,7 +1181,7 @@ where
         assert_eq!(mapped[1].shape, b.distribution().shape);
         assert_eq!(mapped[2].shape, self.distribution().shape);
         let descriptor = selected.fold.as_ref().expect("selected sparse-sparse path must be folded");
-        let plan = selected_plan(selected, [indices_a, indices_b, indices_c], A::Element::WIDTH);
+        let plan = selected_plan(selected, [indices_a, indices_b, indices_c], [A::Element::WIDTH; 3], false);
         let layouts = [folded_matricization(&plan.execution, descriptor, 0),
             folded_matricization(&plan.execution, descriptor, 1)];
         let mut aa: Vec<_> = sparse_on_roots(a, &mapped[0]).into_iter()
@@ -1180,7 +1330,7 @@ where
         assert_eq!(mapped[1].shape, b.distribution().shape);
         assert_eq!(mapped[2].shape, self.distribution().shape);
         let descriptor = selected.fold.as_ref().expect("selected sparse output path must be folded");
-        let plan = selected_plan(selected, [indices_a, indices_b, indices_c], A::Element::WIDTH);
+        let plan = selected_plan(selected, [indices_a, indices_b, indices_c], [A::Element::WIDTH; 3], false);
         let layouts = std::array::from_fn::<_, 3, _>(|operand| {
             folded_matricization(&plan.execution, descriptor, operand)
         });
@@ -1254,7 +1404,7 @@ where
         assert_eq!(mapped[1].shape, b.distribution().shape);
         assert_eq!(mapped[2].shape, self.distribution().shape);
         let descriptor = selected.fold.as_ref().expect("selected sparse output path must be folded");
-        let plan = selected_plan(selected, [indices_a, indices_b, indices_c], A::Element::WIDTH);
+        let plan = selected_plan(selected, [indices_a, indices_b, indices_c], [A::Element::WIDTH; 3], false);
         let a_layout = folded_matricization(&plan.execution, descriptor, 0);
         let c_layout = folded_matricization(&plan.execution, descriptor, 2);
         let mut aa: Vec<_> = sparse_on_roots(a, &mapped[0]).into_iter()
@@ -1305,5 +1455,112 @@ where
         self.blocks = blocks;
         self.redistribute(original);
         let _ = commutative;
+    }
+}
+
+impl<C: Monoid + Clone> SparseTensor<'_, '_, C>
+where
+    C::Element: Wire,
+{
+    /// Execute the exact folded heterogeneous sparse/sparse/sparse selection.
+    /// The selected raw distributions, replication, panels and virtual tree are
+    /// retained. `function` creates one path contribution and `accumulate`
+    /// combines intersecting paths; the output monoid performs MPI reduction
+    /// and the final old-C/product sparse addition. Custom coefficients are the
+    /// source identities, so no synthetic multiplication is required on C.
+    #[allow(clippy::too_many_arguments)]
+    pub fn contract_sparse_function_from_selected<AA, BB, F, G>(
+        &mut self,
+        indices_c: &str,
+        a: &SparseTensor<'_, '_, AA>,
+        indices_a: &str,
+        b: &SparseTensor<'_, '_, BB>,
+        indices_b: &str,
+        selected: &crate::sparse_search::Selected,
+        function: F,
+        accumulate: G,
+    )
+    where
+        AA: Monoid,
+        BB: Monoid,
+        AA::Element: Wire,
+        BB::Element: Wire,
+        F: Fn(&AA::Element, &BB::Element) -> C::Element,
+        G: Fn(C::Element, &mut C::Element),
+    {
+        assert_eq!(selected.pattern, crate::sparse_search::Pattern::SparseSparseSparse);
+        assert!(std::ptr::eq(self.context(), a.context()));
+        assert!(std::ptr::eq(self.context(), b.context()));
+        let mapped = &selected.distributions;
+        assert_eq!(mapped[0].shape, a.distribution().shape);
+        assert_eq!(mapped[1].shape, b.distribution().shape);
+        assert_eq!(mapped[2].shape, self.distribution().shape);
+        let descriptor = selected.fold.as_ref()
+            .expect("selected heterogeneous sparse output path must be folded");
+        let plan = selected_plan(
+            selected,
+            [indices_a, indices_b, indices_c],
+            [AA::Element::WIDTH, BB::Element::WIDTH, C::Element::WIDTH],
+            true,
+        );
+        let layouts = std::array::from_fn::<_, 3, _>(|operand| {
+            folded_matricization(&plan.execution, descriptor, operand)
+        });
+        let mut aa: Vec<_> = sparse_on_roots(a, &mapped[0]).into_iter()
+            .map(|block| crate::sparse_matricize::matricize_pairs(&layouts[0], &block)).collect();
+        let mut bb: Vec<_> = sparse_on_roots(b, &mapped[1]).into_iter()
+            .map(|block| crate::sparse_matricize::matricize_pairs(&layouts[1], &block)).collect();
+        let old: Vec<_> = sparse_on_roots(self, &mapped[2]).into_iter()
+            .map(|block| crate::sparse_matricize::matricize_pairs(&layouts[2], &block).to_csr())
+            .collect();
+        let replication: [Vec<Context<'_>>; 3] = std::array::from_fn(|operand| {
+            plan.execution.replication_axes[operand].iter()
+                .map(|&axis| mapped[0].topology.fiber(self.context(), axis)).collect()
+        });
+        replicate_coo(&replication[0], &mut aa);
+        replicate_coo(&replication[1], &mut bb);
+        let aa: Vec<_> = aa.iter().map(Coo::to_csr).collect();
+        let bb: Vec<_> = bb.iter().map(Coo::to_csr).collect();
+        let mut product: Vec<_> = old.iter().map(empty_csr).collect();
+        let panel_contexts = panels(self.context(), &mapped[0].topology, &plan.execution);
+        product = execute_custom_csr_panels(
+            &panel_contexts,
+            &plan.execution,
+            0,
+            crate::sparse_2d::Layers { count: 1, index: 0 },
+            descriptor,
+            self.algebra(),
+            &aa,
+            &bb,
+            product,
+            &function,
+            &accumulate,
+        );
+        close_contexts(panel_contexts);
+        for communicator in &replication[2] {
+            for block in &mut product {
+                let shape = block.shape();
+                *block = block.reduce(communicator, 0, self.algebra()).unwrap_or_else(|| {
+                    Coo::new(shape.0, shape.1, Vec::new()).to_csr()
+                });
+            }
+        }
+        let output_root = replication[2].iter().all(|context| context.rank() == 0);
+        if output_root {
+            for (product, old) in product.iter_mut().zip(&old) {
+                *product = old.add(product, self.algebra());
+            }
+        }
+        let dematricization = folded_dematricization(&plan.execution, descriptor);
+        let pinned: Vec<_> = product.iter().map(|block| {
+            crate::sparse_matricize::dematricize_pairs(&dematricization, &block.to_coo())
+        }).collect();
+        let blocks = crate::sparse_keys::depin_output(
+            &local_key_metadata(&mapped[2], self.context().rank()), &pinned);
+        for group in replication { for communicator in group { communicator.close(); } }
+        let original = self.distribution.clone();
+        self.distribution = mapped[2].clone();
+        self.blocks = blocks;
+        self.redistribute(original);
     }
 }

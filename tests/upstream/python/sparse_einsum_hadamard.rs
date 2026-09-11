@@ -8,7 +8,7 @@ use ctf::{
     mapping::{Distribution, Topology},
     random::Generator,
     sparse::SparseTensor,
-    sparse_search::{Options, Pattern, SearchCache},
+    sparse_search::{Options, Pattern, SearchCache, StorageSize},
     tensor::Tensor,
     topology_candidates,
 };
@@ -47,8 +47,7 @@ fn prepare(
         context,
         &catalog,
         &models,
-        8,
-        16,
+        [StorageSize { element_bytes: 8, pair_bytes: 16 }; 3],
         false,
         pattern,
         options(),
