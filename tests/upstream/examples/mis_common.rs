@@ -1,5 +1,7 @@
 //! Shared source fixtures and sparse graph operations for MIS and 2-MIS.
 
+#![allow(dead_code)]
+
 use std::mem::size_of;
 
 use ctf::{

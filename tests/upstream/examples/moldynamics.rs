@@ -1,5 +1,7 @@
 //! Native Rust form of pinned examples/moldynamics.h.
 
+#![allow(dead_code)]
+
 use ctf::{
     algebra::{Group, Monoid, Semiring, Wire},
     scalar_conversion::CastFromF64,

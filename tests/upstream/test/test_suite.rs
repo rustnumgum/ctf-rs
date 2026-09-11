@@ -5,6 +5,8 @@
 //! and invokes native Rust ports whose individual source criteria assert at
 //! the point of evaluation. Sparse and density-parameter cases are excluded.
 
+#![allow(dead_code)]
+
 use ctf::context::Context;
 
 const N: usize = 6;

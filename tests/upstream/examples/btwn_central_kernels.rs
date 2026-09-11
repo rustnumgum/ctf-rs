@@ -1,6 +1,8 @@
 // Rust equivalents of the custom kernels in
 // examples/btwn_central_kernels.cxx from the pinned CTF source.
 
+#![allow(dead_code)]
+
 use ctf::algebra::{Monoid, Semiring, Wire};
 
 pub const INFINITY: i32 = i32::MAX / 2;
