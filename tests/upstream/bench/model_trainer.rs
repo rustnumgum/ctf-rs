@@ -2,16 +2,18 @@
 //!
 //! The benchmark keeps the source driver's communicator split, dimension
 //! progression, and five-round training structure.  The sparse MTTKRP,
-//! sparse vector/matrix, offload, and sparse MP3 workloads are intentionally
-//! outside this dense subset.  The source model registry updates are also
-//! excluded because there is no native model-registry responsibility here;
-//! communicator barriers retain the phase boundaries instead.
+//! sparse vector/matrix, offload, CCSD, and sparse MP3 workloads are intentionally
+//! outside this pre-existing dense subset. Tensor operations do not implicitly
+//! observe an external model registry, so communicator barriers retain the
+//! source's model update phase boundaries. Coefficient persistence uses an
+//! explicit registry.
 
-use std::time::Instant;
+use std::{ffi::OsStr, path::PathBuf, time::Instant};
 
 use ctf::{
     algebra::{Arithmetic, Monoid},
     context::Context,
+    cost::Models,
     mapping::{Distribution, Topology},
     tensor::Tensor,
 };
@@ -334,15 +336,38 @@ fn run(context: &Context<'_>) -> f64 {
     elapsed
 }
 
+fn coefficient_path() -> PathBuf {
+    let mut arguments = std::env::args_os().skip(1);
+    while let Some(argument) = arguments.next() {
+        if argument == OsStr::new("-write") {
+            return arguments
+                .next()
+                .map(PathBuf::from)
+                .expect("-write requires a model file path");
+        }
+    }
+    panic!("usage: upstream_model_trainer -write MODEL_FILE");
+}
+
 fn main() {
+    let coefficient_path = coefficient_path();
     let (universe, provided) = mpi::initialize_with_threading(mpi::Threading::Funneled)
         .expect("MPI initialization failed");
     assert!(provided >= mpi::Threading::Funneled);
     let world = ctf::context::Context::world(&universe);
+    let mut models = Models::upstream(32_768);
     let world_seconds = run(&world);
     if world.rank() == 0 {
+        models.write_all_models(&coefficient_path).unwrap();
+    }
+    world.barrier();
+    models.load_all_models(&coefficient_path).unwrap();
+    world.barrier();
+    if world.rank() == 0 {
+        models.print_all_models(std::io::stdout().lock()).unwrap();
         println!(
-            "INFO model_trainer: dense train_ttm+train_dns_vec_mat, time={TIME_BUDGET}, iterations={NUM_ITERATIONS}, time_jump={TIME_JUMP}, world sec={world_seconds}"
+            "INFO model_trainer: dense train_ttm+train_dns_vec_mat, time={TIME_BUDGET}, iterations={NUM_ITERATIONS}, time_jump={TIME_JUMP}, write+load={}, world sec={world_seconds}",
+            coefficient_path.display()
         );
     }
     world.close();

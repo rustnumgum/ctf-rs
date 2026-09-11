@@ -262,6 +262,11 @@ harness = false
 required-features = ["native-linalg"]
 
 [[test]]
+name = "model_io"
+path = "tests/model_io.rs"
+harness = false
+
+[[test]]
 name = "selector"
 path = "tests/selector.rs"
 harness = false

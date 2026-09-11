@@ -2,8 +2,16 @@
 // redistribution/nosym_transp.cxx. Copyright (c) 2011, Edgar Solomonik. See LICENSE.
 //! Named CPU model bank and source cost formulas. Estimates are seconds. Loading
 //! or fitting coefficients is explicit; estimates never time operations themselves.
-use crate::model::LinearModel;
-use std::io::{self, BufRead, Write};
+use crate::{
+    context::Context,
+    model::{LinearModel, source_coefficient},
+};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::{self, File, OpenOptions},
+    io::{self, BufRead, BufReader, BufWriter, Write},
+    path::Path,
+};
 
 pub struct Models {
     models: Vec<LinearModel>,
@@ -28,6 +36,9 @@ impl Models {
     pub fn iter(&self) -> impl Iterator<Item = &LinearModel> {
         self.models.iter()
     }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut LinearModel> {
+        self.models.iter_mut()
+    }
     pub fn get(&self, name: &str) -> &LinearModel {
         self.models
             .iter()
@@ -44,7 +55,7 @@ impl Models {
     /// (e.g. excluded CUDA models) are ignored; missing/malformed CPU records
     /// return errors rather than substituting zero or silently retaining seeds.
     pub fn load(&mut self, reader: impl BufRead) -> io::Result<()> {
-        let mut records = std::collections::HashMap::new();
+        let mut records = HashMap::new();
         for line in reader.lines() {
             let line = line?;
             let mut fields = line.split_whitespace();
@@ -89,9 +100,116 @@ impl Models {
         for model in &self.models {
             write!(writer, "{}", model.name())?;
             for value in model.coefficients() {
-                write!(writer, " {value:.4e}")?;
+                write!(writer, " {}", source_coefficient(*value))?;
             }
             writeln!(writer)?;
+        }
+        Ok(())
+    }
+    /// Load every registered CPU model from an explicit source-format file.
+    pub fn load_all_models(&mut self, file_name: impl AsRef<Path>) -> io::Result<()> {
+        self.load(BufReader::new(File::open(file_name)?))
+    }
+    /// Replace registered records and append missing ones while retaining records
+    /// for models outside this CPU registry, as the source writer does.
+    pub fn write_all_models(&self, file_name: impl AsRef<Path>) -> io::Result<()> {
+        let file_name = file_name.as_ref();
+        let existing = match fs::read_to_string(file_name) {
+            Ok(contents) => contents,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => String::new(),
+            Err(error) => return Err(error),
+        };
+        let mut replacements = HashMap::new();
+        for model in &self.models {
+            let mut record = model.name().to_owned();
+            for value in model.coefficients() {
+                record.push(' ');
+                record.push_str(&source_coefficient(*value));
+            }
+            replacements.insert(model.name(), record);
+        }
+        let mut found = HashSet::new();
+        let mut output = BufWriter::new(File::create(file_name)?);
+        for line in existing.lines() {
+            let name = line.split_once(' ').map_or(line, |(name, _)| name);
+            if let Some(record) = replacements.get(name) {
+                writeln!(output, "{record}")?;
+                found.insert(name);
+            } else {
+                writeln!(output, "{line}")?;
+            }
+        }
+        for model in &self.models {
+            if !found.contains(model.name()) {
+                writeln!(output, "{}", replacements[model.name()])?;
+            }
+        }
+        output.flush()
+    }
+    /// Append coefficients once and retained observations in rank order to one
+    /// file per registered model. The path must already exist.
+    pub fn dump_all_models(&self, context: &Context<'_>, path: impl AsRef<Path>) -> io::Result<()> {
+        let path = path.as_ref();
+        let mut result = Ok(());
+        for rank in 0..context.size() {
+            if rank == context.rank() && result.is_ok() {
+                result = self.dump_rank(path, rank == 0);
+            }
+            context.barrier();
+        }
+        result
+    }
+    fn dump_rank(&self, path: &Path, include_coefficients: bool) -> io::Result<()> {
+        for model in &self.models {
+            let mut output = BufWriter::new(
+                OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(path.join(model.name()))?,
+            );
+            if include_coefficients {
+                for value in model.coefficients() {
+                    write!(output, "{value} ")?;
+                }
+                writeln!(output)?;
+            }
+            for (seconds, parameters) in model.retained_observations() {
+                write!(output, "{seconds} ")?;
+                for value in parameters {
+                    write!(output, "{value} ")?;
+                }
+                writeln!(output)?;
+            }
+            output.flush()?;
+        }
+        Ok(())
+    }
+    /// Print source declarations followed by diagnostics for observed models.
+    pub fn print_all_models(&self, mut output: impl Write) -> io::Result<()> {
+        for model in &self.models {
+            write!(output, "double {}_init[] = {{", model.name())?;
+            for (index, value) in model.coefficients().iter().enumerate() {
+                if index > 0 {
+                    write!(output, ", ")?;
+                }
+                write!(output, "{}", source_coefficient(*value))?;
+            }
+            writeln!(output, "}};")?;
+        }
+        for model in &self.models {
+            let diagnostics = model.diagnostics();
+            if diagnostics.observations > 0 {
+                writeln!(
+                    output,
+                    "{} is_tuned = {} is_active = 1 ({}) avg_tot_time = {:.6} avg_over_time = {:.6} avg_under_time = {:.6}",
+                    model.name(),
+                    usize::from(diagnostics.tuned),
+                    diagnostics.observations,
+                    diagnostics.average_total_time,
+                    diagnostics.average_over_time,
+                    diagnostics.average_under_time,
+                )?;
+            }
         }
         Ok(())
     }

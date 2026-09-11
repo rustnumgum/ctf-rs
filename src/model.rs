@@ -4,6 +4,15 @@
 //! training. Updates communicate only the reduced systems, not all observations.
 use crate::{context::Context, linalg::LocalKernels};
 
+pub(crate) fn source_coefficient(value: f64) -> String {
+    let scientific = format!("{value:.4E}");
+    let Some((mantissa, exponent)) = scientific.split_once('E') else {
+        return scientific;
+    };
+    let exponent = exponent.parse::<i32>().unwrap();
+    format!("{mantissa}E{exponent:+03}")
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Diagnostics {
     pub observations: usize,
