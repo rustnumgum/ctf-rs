@@ -2,7 +2,8 @@ param(
     [string]$MingwRoot = 'C:\msys64\mingw64',
     [string]$TargetDir = 'D:\ctf-rs-native-target',
     [switch]$BuildOnly,
-    [switch]$D6Only
+    [switch]$D6Only,
+    [switch]$C1Only
 )
 $ErrorActionPreference = 'Stop'
 $env:PATH = "$HOME\.cargo\bin;$MingwRoot\bin;C:\Program Files\Microsoft MPI\Bin;" + $env:PATH
@@ -17,6 +18,15 @@ if ($BuildOnly) {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     cargo build --examples
     exit $LASTEXITCODE
+}
+
+if ($C1Only) {
+    foreach ($ranks in 1,2,4) {
+        $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUNNER = "mpiexec -n $ranks"
+        cargo test --test sparse_text_io --test distributed_sparse_io
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    exit 0
 }
 
 if ($D6Only) {
