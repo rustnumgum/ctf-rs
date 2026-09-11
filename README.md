@@ -54,16 +54,40 @@ split leaks its handle rather than performing a collective on Drop.
 The rsmpi dependency has default features disabled; custom reductions do not
 use libffi.
 
-In WSL Ubuntu-26.04, install the Rust toolchain, MPI development files,
-`libclang-dev`, BLAS/LAPACK and ScaLAPACK development libraries. Run
-`bash scripts/acceptance-wsl.sh` from this project. It uses the Linux filesystem
-for Cargo's target directory. The script covers the current 175 MPI drivers at
-1, 2, and 4 ranks, plus its local/library checks and seven-rank Strassen check.
-The S1 close ran all thirteen S1 targets at WSL and native 1/2/4 under the
-fixed plan.v4 contract; every target passed at every rank and no HANDOFF
-question remains. This record is not permission to rerun a closed numerical
-check. Recorded results are in `docs/validation.md`, section
-"S1d and S1 close".
+### Platforms
+
+`scripts/acceptance-wsl.sh` is host-portable: it runs on any Unix host with
+`mpirun` on `PATH`, including WSL Ubuntu-26.04 and macOS.
+
+- WSL Ubuntu-26.04: install the Rust toolchain, MPI development files,
+  `libclang-dev`, BLAS/LAPACK and ScaLAPACK development libraries, and use
+  the Linux filesystem for Cargo's target directory.
+- macOS: `brew install open-mpi openblas scalapack`. `build.rs` adds the
+  Homebrew prefix (`HOMEBREW_PREFIX`, else `brew --prefix`, else
+  `/opt/homebrew`) to the link search path; ScaLAPACK/BLAS link as
+  `scalapack`/`openblas`, the same names native Windows uses (Linux keeps
+  `scalapack-openmpi`/`blas`/`lapack`).
+- Native Windows: `scripts/acceptance-native.ps1 -MsMpiBin <path>`; see
+  `docs/native-windows.md`.
+
+Both scripts read one manifest, `scripts/acceptance-targets.tsv` (columns
+target, class mpi/local/lib/excluded, ranks, sets, note); `scripts/check-targets.sh`
+fails if a Cargo test target is not triaged in it. Each target runs once per
+rank count, printing `RUN_EXIT <target> ranks=<n> exit=<code>` and a
+per-target log under `$CTF_ACCEPTANCE_LOG_DIR` (default
+`$HOME/.cache/ctf-rs-acceptance/<timestamp>/`); a failing target does not
+stop the run, and the script exits nonzero at the end if any target failed.
+`CTF_ACCEPTANCE_ONLY` and `CTF_ACCEPTANCE_RANKS` restrict a run to a subset
+of targets or ranks.
+
+The manifest now includes the thirteen S1 targets, `dgtog_redistribution`
+and `model_io`; `upstream_bench_contraction` (informational) and
+`upstream_model_trainer` (needs `-write`) are listed as deliberate
+exclusions. The S1 close ran those thirteen targets at WSL and native 1/2/4
+under the fixed plan.v4 contract; every target passed at every rank and no
+HANDOFF question remains (`docs/validation.md`, section "S1d and S1 close").
+This record is not permission to rerun a closed numerical check; the
+acceptance scripts now cover the same targets going forward.
 
 To avoid Windows-drive source I/O, run `bash scripts/sync-wsl.sh` from the
 Windows-backed repository in WSL. Build/test in `/home/xylxp/ctf-rs-work` after
