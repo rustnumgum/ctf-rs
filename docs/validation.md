@@ -24,6 +24,7 @@ row below only points into the existing chronological record.
 | S1b compressed-symmetry and custom sparse kernels (historical) | "S1b compressed-symmetry and custom sparse kernels" | superseded, see "S1d and S1 close" |
 | S1c sparse summation, communication, persistence (historical) | "S1c sparse summation, communication, persistence" | superseded, see "S1d and S1 close" |
 | S1d and S1 close (final contract for all thirteen S1 targets) | "S1d and S1 close" | CLOSED, DIGIT / PASS at WSL 1/2/4; three targets also native 1/2/4 |
+| A1 audit remediation (plan.v5: scripts, dead code, panel executor merge, SAFETY comments, macOS build, documents) | "A1 audit remediation" | CLOSED on macOS, DIGIT / PASS 622/622 with every baseline quantity reproduced; WSL and native reruns pending on MSI |
 | upstream_apsp | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
 | upstream_algebraic_multigrid | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
 | upstream_block_sparse | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
@@ -39,6 +40,63 @@ row below only points into the existing chronological record.
 | sparse_sample | "S1d and S1 close" > "Final-tree target outcomes" | DIGIT / PASS, WSL 1/2/4 |
 | Checkpoint n=3 fixture (historical, not a source failure) | "Checkpoint n=3 history (not a source failure)" | superseded by the n=7 default fixture under "S1d and S1 close" |
 | All other dated per-feature milestones (2026-09-06 through 2026-09-08, roughly 140 sections interleaved with the batches above) | not individually indexed here; each is unedited chronological history that the C1/R1/D1-D6/S1 close sections above summarize | see `docs/coverage.md` for the current phase-level status of that work |
+
+## A1 audit remediation
+
+### Fixed plan.v5 contract (2026-09-12)
+
+Accepted immutable harness `plans/ctf-rs/plan.v5.md`, gate `G-CTF-A1`,
+class R against pinned cc4s/ctf `f69cbb46e23bc2f39cda5722ce096f56301dab4f`:
+every gating driver keeps its own quantity, reference, and bound, and a
+driver whose printed result changes is a failure of the refactor. The
+audit that fixed the list is harness `evidence/2026-09-12-ctf-rs-audit/findings.md`
+(evt-0073). Executor: Claude with five subagents on the Mac, each in its
+own git worktree on a disjoint file set, reviewed and merged in order; the
+plan names the macOS run as the regression and leaves the WSL and native
+runs on MSI for a later request.
+
+| Item | Commits | Audit IDs |
+|---|---|---|
+| macOS link names and Homebrew search path (`build.rs`) | b47cec8 | A5 |
+| Hygiene: `DIGIT / ` prefix, rustdoc links, dead stores, `.gitignore`, `rust-version = "1.89"`, five examples declared, dead `symmetric_reshuffle::plan` and its tests removed | 5ab3a75 to 40f818b | A1, A3, A4, E3 |
+| `#[must_use]` on `Context::split`/`split_shared`, unused imports, `// SAFETY:` at all 94 unsafe sites, `redistribute_ror` decision recorded, macOS `memcontrol` branch | 155687f, 9214e4c, e9b6bba, e34146e | D2, D3, D4, A1 |
+| Acceptance manifest `scripts/acceptance-targets.tsv`, `scripts/check-targets.sh`, both scripts rewritten to record every target once per rank and continue past failures | 8bbd97b and its five predecessors | E1, E2, E4, E5 |
+| Untested sparse-dense-sparse executors and `Pattern::SparseDenseSparse` removed; panel executors shared (one sparse-output and one dense-output generic, the custom executor on the shared helpers); Hadamard-index elimination factored; label metadata built once | bc3a264 to c92915b | C1, C2, C3, C4 |
+| Documents to the S1-close state, inventory corrections, README platforms section, expression-chain ordering scope limit, this file's index | 0efac66 to 562aaba | B, F |
+| `model_io` defaults to a temporary output directory so the scripts can run it | 7ffd5f2 | E1 |
+
+### Regression on macOS (2026-09-12)
+
+Host: macOS 15.7.3, rustc 1.97.1, Homebrew Open MPI 5.0.10, OpenBLAS,
+ScaLAPACK; `OPENBLAS_NUM_THREADS=1`, `mpirun --oversubscribe`. Two runs
+of `bash scripts/acceptance-wsl.sh` (the manifest-driven script, every
+`mpi` target once at 1, 2, 4 ranks, `upstream_strassen` also at 7, the
+five `lib` filters and 46 `local` targets once):
+
+| Run | Revision | Invocations | Result |
+|---|---|---|---|
+| baseline, before the sparse refactor | e9b6bba | 623 | 617 pass; the six failures are `d4_memcontrol` (no macOS branch yet, `UnsupportedPlatform`) and `model_io` (required an argument) at 1, 2, 4 |
+| final | 7ffd5f2 | 622 | **DIGIT / PASS 622/622**; the `symmetric_reshuffle` lib row is gone with its tests, hence one invocation fewer |
+
+Comparison: the 577 `DIGIT` lines of the baseline appear identically in
+the final run after stripping wall-clock fields; the final run adds the
+six lines of the two newly passing targets. No driver quantity moved.
+Named digits, identical to the WSL and native values of "S1d and S1 close":
+`upstream_checkpoint_sparse` Q = 1.659570583342333e-6, 1.730313117560421e-6,
+1.6343449060870917e-6 at 1, 2, 4; `upstream_algebraic_multigrid` rnorm =
+0.004937970528833717, 0.005085930671471991, 0.005189487439309569.
+`cargo check --all-targets` and `RUSTDOCFLAGS="-D warnings" cargo doc
+--no-deps` are clean; `scripts/check-targets.sh` accounts for all 238 test
+targets and 5 lib filters. `scripts/acceptance-native.ps1` parses under
+Windows PowerShell on MSI and reads the manifest there (243 rows; sets d6
+50, c1 2) but has not been executed; the WSL and native runs of the plan
+are pending on MSI. Logs: harness `evidence/2026-09-12-ctf-rs-audit/`
+(`baseline-run.log`, `final-run.log`, the normalized `DIGIT` lists).
+
+Not done under this plan, by name: the clippy classes outside the
+argument-count allows (238 warnings, style), and a single generic panel
+executor for the sparse-output and dense-output cases, kept as two because
+their moving-output combination differs in when beta is applied.
 
 ## C1 close
 
