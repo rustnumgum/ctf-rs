@@ -14,7 +14,7 @@ use ctf::{
 
 const BLOCK_SIZE: usize = 7;
 const BLOCK_COUNT: usize = 10;
-const NORM_BOUND: f64 = 1.e-4;
+const NORM_BOUND: f64 = 1.0e-4;
 
 type BlockAlgebra = Arithmetic<f64>;
 type Block<'c, 'r> = Tensor<'c, 'r, BlockAlgebra>;
