@@ -55,6 +55,17 @@ fn is_primary_layer(distribution: &Distribution, rank: usize) -> bool {
         .all(|(coordinate, mapped)| mapped || coordinate == 0)
 }
 
+// Source bucket_by_pe: mapped dimensions determine the primary owner once;
+// unused process-grid coordinates enumerate its physical replicas.
+fn replica_offsets(distribution: &Distribution) -> Vec<usize> {
+    let mut used = vec![false; distribution.topology.dimensions.len()];
+    for mapping in &distribution.mappings { mapping_uses_axis(mapping, &mut used); }
+    (0..distribution.topology.size()).filter(|&rank| {
+        distribution.topology.coordinates(rank).iter().zip(&used)
+            .all(|(&coordinate, &mapped)| !mapped || coordinate == 0)
+    }).collect()
+}
+
 impl<'c, 'r, A: Monoid> SparseTensor<'c, 'r, A> {
     pub fn new(context: &'c Context<'r>, distribution: Distribution, algebra: A) -> Self {
         assert_eq!(context.size(), distribution.topology.size());
@@ -146,16 +157,25 @@ impl<A: Monoid> SparseTensor<'_, '_, A> where A::Element: Wire {
             (position as u64).encode(bucket);
             (key as u64).encode(bucket);
         }
-        let mut replies = vec![Vec::new(); self.context.size()];
+        let mut reads = vec![Vec::new(); self.blocks.len()];
         for (rank, bytes) in self.context.inner.exchange(&requests).iter().enumerate() {
             for request in bytes.chunks_exact(16) {
                 let position = u64::decode(&request[..8]);
                 let key = u64::decode(&request[8..]) as usize;
-                let block = &self.blocks[self.block(key)];
-                let value = match block.binary_search_by_key(&key, |pair| pair.0) {
-                    Ok(index) => block[index].1.clone(),
-                    Err(_) => self.algebra.zero(),
-                };
+                reads[self.block(key)].push((key, rank, position));
+            }
+        }
+        let mut replies = vec![Vec::new(); self.context.size()];
+        for (block, mut requests) in self.blocks.iter().zip(reads) {
+            requests.sort_by_key(|request| request.0);
+            let mut entry = 0;
+            // sparse_rw::sp_read advances only the read cursor on equal keys,
+            // preserving duplicate requests without repeated binary searches.
+            for (key, rank, position) in requests {
+                while entry < block.len() && block[entry].0 < key { entry += 1; }
+                let value = if entry < block.len() && block[entry].0 == key {
+                    block[entry].1.clone()
+                } else { self.algebra.zero() };
                 position.encode(&mut replies[rank]);
                 value.encode(&mut replies[rank]);
             }
@@ -172,13 +192,14 @@ impl<A: Monoid> SparseTensor<'_, '_, A> where A::Element: Wire {
 
     fn receive_updates(&self, pairs: &[(usize, A::Element)]) -> Vec<Vec<(usize, A::Element)>> {
         let mut buckets = vec![Vec::new(); self.context.size()];
+        let replicas = replica_offsets(&self.distribution);
         for (key, value) in pairs {
             assert!(*key < self.distribution.global_len());
-            for (rank, bucket) in buckets.iter_mut().enumerate() {
-                if self.distribution.owns(rank, *key) {
-                    (*key as u64).encode(bucket);
-                    value.encode(bucket);
-                }
+            let owner = self.distribution.owner(*key);
+            for &offset in &replicas {
+                let bucket = &mut buckets[owner + offset];
+                (*key as u64).encode(bucket);
+                value.encode(bucket);
             }
         }
         let mut updates = vec![Vec::new(); self.blocks.len()];
@@ -222,13 +243,14 @@ impl<A: Monoid> SparseTensor<'_, '_, A> where A::Element: Wire {
         assert_eq!(target.shape, self.distribution.shape);
         assert_eq!(target.topology.size(), self.context.size());
         let mut buckets = vec![Vec::new(); self.context.size()];
+        let replicas = replica_offsets(&target);
         for (key, value) in self.blocks.iter().flatten() {
             if self.distribution.owner(*key) != self.context.rank() { continue; }
-            for (rank, bucket) in buckets.iter_mut().enumerate() {
-                if target.owns(rank, *key) {
-                    (*key as u64).encode(bucket);
-                    value.encode(bucket);
-                }
+            let owner = target.owner(*key);
+            for &offset in &replicas {
+                let bucket = &mut buckets[owner + offset];
+                (*key as u64).encode(bucket);
+                value.encode(bucket);
             }
         }
         let virtual_blocks = target.mappings.iter()
