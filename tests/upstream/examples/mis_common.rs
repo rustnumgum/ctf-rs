@@ -180,9 +180,9 @@ pub fn sparse_dense_matvec<A>(
     );
 }
 
-pub fn sparse_add<A>(
-    output: &mut SparseTensor<'_, '_, A>,
-    input: &SparseTensor<'_, '_, A>,
+pub fn sparse_add<'c, 'r, A>(
+    output: &mut SparseTensor<'c, 'r, A>,
+    input: &SparseTensor<'c, 'r, A>,
     alpha: A::Element,
     beta: A::Element,
     cache: &mut SumSearchCache<'_, '_>,
