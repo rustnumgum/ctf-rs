@@ -101,3 +101,7 @@ pub mod tensor;
 pub mod topology_candidates;
 pub mod util;
 pub mod vector;
+pub mod sparse_symmetric;
+pub mod sparse_symmetric_search;
+mod sparse_symmetric_sum;
+mod sparse_symmetric_transform;
