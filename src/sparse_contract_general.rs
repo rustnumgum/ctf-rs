@@ -178,6 +178,17 @@ fn sparse_weigh_index(
     nonzeros: [Option<u64>; 2],
 ) -> Option<WeighIndex> {
     let metadata = LabelMetadata::new(distributions, indices);
+    sparse_weigh_index_from_metadata(&metadata, distributions, nonzeros)
+}
+
+/// Same search as [`sparse_weigh_index`], for a caller that already built the
+/// [`LabelMetadata`] for `distributions`/its own index strings and can reuse
+/// it instead of paying for a second `LabelMetadata::new`.
+fn sparse_weigh_index_from_metadata(
+    metadata: &LabelMetadata,
+    distributions: [&Distribution; 3],
+    nonzeros: [Option<u64>; 2],
+) -> Option<WeighIndex> {
     let mut size_a_1 = 1u64;
     let mut size_a_2 = 1u64;
     let mut size_b_1 = 1u64;
@@ -1066,7 +1077,11 @@ where
         let nonzeros_a = canonical_nnz(a);
         let distributions = [a.distribution(), b.distribution(), self.distribution()];
         let indices = [indices_a, indices_b, indices_c];
-        if let Some(weigh) = sparse_weigh_index(distributions, indices, [Some(nonzeros_a), None]) {
+        // Built once and, when no weigh index remains, carried into
+        // contract_sparse_from_selected_with_metadata instead of being
+        // rebuilt there (audit finding C4).
+        let metadata = LabelMetadata::new(distributions, indices);
+        if let Some(weigh) = sparse_weigh_index_from_metadata(&metadata, distributions, [Some(nonzeros_a), None]) {
             assert!(weigh.expand_a, "dense Hadamard-index expansion is unsupported");
             let (expanded, expanded_indices, relabeled_b) =
                 hadamard_expand_a(a, indices_a, indices_b, &weigh);
@@ -1089,7 +1104,8 @@ where
             [Some(nonzeros_a), None, None],
             output_fraction,
         )?.expect("sparse contraction search found no eligible plan").clone();
-        self.contract_sparse_from_selected(
+        self.contract_sparse_from_selected_with_metadata(
+            Some(&metadata),
             indices_c,
             a,
             indices_a,
@@ -1118,6 +1134,34 @@ where
         beta: A::Element,
         commutative: bool,
     ) {
+        let metadata = LabelMetadata::new(
+            [a.distribution(), b.distribution(), self.distribution()],
+            [indices_a, indices_b, indices_c],
+        );
+        self.contract_sparse_from_mapped_with_metadata(&metadata, indices_c, a, indices_a, b,
+            indices_b, mapped, alpha, beta, commutative);
+    }
+
+    /// Same execution as [`Self::contract_sparse_from_mapped`], for a caller
+    /// (`contract_sparse`, through
+    /// [`Self::contract_sparse_from_selected_with_metadata`]) that already
+    /// built the [`LabelMetadata`] for `distributions`/these index strings
+    /// and can reuse it instead of paying for a second `LabelMetadata::new`
+    /// (audit finding C4).
+    #[allow(clippy::too_many_arguments)]
+    fn contract_sparse_from_mapped_with_metadata(
+        &mut self,
+        metadata: &LabelMetadata,
+        indices_c: &str,
+        a: &SparseTensor<'_, '_, A>,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        mapped: [Distribution; 3],
+        alpha: A::Element,
+        beta: A::Element,
+        commutative: bool,
+    ) {
         assert!(std::ptr::eq(self.context(), a.context()));
         assert!(std::ptr::eq(self.context(), b.context()));
         assert_eq!(mapped[0].shape, a.distribution().shape);
@@ -1127,10 +1171,6 @@ where
             distribution.topology == mapped[0].topology
                 && distribution.topology.size() == self.context().size()
         }));
-        let metadata = LabelMetadata::new(
-            [a.distribution(), b.distribution(), self.distribution()],
-            [indices_a, indices_b, indices_c],
-        );
         let element_size = A::Element::WIDTH;
         let pair_size = 8 + element_size;
         let dense_virtual_size: usize = mapped[0].block_shape().iter().product();
@@ -1231,11 +1271,40 @@ where
         beta: A::Element,
         commutative: bool,
     ) {
+        self.contract_sparse_from_selected_with_metadata(None, indices_c, a, indices_a, b,
+            indices_b, selected, alpha, beta, commutative);
+    }
+
+    /// Same execution as [`Self::contract_sparse_from_selected`], for
+    /// `contract_sparse`, which already built the unfolded path's
+    /// [`LabelMetadata`] and passes it through to
+    /// [`Self::contract_sparse_from_mapped_with_metadata`] instead of having
+    /// it rebuilt there (audit finding C4). `metadata` is unused on the
+    /// folded path.
+    #[allow(clippy::too_many_arguments)]
+    fn contract_sparse_from_selected_with_metadata(
+        &mut self,
+        metadata: Option<&LabelMetadata>,
+        indices_c: &str,
+        a: &SparseTensor<'_, '_, A>,
+        indices_a: &str,
+        b: &Self,
+        indices_b: &str,
+        selected: &crate::sparse_search::Selected,
+        alpha: A::Element,
+        beta: A::Element,
+        commutative: bool,
+    ) {
         assert!(matches!(selected.pattern,
             crate::sparse_search::Pattern::SparseDenseDense { .. }));
         if selected.fold.is_none() {
-            self.contract_sparse_from_mapped(indices_c, a, indices_a, b, indices_b,
-                selected.distributions.clone(), alpha, beta, commutative);
+            match metadata {
+                Some(metadata) => self.contract_sparse_from_mapped_with_metadata(metadata,
+                    indices_c, a, indices_a, b, indices_b,
+                    selected.distributions.clone(), alpha, beta, commutative),
+                None => self.contract_sparse_from_mapped(indices_c, a, indices_a, b, indices_b,
+                    selected.distributions.clone(), alpha, beta, commutative),
+            }
             return;
         }
         assert!(std::ptr::eq(self.context(), a.context()));
