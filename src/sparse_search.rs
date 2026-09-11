@@ -15,7 +15,6 @@ pub enum Pattern {
     SparseDenseDense { coo_kernel: bool },
     SparseSparseDense,
     SparseSparseSparse,
-    SparseDenseSparse,
 }
 
 impl Pattern {
@@ -24,7 +23,6 @@ impl Pattern {
             Self::SparseDenseDense { .. } => [true, false, false],
             Self::SparseSparseDense => [true, true, false],
             Self::SparseSparseSparse => [true, true, true],
-            Self::SparseDenseSparse => [true, false, true],
         }
     }
 
