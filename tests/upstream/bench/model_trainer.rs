@@ -256,7 +256,7 @@ fn train_world(duration: f64, context: &Context<'_>, step_size: f64) {
         let started = Instant::now();
         let mut iterations = 0usize;
         let mut m = m0;
-        let mut elapsed = 0.0;
+        let mut elapsed;
         loop {
             if n < 80 {
                 train_ttm(n * m + 13, n, context);
@@ -275,7 +275,6 @@ fn train_world(duration: f64, context: &Context<'_>, step_size: f64) {
             break;
         }
         n = (n as f64 * step_size) as usize;
-        m += 3;
     }
 }
 
