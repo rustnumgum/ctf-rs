@@ -4,7 +4,7 @@
 //! CTF reference at f69cbb46e23bc2f39cda5722ce096f56301dab4f
 //! (`src/interface/matrix.cxx` and `src/shared/lapack_symbs.cxx`).
 use crate::algebra::Complex;
-use ::mpi::{ffi as sys, topology::Communicator, traits::AsRaw};
+use ::mpi::{ffi as sys, topology::Communicator};
 use std::{ffi::c_char, marker::PhantomData, rc::Rc};
 
 #[cfg_attr(any(target_os = "windows", target_os = "macos"), link(name = "scalapack"))]

@@ -6,7 +6,6 @@ use ::mpi::{
     ffi as sys,
     point_to_point::{send_receive_into_with_tags, send_receive_replace_into_with_tags},
     topology::{Color, Communicator, SimpleCommunicator},
-    traits::AsRaw,
 };
 #[path = "allgather.rs"]
 mod allgather;
