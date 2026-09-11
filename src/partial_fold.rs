@@ -178,6 +178,51 @@ pub fn select(
     models: &Models,
     virtual_copies: [usize; 3],
 ) -> Result<Outcome, Error> {
+    select_permutations(
+        local_shapes,
+        links,
+        indices,
+        models,
+        virtual_copies,
+        [1.; 3],
+        &[0, 1, 2, 3, 4, 5],
+        false,
+    )
+}
+
+/// Sparse `select_ctr_perm` considers only source permutation 1 (A,C,B).
+/// Sparse transpose estimates are scaled by the stored fractions before the
+/// selected third role receives the source's second output transpose charge.
+pub fn select_sparse(
+    local_shapes: [&[usize]; 3],
+    links: [&[Symmetry]; 3],
+    indices: [&str; 3],
+    models: &Models,
+    virtual_copies: [usize; 3],
+    fractions: [f64; 3],
+) -> Result<Outcome, Error> {
+    select_permutations(
+        local_shapes,
+        links,
+        indices,
+        models,
+        virtual_copies,
+        fractions,
+        &[1],
+        true,
+    )
+}
+
+fn select_permutations(
+    local_shapes: [&[usize]; 3],
+    links: [&[Symmetry]; 3],
+    indices: [&str; 3],
+    models: &Models,
+    virtual_copies: [usize; 3],
+    transpose_factors: [f64; 3],
+    permutations: &[usize],
+    sparse: bool,
+) -> Result<Outcome, Error> {
     let operands = [Operand::A, Operand::B, Operand::C];
     for operand in 0..3 {
         if local_shapes[operand].len() != indices[operand].len() {
@@ -188,7 +233,7 @@ pub fn select(
             });
         }
     }
-    let fold = fold_indices::select(indices, links, false, false)?;
+    let fold = fold_indices::select(indices, links, sparse, false)?;
     if fold.eligibility != fold_indices::Eligibility::Eligible {
         return Ok(Outcome::Ineligible(fold.eligibility));
     }
@@ -224,14 +269,15 @@ pub fn select(
 
     let mut selected = None;
     let mut selected_time = f64::MAX;
-    for permutation in 0..6 {
+    for &permutation in permutations {
         let orders = permutation_orders(&base_layouts, &inverse, permutation);
         let mut layouts = base_layouts.clone();
         for operand in 0..3 {
             layouts[operand].permute_folded(&orders[operand]);
         }
         let mut transpose_seconds = std::array::from_fn(|operand| {
-            virtual_copies[operand] as f64
+            transpose_factors[operand]
+                * virtual_copies[operand] as f64
                 * models.transpose(
                     &layouts[operand].group_lengths,
                     &layouts[operand].inner_ordering,

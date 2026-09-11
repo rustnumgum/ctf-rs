@@ -55,8 +55,17 @@ pub struct TotalEstimate {
 pub struct Plan {
     pub tree: Tree,
     fractions: Fractions,
+    tree_fractions: Fractions,
     storage: [Storage; 3],
+    fold: Option<FoldCost>,
     pub(crate) execution: Execution,
+}
+
+#[derive(Clone, Debug)]
+struct FoldCost {
+    transpose_seconds: [f64; 3],
+    resident_bytes: usize,
+    temporary_bytes: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -123,7 +132,11 @@ impl Tree {
 
 impl Plan {
     pub fn estimate(&self, models: &Models, layers: usize) -> Estimate {
-        self.tree.estimate(models, self.fractions, layers)
+        let mut estimate = self.tree.estimate(models, self.tree_fractions, layers);
+        if let Some(fold) = &self.fold {
+            estimate.seconds += fold.transpose_seconds.iter().sum::<f64>();
+        }
+        estimate
     }
 
     /// Unfolded `detail_estimate_mem_and_time`: changed input layouts remain
@@ -156,7 +169,11 @@ impl Plan {
                 )
             }
         });
-        let tree = self.estimate(models, layers);
+        let tree_only = self.tree.estimate(models, self.tree_fractions, layers);
+        let mut seconds = tree_only.seconds;
+        if let Some(fold) = &self.fold {
+            seconds += fold.transpose_seconds.iter().sum::<f64>();
+        }
         let changed = std::array::from_fn::<_, 3, _>(|operand| {
             !crate::redist_cost::same_mapping(old[operand], mapped[operand])
         });
@@ -171,11 +188,15 @@ impl Plan {
         }).sum::<usize>();
         let temporary = (0..3).filter(|&operand| changed[operand])
             .map(|operand| redistribution[operand].temporary_bytes).sum::<usize>();
+        let (fold_resident, fold_temporary) = self.fold.as_ref()
+            .map_or((0, 0), |fold| (fold.resident_bytes, fold.temporary_bytes));
         TotalEstimate {
-            seconds: tree.seconds + redistribution[0].seconds
+            seconds: seconds + redistribution[0].seconds
                 + redistribution[1].seconds + 2. * redistribution[2].seconds,
-            memory_bytes: resident + temporary.max(usize::try_from(tree.working_bytes).unwrap()),
-            tree,
+            memory_bytes: resident + temporary.max(
+                fold_temporary.max(fold_resident + usize::try_from(tree_only.working_bytes).unwrap())
+            ),
+            tree: tree_only,
             redistribution,
         }
     }
@@ -297,6 +318,103 @@ fn panel_virtual(first: &Mapping, second: &Mapping, steps: usize) -> usize {
     phase
 }
 
+fn folded_kind(storage: [bool; 3], coo_kernel: bool, custom: bool) -> Option<sparse_cost::local::Folded> {
+    match storage {
+        [true, false, false] if coo_kernel && !custom => Some(sparse_cost::local::Folded::CooDense),
+        [true, false, false] => Some(sparse_cost::local::Folded::CsrDense),
+        [true, true, false] => Some(sparse_cost::local::Folded::CsrSparseDense),
+        [true, true, true] => Some(sparse_cost::local::Folded::CsrSparse),
+        [true, false, true] => Some(sparse_cost::local::Folded::CcsrDense),
+        _ => None,
+    }
+}
+
+fn fold_cost(
+    mapped: [&Distribution; 3],
+    inputs: Inputs,
+    descriptor: &crate::partial_fold::Descriptor,
+    coo_kernel: bool,
+) -> (FoldCost, Fractions) {
+    let sparse = inputs.storage.map(|storage| storage.sparse);
+    let csr_or_coo = sparse[1] || sparse[2] || inputs.custom || !coo_kernel;
+    let use_ccsr = csr_or_coo && sparse == [true, false, true];
+    let original = [inputs.fractions.a, inputs.fractions.b, inputs.fractions.c];
+    let mut adjusted = original;
+    let mut resident = 0usize;
+    let mut temporary = 0usize;
+    let dimensions = [descriptor.m, descriptor.k, descriptor.m];
+    for operand in 0..2 {
+        let size = mapped[operand].local_len();
+        let storage = inputs.storage[operand];
+        if !storage.sparse {
+            resident += size * storage.element_size;
+            continue;
+        }
+        let bytes = if !csr_or_coo {
+            (original[operand] * size as f64 * (storage.element_size + 8) as f64) as usize
+        } else if use_ccsr {
+            let bytes = (original[operand] * size as f64 * (storage.element_size + 16) as f64) as usize;
+            adjusted[operand] *= (storage.element_size + 16) as f64 / storage.pair_size as f64;
+            bytes
+        } else {
+            let virtual_blocks: usize = mapped[operand].mappings.iter()
+                .map(|mapping| mapping.phase() / mapping.physical_phase()).product();
+            let bytes = (original[operand] * size as f64 * (storage.element_size + 4) as f64) as usize
+                + virtual_blocks * dimensions[operand] * 4;
+            adjusted[operand] = original[operand]
+                * (storage.element_size + 4) as f64 / storage.pair_size as f64
+                + (virtual_blocks * dimensions[operand] * 4) as f64
+                    / (storage.pair_size * size) as f64;
+            bytes
+        };
+        resident += bytes;
+        temporary = temporary.max(if !csr_or_coo {
+            resident
+        } else if use_ccsr {
+            resident + bytes
+        } else {
+            resident + (original[operand] * size as f64 * (storage.element_size + 8) as f64) as usize
+        });
+    }
+    let size = mapped[2].local_len();
+    let storage = inputs.storage[2];
+    if storage.sparse {
+        let (bytes, conversion) = if !csr_or_coo {
+            ((original[2] * size as f64 * (storage.element_size + 8) as f64) as usize, 0)
+        } else if use_ccsr {
+            let bytes = (original[2] * size as f64 * (storage.element_size + 16) as f64) as usize;
+            adjusted[2] *= (storage.element_size + 16) as f64 / storage.pair_size as f64;
+            (bytes, bytes)
+        } else {
+            let virtual_blocks: usize = mapped[2].mappings.iter()
+                .map(|mapping| mapping.phase() / mapping.physical_phase()).product();
+            let bytes = (original[2] * size as f64 * (storage.element_size + 4) as f64) as usize
+                + virtual_blocks * descriptor.m * 4;
+            adjusted[2] = original[2]
+                * (storage.element_size + 4) as f64 / storage.pair_size as f64
+                + (virtual_blocks * descriptor.m * 4) as f64
+                    / (storage.pair_size * size) as f64;
+            let conversion = (original[2] * size as f64 * (storage.element_size + 8) as f64) as usize;
+            (bytes, conversion)
+        };
+        resident += bytes;
+        temporary = temporary.max(resident);
+        temporary = temporary.max(
+            bytes + conversion + (original[2] * size as f64 * storage.pair_size as f64) as usize
+        );
+    } else {
+        resident += size * storage.element_size;
+    }
+    (
+        FoldCost {
+            transpose_seconds: descriptor.transpose_seconds,
+            resident_bytes: resident,
+            temporary_bytes: temporary,
+        },
+        Fractions { a: adjusted[0], b: adjusted[1], c: adjusted[2] },
+    )
+}
+
 /// Build source's non-folded sparse tree. This is the outer/general k0 path;
 /// folded k1--k5 selection needs fold metadata and is deliberately separate.
 pub fn build_unfolded(
@@ -304,7 +422,21 @@ pub fn build_unfolded(
     indices: [&str; 3],
     inputs: Inputs,
 ) -> Result<Plan, Unsupported> {
-    if inputs.storage.map(|storage| storage.sparse) != [true, false, false] {
+    build(mapped, indices, inputs, None, false)
+}
+
+pub fn build(
+    mapped: [&Distribution; 3],
+    indices: [&str; 3],
+    inputs: Inputs,
+    fold: Option<&crate::partial_fold::Descriptor>,
+    coo_kernel: bool,
+) -> Result<Plan, Unsupported> {
+    let sparse = inputs.storage.map(|storage| storage.sparse);
+    if fold.is_none() && sparse != [true, false, false] {
+        return Err(Unsupported::Storage);
+    }
+    if fold.is_some() && folded_kind(sparse, coo_kernel, inputs.custom).is_none() {
         return Err(Unsupported::Storage);
     }
     let topology = &mapped[0].topology;
@@ -490,13 +622,38 @@ pub fn build_unfolded(
             }
         }
     }
-    let fractions = [inputs.fractions.a, inputs.fractions.b, inputs.fractions.c];
-    let local = sparse_cost::local::Local {
-        kernel: sparse_cost::local::Kernel::General {
+    let (fold_cost, tree_fractions) = if let Some(descriptor) = fold {
+        let (cost, adjusted) = fold_cost(mapped, inputs, descriptor, coo_kernel);
+        (Some(cost), adjusted)
+    } else {
+        (None, inputs.fractions)
+    };
+    let fractions = [tree_fractions.a, tree_fractions.b, tree_fractions.c];
+    let kernel = if let Some(descriptor) = fold {
+        sparse_cost::local::Kernel::Folded {
+            kind: folded_kind(sparse, coo_kernel, inputs.custom).unwrap(),
+            m: descriptor.m,
+            n: descriptor.n,
+            k: descriptor.k,
+        }
+    } else {
+        sparse_cost::local::Kernel::General {
             extents: extents.into_iter().map(Option::unwrap).collect(),
-        },
+        }
+    };
+    let packed_elements = if let Some(descriptor) = fold {
+        std::array::from_fn(|operand| {
+            let layout = &descriptor.layouts[operand];
+            layout.inner_ordering[layout.folded_shape.len()..].iter()
+                .map(|&group| layout.group_lengths[group]).product()
+        })
+    } else {
+        block_shapes.each_ref().map(|shape| shape.iter().product())
+    };
+    let local = sparse_cost::local::Local {
+        kernel,
         custom: inputs.custom,
-        packed_elements: block_shapes.each_ref().map(|shape| shape.iter().product()),
+        packed_elements,
         element_bytes: inputs.storage.map(|storage| storage.element_size),
         sparse: inputs.storage.map(|storage| storage.sparse),
         nnz_fraction: fractions,
@@ -518,16 +675,22 @@ pub fn build_unfolded(
         }, Box::new(tree));
     }
     if topology.size() > 1 {
-        tree = Tree::Pin(sparse_cost::KeyPinning {
-            operand: Operand::A,
-            dense_block_size: mapped[0].local_len(),
-            pair_sizes: inputs.storage.map(|storage| storage.pair_size),
-        }, Box::new(tree));
+        for operand in (0..3).rev() {
+            if inputs.storage[operand].sparse {
+                tree = Tree::Pin(sparse_cost::KeyPinning {
+                    operand: [Operand::A, Operand::B, Operand::C][operand],
+                    dense_block_size: mapped[operand].local_len(),
+                    pair_sizes: inputs.storage.map(|storage| storage.pair_size),
+                }, Box::new(tree));
+            }
+        }
     }
     Ok(Plan {
         tree,
         fractions: inputs.fractions,
+        tree_fractions,
         storage: inputs.storage,
+        fold: fold_cost,
         execution: Execution {
             replication_axes,
             panels: execution_panels,

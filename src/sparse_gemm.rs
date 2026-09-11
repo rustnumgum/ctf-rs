@@ -8,7 +8,7 @@ use crate::{algebra::{Semiring, Wire}, context::Context,
     symmetry::Symmetry, tensor::Tensor};
 
 #[path = "sparse_gemm_kernel.rs"]
-mod kernel;
+pub(super) mod kernel;
 
 struct Layout {
     shape: [usize; 3],
