@@ -115,7 +115,21 @@ if [[ -s "$build_json" ]]; then
   while IFS=$'\t' read -r name exe; do
     exe_names+=("$name")
     exe_paths+=("$exe")
-  done < <(jq -r 'select(.reason=="compiler-artifact" and .profile.test==true and .executable!=null) | [.target.name, .executable] | @tsv' "$build_json")
+  done < <(python3 -c '
+import json, sys
+with open(sys.argv[1]) as fh:
+    for line in fh:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except ValueError:
+            continue
+        profile = msg.get("profile") or {}
+        if msg.get("reason") == "compiler-artifact" and profile.get("test") is True and msg.get("executable"):
+            print(msg["target"]["name"] + "\t" + msg["executable"])
+' "$build_json")
 fi
 
 exe_for() {
